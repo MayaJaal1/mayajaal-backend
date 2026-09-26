@@ -14,29 +14,35 @@ app.listen(PORT, () => {
   console.log(`Server is listening on port ${PORT}`);
 });
 
-// 2. Telegram Bot Configuration & Initialization (Pehle yeh hoga)
+// 2. Telegram Bot Configuration & Initialization
 const TOKEN = '8697090840:AAHuAlkm2mmbHx_pCtu9ZDy5kfpVtvVQ8ZA';
 const BACKEND_URL = 'https://mayajaal-backend-git-main-ajayr0201-9102.vercel.app';
 const STORAGE_CHANNEL = '@maya_jaal1';
 
 const bot = new TelegramBot(TOKEN, { polling: true });
 
-// 3. /start Command Handling
+// 3. /start Command Handling (Branded Welcome Message)
 bot.onText(/\/start/, async (msg) => {
   const chatId = msg.chat.id;
   const telegramId = msg.from.id.toString();
   const firstName = msg.from.first_name || 'User';
 
   try {
-    const response = await axios.get(`${BACKEND_URL}/?id=${telegramId}&name=${encodeURIComponent(firstName)}`);
-    bot.sendMessage(chatId, `Namaste ${firstName}! MayaJaal me aapka swagat hai.\n\nAapka account successfully connect ho gaya hai!`);
+    await axios.get(`${BACKEND_URL}/?id=${telegramId}&name=${encodeURIComponent(firstName)}`);
+    
+    const welcomeText = `🎬 **Welcome to MayaJaal, ${firstName}!**\n\n` +
+      `⚡ Your personal high-speed streaming portal is now successfully linked.\n\n` +
+      `📂 **How to use:**\n` +
+      `Simply send any Video, Movie, or Document here, and MayaJaal will instantly generate a direct streaming link for your app!`;
+
+    bot.sendMessage(chatId, welcomeText, { parse_mode: 'Markdown' });
   } catch (error) {
     console.error(error);
-    bot.sendMessage(chatId, "Backend se connect karne me kuch samasya aayi hai.");
+    bot.sendMessage(chatId, "⚠️ MayaJaal server connection error. Please try again later.");
   }
 });
 
-// 4. File, Video, Photo Message Handling & Link Generation
+// 4. File, Video, Photo Message Handling & Branded Link Generation
 bot.on('message', async (msg) => {
   const chatId = msg.chat.id;
 
@@ -50,21 +56,29 @@ bot.on('message', async (msg) => {
     try {
       const fileName = file.file_name || msg.caption || 'MayaJaal_Media_File';
 
-      // File ko private storage channel par forward karo
-      const forwardedMsg = await bot.forwardMessage(STORAGE_CHANNEL, chatId, msg.message_id);
+      // Send a processing notice
+      const processingMsg = await bot.sendMessage(chatId, "🔄 *Processing your media through MayaJaal core...*", { parse_mode: 'Markdown' });
 
-      // Storage channel ki message ID nikal lo
+      // Forward file to private storage channel
+      const forwardedMsg = await bot.forwardMessage(STORAGE_CHANNEL, chatId, msg.message_id);
       const fileMessageId = forwardedMsg.message_id;
 
-      // Android app ke liye streaming/access link generate karo
+      // Generate App Deep Link / Stream Link
       const accessLink = `${BACKEND_URL}/stream?msgId=${fileMessageId}`;
 
-      // User ko link wapas bhejo
-      bot.sendMessage(chatId, `✅ File successfully upload ho gayi hai!\n\n📁 **File Name:** ${fileName}\n\n🔗 **Aapka Streaming Link:**\n\`${accessLink}\``, { parse_mode: 'Markdown' });
+      // Delete processing notice and send final branded success box
+      await bot.deleteMessage(chatId, processingMsg.message_id);
+
+      const successText = `✨ **MayaJaal Media Link Generated!** ✨\n\n` +
+        `📌 **File:** ${fileName}\n\n` +
+        `🔗 **Stream Link:**\n\`${accessLink}\`\n\n` +
+        `💡 *Click the link above to stream directly inside your MayaJaal app!*`;
+
+      bot.sendMessage(chatId, successText, { parse_mode: 'Markdown' });
 
     } catch (error) {
       console.error("File forwarding error:", error);
-      bot.sendMessage(chatId, "File upload karne mein kuch samasya aayi. Kripya dobara koshish karein.");
+      bot.sendMessage(chatId, "❌ Failed to process media. Please ensure the bot is an Admin in your storage channel.");
     }
   }
 });
