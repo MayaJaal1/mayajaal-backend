@@ -4,7 +4,7 @@ const app = express();
 
 const TOKEN = '8697090840:AAHuAlkm2mmbHx_pCtu9ZDy5kfpVtvVQ8ZA';
 const STORAGE_CHANNEL = '@maya_jaal1'; 
-const LOG_CHAT_ID = '7728273125'; // Aapki apni Telegram Chat ID
+const LOG_CHAT_ID = '7728273125'; // Aapki Telegram Chat ID
 
 app.get('/', (req, res) => {
   res.send('MayaJaal Backend is live and running!');
@@ -48,4 +48,5 @@ app.get('/stream', async (req, res) => {
   }
 });
 
-module.5 = app; // ( ya module.exports = app; )
+// Yahan module.exports hona chahiye
+module.exports = app;
