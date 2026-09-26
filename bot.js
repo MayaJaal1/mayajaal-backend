@@ -42,7 +42,7 @@ bot.onText(/\/start/, async (msg) => {
   }
 });
 
-// 4. File, Video, Photo Message Handling & Branded Link Generation
+// 4. File, Video, Photo Message Handling & Clickable Link Generation
 bot.on('message', async (msg) => {
   const chatId = msg.chat.id;
 
@@ -66,12 +66,12 @@ bot.on('message', async (msg) => {
       // Generate App Deep Link / Stream Link
       const accessLink = `${BACKEND_URL}/stream?msgId=${fileMessageId}`;
 
-      // Delete processing notice and send final branded success box
+      // Delete processing notice and send final clickable link success box
       await bot.deleteMessage(chatId, processingMsg.message_id);
 
       const successText = `✨ **MayaJaal Media Link Generated!** ✨\n\n` +
         `📌 **File:** ${fileName}\n\n` +
-        `🔗 **Stream Link:**\n\`${accessLink}\`\n\n` +
+        `🔗 **Stream Link:**\n${accessLink}\n\n` +
         `💡 *Click the link above to stream directly inside your MayaJaal app!*`;
 
       bot.sendMessage(chatId, successText, { parse_mode: 'Markdown' });
