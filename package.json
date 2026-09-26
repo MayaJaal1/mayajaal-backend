@@ -1,12 +1,13 @@
 {
-  "name": "mayajaal-backend",
+  "name": "mayajaal",
   "version": "1.0.0",
-  "description": "MayaJaal Telegram Bot Backend",
-  "main": "index.js",
+  "description": "MayaJaal Telegram Bot",
+  "main": "bot.js",
   "scripts": {
-    "start": "node index.js"
+    "start": "node bot.js"
   },
   "dependencies": {
-    "express": "^4.19.2"
+    "axios": "^1.6.8",
+    "node-telegram-bot-api": "^0.66.0"
   }
 }
