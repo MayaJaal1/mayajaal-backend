@@ -21,14 +21,28 @@ app.get('/stream', async (req, res) => {
   }
 
   try {
-    // Telegram API se message ki details nikalna
-    const telegramUrl = `https://api.telegram.org/bot${TOKEN}/forwardMessage`;
-    
-    // Ham storage channel ya log chat se file fetch karne ke liye direct stream URL banate hain
-    // Telegram file link direct fetch karne ke liye getFile API use hoti hai
-    // Par sabse asaan tarika yeh hai ki hum HTML5 video player me direct stream URL pass karein
-    
-    // Yahan hum ek responsive HTML5 video player page return kar rahe hain
+    // 1. Telegram channel se message forward karke file_id nikalna
+    const forwardResponse = await axios.post(`https://api.telegram.org/bot${TOKEN}/forwardMessage`, {
+      chat_id: LOG_CHAT_ID,
+      from_chat_id: LOG_CHAT_ID,
+      message_id: Number(msgId)
+    });
+
+    const messageData = forwardResponse.data.result;
+    const media = messageData.video || messageData.document || messageData.audio;
+
+    if (!media) {
+      return res.status(404).send('<h3>Error: Media file not found in this message.</h3>');
+    }
+
+    const fileId = media.file_id;
+
+    // 2. Telegram se file ka direct download/stream path lena
+    const fileResponse = await axios.get(`https://api.telegram.org/bot${TOKEN}/getFile?file_id=${fileId}`);
+    const filePath = fileResponse.data.result.file_path;
+    const directVideoUrl = `https://api.telegram.org/file/bot${TOKEN}/${filePath}`;
+
+    // 3. HTML5 Video Player Page return karna jo app ke WebView me chalega
     const htmlResponse = `
       <!DOCTYPE html>
       <html lang="en">
@@ -44,20 +58,20 @@ app.get('/stream', async (req, res) => {
                   justify-content: center;
                   align-items: center;
                   height: 100vh;
-                  color: #fff;
-                  font-family: sans-serif;
               }
               video {
                   width: 100%;
                   height: 100%;
                   max-height: 100vh;
+                  outline: none;
               }
           </style>
       </head>
       <body>
-          <div style="text-align: center;">
-              <p>Loading MayaJaal Secure Stream for ID: ${msgId}...</p>
-          </div>
+          <video controls autoplay playsinline>
+              <source src="${directVideoUrl}" type="video/mp4">
+              Your browser does not support the video tag.
+          </video>
       </body>
       </html>
     `;
@@ -65,8 +79,8 @@ app.get('/stream', async (req, res) => {
     res.send(htmlResponse);
 
   } catch (error) {
-    console.error('Streaming error:', error);
-    res.status(500).send('<h3>Error loading media stream from Telegram.</h3>');
+    console.error('Streaming error:', error.response?.data || error.message);
+    res.status(500).send('<h3>Error loading media stream from Telegram. Please check msgId.</h3>');
   }
 });
 
