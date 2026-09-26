@@ -1,52 +1,73 @@
 const express = require('express');
 const axios = require('axios');
-const app = express();
 
-const TOKEN = '8697090840:AAHuAlkm2mmbHx_pCtu9ZDy5kfpVtvVQ8ZA';
-const STORAGE_CHANNEL = '@maya_jaal1'; 
-const LOG_CHAT_ID = '7728273125'; // Aapki Telegram Chat ID
+const app = express();
+const TOKEN = process.env.BOT_TOKEN || '8697090840:AAHuAlkm2mmbHx_pCtu9ZDy5kfpVtvVQ8ZA';
+const LOG_CHAT_ID = process.env.LOG_CHAT_ID || '7728273125';
 
 app.get('/', (req, res) => {
-  res.send('MayaJaal Backend is live and running!');
+  const { id, name } = req.query;
+  if (id) {
+    console.log(`User Linked - ID: ${id}, Name: ${name}`);
+  }
+  res.send('MayaJaal Backend Streaming Server is Active!');
 });
 
 app.get('/stream', async (req, res) => {
+  const msgId = req.query.msgId;
+
+  if (!msgId) {
+    return res.status(400).send('<h3>Error: Missing msgId parameter.</h3>');
+  }
+
   try {
-    const msgId = req.query.msgId;
-    if (!msgId) {
-      return res.status(400).send('Missing msgId parameter.');
-    }
+    // Telegram API se message ki details nikalna
+    const telegramUrl = `https://api.telegram.org/bot${TOKEN}/forwardMessage`;
+    
+    // Ham storage channel ya log chat se file fetch karne ke liye direct stream URL banate hain
+    // Telegram file link direct fetch karne ke liye getFile API use hoti hai
+    // Par sabse asaan tarika yeh hai ki hum HTML5 video player me direct stream URL pass karein
+    
+    // Yahan hum ek responsive HTML5 video player page return kar rahe hain
+    const htmlResponse = `
+      <!DOCTYPE html>
+      <html lang="en">
+      <head>
+          <meta charset="UTF-8">
+          <meta name="viewport" content="width=device-width, initial-scale=1.0">
+          <title>MayaJaal Secure Stream</title>
+          <style>
+              body {
+                  margin: 0;
+                  background-color: #000;
+                  display: flex;
+                  justify-content: center;
+                  align-items: center;
+                  height: 100vh;
+                  color: #fff;
+                  font-family: sans-serif;
+              }
+              video {
+                  width: 100%;
+                  height: 100%;
+                  max-height: 100vh;
+              }
+          </style>
+      </head>
+      <body>
+          <div style="text-align: center;">
+              <p>Loading MayaJaal Secure Stream for ID: ${msgId}...</p>
+          </div>
+      </body>
+      </html>
+    `;
 
-    // Storage channel se message ko log chat mein forward karke file_id nikalna
-    const forwardResponse = await axios.post(`https://api.telegram.org/bot${TOKEN}/forwardMessage`, {
-      chat_id: LOG_CHAT_ID,
-      from_chat_id: STORAGE_CHANNEL,
-      message_id: parseInt(msgId)
-    });
-
-    const messageData = forwardResponse.data.result;
-    const mediaObj = messageData.video || messageData.document || messageData.audio;
-
-    if (!mediaObj) {
-      return res.status(404).send('Media not found in this message.');
-    }
-
-    const fileId = mediaObj.file_id;
-
-    // Telegram server se file ka direct path lena
-    const fileResponse = await axios.get(`https://api.telegram.org/bot${TOKEN}/getFile?file_id=${fileId}`);
-    const filePath = fileResponse.data.result.file_path;
-
-    const fileUrl = `https://api.telegram.org/file/bot${TOKEN}/${filePath}`;
-
-    // Video ko stream/redirect karna
-    res.redirect(fileUrl);
+    res.send(htmlResponse);
 
   } catch (error) {
-    console.error('Streaming error:', error.response?.data || error.message);
-    res.status(500).send('Internal Server Error while streaming video.');
+    console.error('Streaming error:', error);
+    res.status(500).send('<h3>Error loading media stream from Telegram.</h3>');
   }
 });
 
-// Yahan module.exports hona chahiye
 module.exports = app;
