@@ -4,8 +4,8 @@ const axios = require('axios');
 // Aapka Telegram Bot Token
 const TOKEN = '8697090840:AAHuAlkm2mmbHx_pCtu9ZDy5kfpVtvVQ8ZA';
 
-// Yahan apna Vercel wala live URL daal dein (jaise https://mayajaal-backend.vercel.app)
-const BACKEND_URL = 'APNA_VERCEL_BACKEND_URL_YAHAN_DAALEIN';
+// Aapka Vercel backend URL yahan set kar diya gaya hai
+const BACKEND_URL = 'https://mayajaal-backend-git-main-ajayr0201-9102.vercel.app';
 
 const bot = new TelegramBot(TOKEN, { polling: true });
 
