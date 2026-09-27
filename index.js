@@ -5,7 +5,7 @@ const app = express();
 app.use(express.json());
 
 const TOKEN = process.env.BOT_TOKEN || '8697090840:AAHuAlkm2mmbHx_pCtu9ZDy5kfpVtvVQ8ZA';
-const VERCEL_URL = process.env.VERCEL_URL || 'https://live-score-website-alpha.vercel.app';
+const VERCEL_URL = process.env.VERCEL_URL || 'https://mayajaal-backend-git-main-ajayr0201-9102.vercel.app';
 
 app.get('/', (req, res) => {
   res.send('MayaJaal Backend Streaming Server is Active!');
@@ -48,12 +48,30 @@ app.post('/webhook', async (req, res) => {
   }
 });
 
-// Streaming Page Route
+// Streaming Page Route with Missing fileId handling
 app.get('/stream', async (req, res) => {
   const fileId = req.query.fileId;
 
   if (!fileId) {
-    return res.status(400).send('<h3>Error: Missing fileId parameter.</h3>');
+    return res.send(`
+      <!DOCTYPE html>
+      <html lang="en">
+      <head>
+          <meta charset="UTF-8">
+          <meta name="viewport" content="width=device-width, initial-scale=1.0">
+          <title>MayaJaal Stream</title>
+          <style>
+              body { margin: 0; background-color: #000; color: #fff; display: flex; justify-content: center; align-items: center; height: 100vh; font-family: sans-serif; text-align: center; }
+          </style>
+      </head>
+      <body>
+          <div>
+              <h2>🎬 MayaJaal Secure Stream</h2>
+              <p>Please open a valid video link generated from your Telegram Bot.</p>
+          </div>
+      </body>
+      </html>
+    `);
   }
 
   try {
