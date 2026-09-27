@@ -5,13 +5,13 @@ const app = express();
 app.use(express.json());
 
 const TOKEN = process.env.BOT_TOKEN || '8697090840:AAHuAlkm2mmbHx_pCtu9ZDy5kfpVtvVQ8ZA';
-const RENDER_URL = process.env.RENDER_URL || 'https://live-score-website-alpha.vercel.app';
+const VERCEL_URL = process.env.VERCEL_URL || 'https://live-score-website-alpha.vercel.app';
 
 app.get('/', (req, res) => {
   res.send('MayaJaal Backend Streaming Server is Active!');
 });
 
-// Telegram Webhook
+// Telegram Webhook Endpoint
 app.post('/webhook', async (req, res) => {
   try {
     const update = req.body;
@@ -23,18 +23,18 @@ app.post('/webhook', async (req, res) => {
       if (text && text.startsWith('/start')) {
         await axios.post(`https://api.telegram.org/bot${TOKEN}/sendMessage`, {
           chat_id: chatId,
-          text: 'Welcome to MayaJaal! 🎬\n\nSend any video or file here, and I will instantly give you a streaming link for your app!'
+          text: 'Welcome to MayaJaal! 🎬\n\nSend any video or file here, and I will instantly give you a direct streaming link for your app!'
         });
       } 
       else {
         const media = update.message.video || update.message.document || update.message.audio;
         if (media) {
           const fileId = media.file_id;
-          const streamLink = `${RENDER_URL}/stream?fileId=${encodeURIComponent(fileId)}`;
+          const streamLink = `${VERCEL_URL}/stream?fileId=${encodeURIComponent(fileId)}`;
           
           await axios.post(`https://api.telegram.org/bot${TOKEN}/sendMessage`, {
             chat_id: chatId,
-            text: `✅ File processed successfully!\n\n🔗 Watch Link:\n${streamLink}`,
+            text: `✅ File processed successfully!\n\n🔗 Click to watch in App:\n${streamLink}`,
             disable_web_page_preview: true
           });
         }
@@ -48,7 +48,7 @@ app.post('/webhook', async (req, res) => {
   }
 });
 
-// Real Streaming Route using direct fileId
+// Streaming Page Route
 app.get('/stream', async (req, res) => {
   const fileId = req.query.fileId;
 
@@ -57,12 +57,10 @@ app.get('/stream', async (req, res) => {
   }
 
   try {
-    // Telegram se seedha file_path nikalna
     const fileResponse = await axios.get(`https://api.telegram.org/bot${TOKEN}/getFile?file_id=${fileId}`);
     const filePath = fileResponse.data.result.file_path;
     const directVideoUrl = `https://api.telegram.org/file/bot${TOKEN}/${filePath}`;
 
-    // HTML5 Video Player render karna jo app ke WebView me chalega
     const htmlResponse = `
       <!DOCTYPE html>
       <html lang="en">
