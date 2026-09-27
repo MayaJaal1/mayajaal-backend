@@ -11,9 +11,8 @@ app.get('/', (req, res) => {
   res.send('MayaJaal Backend Streaming Server is Active!');
 });
 
-// Telegram Webhook Endpoint (No Force Subscription, Fast & Smooth)
+// Telegram Webhook Endpoint
 app.post('/webhook', async (req, res) => {
-  // Telegram ko turant OK bhej do taaki bot slow na ho
   res.status(200).send('OK');
 
   try {
@@ -25,17 +24,19 @@ app.post('/webhook', async (req, res) => {
       if (text && text.startsWith('/start')) {
         await axios.post(`https://api.telegram.org/bot${TOKEN}/sendMessage`, {
           chat_id: chatId,
-          text: 'Welcome to MayaJaal! 🎬\n\nAb koi bhi video yahan bhejo, main turant aapko direct streaming link de dunga!'
+          text: 'Welcome to MayaJaal! 🎬\n\nAb koi bhi video yahan bhejo, main turant aapko app ka direct link de dunga!'
         });
       } else {
         const media = update.message.video || update.message.document || update.message.audio;
         if (media) {
           const fileId = media.file_id;
           const streamLink = `${VERCEL_URL}/stream?fileId=${encodeURIComponent(fileId)}`;
+          // App ke liye deep link format
+          const deepLink = `mayajaall://?url=${encodeURIComponent(streamLink)}`;
           
           await axios.post(`https://api.telegram.org/bot${TOKEN}/sendMessage`, {
             chat_id: chatId,
-            text: `✅ File processed successfully!\n\n🔗 Click to watch in App:\n${streamLink}`,
+            text: `✅ File processed successfully!\n\n🔗 Click below to watch in MayaJaal App:\n${deepLink}\n\n(Agar app install nahi hai toh pehle website link use karein)`,
             disable_web_page_preview: true
           });
         }
