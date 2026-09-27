@@ -24,19 +24,17 @@ app.post('/webhook', async (req, res) => {
       if (text && text.startsWith('/start')) {
         await axios.post(`https://api.telegram.org/bot${TOKEN}/sendMessage`, {
           chat_id: chatId,
-          text: 'Welcome to MayaJaal! 🎬\n\nAb koi bhi video yahan bhejo, main turant aapko app ka direct link de dunga!'
+          text: 'Welcome to MayaJaal! 🎬\n\nAb koi bhi video yahan bhejo, main turant aapko direct streaming link de dunga!'
         });
       } else {
         const media = update.message.video || update.message.document || update.message.audio;
         if (media) {
           const fileId = media.file_id;
           const streamLink = `${VERCEL_URL}/stream?fileId=${encodeURIComponent(fileId)}`;
-          // App ke liye deep link format
-          const deepLink = `mayajaall://?url=${encodeURIComponent(streamLink)}`;
           
           await axios.post(`https://api.telegram.org/bot${TOKEN}/sendMessage`, {
             chat_id: chatId,
-            text: `✅ File processed successfully!\n\n🔗 Click below to watch in MayaJaal App:\n${deepLink}\n\n(Agar app install nahi hai toh pehle website link use karein)`,
+            text: `✅ File processed successfully!\n\n🔗 Click to watch or copy link for App:\n${streamLink}`,
             disable_web_page_preview: true
           });
         }
@@ -47,7 +45,7 @@ app.post('/webhook', async (req, res) => {
   }
 });
 
-// Streaming Page Route
+// Streaming Page Route with Video Player
 app.get('/stream', async (req, res) => {
   const fileId = req.query.fileId;
 
