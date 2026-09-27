@@ -11,7 +11,7 @@ app.get('/', (req, res) => {
   res.send('MayaJaal Backend Streaming Server is Active!');
 });
 
-// Telegram Webhook Endpoint
+// Telegram Webhook Endpoint with Inline Button
 app.post('/webhook', async (req, res) => {
   res.status(200).send('OK');
 
@@ -24,7 +24,7 @@ app.post('/webhook', async (req, res) => {
       if (text && text.startsWith('/start')) {
         await axios.post(`https://api.telegram.org/bot${TOKEN}/sendMessage`, {
           chat_id: chatId,
-          text: 'Welcome to MayaJaal! 🎬\n\nAb koi bhi video yahan bhejo, main turant aapko direct streaming link de dunga!'
+          text: 'Welcome to MayaJaal! 🎬\n\nAb koi bhi video yahan bhejo, main turant aapko direct watch button de dunga!'
         });
       } else {
         const media = update.message.video || update.message.document || update.message.audio;
@@ -32,10 +32,20 @@ app.post('/webhook', async (req, res) => {
           const fileId = media.file_id;
           const streamLink = `${VERCEL_URL}/stream?fileId=${encodeURIComponent(fileId)}`;
           
+          // Send message with an Inline Keyboard Button
           await axios.post(`https://api.telegram.org/bot${TOKEN}/sendMessage`, {
             chat_id: chatId,
-            text: `✅ File processed successfully!\n\n🔗 Click to watch or copy link for App:\n${streamLink}`,
-            disable_web_page_preview: true
+            text: '✅ File processed successfully! Click below to watch:',
+            reply_markup: {
+              inline_keyboard: [
+                [
+                  {
+                    text: '▶ Watch Video Now',
+                    url: streamLink
+                  }
+                ]
+              ]
+            }
           });
         }
       }
