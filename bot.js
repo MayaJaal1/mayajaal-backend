@@ -15,7 +15,7 @@ app.listen(PORT, () => {
 });
 
 // 2. Telegram Bot Configuration & Initialization
-const TOKEN = '8697090840:AAHuAlkm2mmbHx_pCtu9ZDy5kfpVtvVQ8ZA';
+const TOKEN = '8697090840:AAEqN02nnWDOeajoR5DEm2EZtR9twopwojI';
 const BACKEND_URL = 'https://mayajaal-backend-git-main-ajayr0201-9102.vercel.app';
 const STORAGE_CHANNEL = '@maya_jaal1';
 
