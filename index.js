@@ -11,11 +11,13 @@ app.get('/', (req, res) => {
   res.send('MayaJaal Backend Streaming Server is Active!');
 });
 
-// Telegram Webhook Endpoint
+// Telegram Webhook Endpoint (No Force Subscription, Fast & Smooth)
 app.post('/webhook', async (req, res) => {
+  // Telegram ko turant OK bhej do taaki bot slow na ho
+  res.status(200).send('OK');
+
   try {
     const update = req.body;
-
     if (update && update.message) {
       const chatId = update.message.chat.id;
       const text = update.message.text;
@@ -23,10 +25,9 @@ app.post('/webhook', async (req, res) => {
       if (text && text.startsWith('/start')) {
         await axios.post(`https://api.telegram.org/bot${TOKEN}/sendMessage`, {
           chat_id: chatId,
-          text: 'Welcome to MayaJaal! 🎬\n\nSend any video or file here, and I will instantly give you a direct streaming link for your app!'
+          text: 'Welcome to MayaJaal! 🎬\n\nAb koi bhi video yahan bhejo, main turant aapko direct streaming link de dunga!'
         });
-      } 
-      else {
+      } else {
         const media = update.message.video || update.message.document || update.message.audio;
         if (media) {
           const fileId = media.file_id;
@@ -40,15 +41,12 @@ app.post('/webhook', async (req, res) => {
         }
       }
     }
-
-    res.status(200).send('OK');
   } catch (error) {
     console.error('Webhook error:', error.message);
-    res.status(500).send('Error processing update');
   }
 });
 
-// Streaming Page Route with Missing fileId handling
+// Streaming Page Route
 app.get('/stream', async (req, res) => {
   const fileId = req.query.fileId;
 
@@ -87,20 +85,8 @@ app.get('/stream', async (req, res) => {
           <meta name="viewport" content="width=device-width, initial-scale=1.0">
           <title>MayaJaal Secure Stream</title>
           <style>
-              body {
-                  margin: 0;
-                  background-color: #000;
-                  display: flex;
-                  justify-content: center;
-                  align-items: center;
-                  height: 100vh;
-              }
-              video {
-                  width: 100%;
-                  height: 100%;
-                  max-height: 100vh;
-                  outline: none;
-              }
+              body { margin: 0; background-color: #000; display: flex; justify-content: center; align-items: center; height: 100vh; }
+              video { width: 100%; height: 100%; max-height: 100vh; outline: none; }
           </style>
       </head>
       <body>
@@ -113,9 +99,8 @@ app.get('/stream', async (req, res) => {
     `;
 
     res.send(htmlResponse);
-
   } catch (error) {
-    console.error('Streaming error:', error.response?.data || error.message);
+    console.error('Streaming error:', error.message);
     res.status(500).send('<h3>Error loading media stream from Telegram.</h3>');
   }
 });
