@@ -14,7 +14,7 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 
 const linkStore = new Map();
-const LINK_TTL_MS = 24 * 60 * 60 * 1000; // 24h
+const LINK_TTL_MS = 24 * 60 * 60 * 1000;
 
 const BASE_URL = process.env.RAILWAY_PUBLIC_DOMAIN
   ? `https://${process.env.RAILWAY_PUBLIC_DOMAIN}`
@@ -80,10 +80,10 @@ const s3 = new S3Client({
 });
 
 // ═══════════════════════════════════════════
-// 4. USER SETTINGS STORE
+// 4. USER SETTINGS
 // ═══════════════════════════════════════════
 const userSettings = new Map();
-// chatId -> { apiToken, header, footer, bold }
+// chatId -> { apiToken, header, footer, bold, enableText }
 
 function getUser(chatId) {
   if (!userSettings.has(chatId)) {
@@ -92,6 +92,7 @@ function getUser(chatId) {
       header: null,
       footer: null,
       bold: false,
+      enableText: true,
     });
   }
   return userSettings.get(chatId);
@@ -120,7 +121,6 @@ function createShortLink(signedUrl) {
   return `${BASE_URL}/v/${id}`;
 }
 
-// Expired links cleanup
 setInterval(() => {
   const now = Date.now();
   let removed = 0;
@@ -134,30 +134,58 @@ setInterval(() => {
 }, 10 * 60 * 1000);
 
 // ═══════════════════════════════════════════
-// 7. WELCOME MESSAGE
+// 7. SET BOT COMMANDS (— "/" menu)
+// ═══════════════════════════════════════════
+async function setupBotCommands() {
+  const commands = [
+    { command: 'start', description: 'Get started & view all commands' },
+    { command: 'api', description: 'Link your MayaJaal account' },
+    { command: 'add_header', description: 'Add text above your links' },
+    { command: 'remove_header', description: 'Remove header text' },
+    { command: 'add_footer', description: 'Add text below your links' },
+    { command: 'remove_footer', description: 'Remove footer text' },
+    { command: 'enable_text', description: 'Keep surrounding text in messages' },
+    { command: 'disable_text', description: 'Remove surrounding text from messages' },
+    { command: 'enable_bold', description: 'Make header & footer bold' },
+    { command: 'disable_bold', description: 'Make header & footer normal' },
+    { command: 'settings', description: 'View your current settings' },
+  ];
+
+  try {
+    await bot.setMyCommands(commands);
+    console.log('✅ Bot commands menu set successfully');
+  } catch (err) {
+    console.error('❌ Failed to set commands menu:', err.message);
+  }
+}
+
+// ═══════════════════════════════════════════
+// 8. WELCOME
 // ═══════════════════════════════════════════
 const WELCOME_TEXT =
-  `🎬 <b>Welcome to MayaJaal Uploader Bot!</b>\n\n` +
-  `Send me any of the following and I'll upload the content and return a shareable link:\n\n` +
+  `🎬 <b>Welcome to MayaJaal Remote URL Uploader Bot!</b>\n\n` +
+  `Send me any of the following and I'll upload the content to MayaJaal and return a shareable link:\n\n` +
   `• <b>Direct file URL</b> (e.g. https://example.com/video.mp4)\n` +
   `• <b>Magnet link</b> (magnet:?xt=urn:btih:…)\n` +
   `• <b>.torrent URL</b>\n\n` +
+  `For torrents, all video files will be uploaded as separate MayaJaal links.\n\n` +
   `<b>Commands:</b>\n` +
   `/api TOKEN — Link your MayaJaal account\n` +
   `/add_header TEXT — Add text above your link\n` +
   `/remove_header — Remove header\n` +
   `/add_footer TEXT — Add text below your link\n` +
   `/remove_footer — Remove footer\n` +
+  `/enable_text — Keep surrounding text in messages\n` +
+  `/disable_text — Remove surrounding text from messages\n` +
   `/enable_bold — Make header & footer bold\n` +
-  `/disable_bold — Normal text\n` +
-  `/settings — View current settings`;
+  `/disable_bold — Normal text`;
 
 bot.onText(/\/start/, (msg) => {
   bot.sendMessage(msg.chat.id, WELCOME_TEXT, { parse_mode: 'HTML' });
 });
 
 // ═══════════════════════════════════════════
-// 8. COMMANDS
+// 9. COMMANDS
 // ═══════════════════════════════════════════
 
 // /api TOKEN
@@ -169,15 +197,13 @@ bot.onText(/\/api(?:\s+(.+))?/, (msg, match) => {
   if (!token) {
     if (user.apiToken) {
       const masked = user.apiToken.slice(0, 6) + '...' + user.apiToken.slice(-4);
-      return bot.sendMessage(
-        chatId,
+      return bot.sendMessage(chatId,
         `✅ <b>API Token already linked:</b>\n<code>${escapeHtml(masked)}</code>\n\n` +
         `Use <code>/api NEW_TOKEN</code> to update.`,
         { parse_mode: 'HTML' }
       );
     }
-    return bot.sendMessage(
-      chatId,
+    return bot.sendMessage(chatId,
       `❌ <b>No API token linked.</b>\n\nUse:\n<code>/api YOUR_TOKEN</code>`,
       { parse_mode: 'HTML' }
     );
@@ -190,8 +216,8 @@ bot.onText(/\/api(?:\s+(.+))?/, (msg, match) => {
   );
 });
 
-// /add_header TEXT
-bot.onText(/\/add_header(?:\s+(.+))?/, (msg, match) => {
+// /add_header
+bot.onText(/\/add_header(?:\s+([\s\S]+))?/, (msg, match) => {
   const chatId = msg.chat.id;
   const text = match[1]?.trim();
   if (!text) {
@@ -213,8 +239,8 @@ bot.onText(/\/remove_header/, (msg) => {
   bot.sendMessage(msg.chat.id, '✅ Header removed.');
 });
 
-// /add_footer TEXT
-bot.onText(/\/add_footer(?:\s+(.+))?/, (msg, match) => {
+// /add_footer
+bot.onText(/\/add_footer(?:\s+([\s\S]+))?/, (msg, match) => {
   const chatId = msg.chat.id;
   const text = match[1]?.trim();
   if (!text) {
@@ -236,13 +262,28 @@ bot.onText(/\/remove_footer/, (msg) => {
   bot.sendMessage(msg.chat.id, '✅ Footer removed.');
 });
 
+// /enable_text
+bot.onText(/\/enable_text/, (msg) => {
+  getUser(msg.chat.id).enableText = true;
+  bot.sendMessage(msg.chat.id,
+    '✅ <b>Surrounding text enabled.</b>\nHeader/footer will appear in messages.',
+    { parse_mode: 'HTML' }
+  );
+});
+
+// /disable_text
+bot.onText(/\/disable_text/, (msg) => {
+  getUser(msg.chat.id).enableText = false;
+  bot.sendMessage(msg.chat.id,
+    '✅ <b>Surrounding text disabled.</b>\nHeader/footer will NOT appear in messages.',
+    { parse_mode: 'HTML' }
+  );
+});
+
 // /enable_bold
 bot.onText(/\/enable_bold/, (msg) => {
   getUser(msg.chat.id).bold = true;
-  bot.sendMessage(msg.chat.id,
-    '✅ <b>Bold enabled</b> for header & footer.',
-    { parse_mode: 'HTML' }
-  );
+  bot.sendMessage(msg.chat.id, '✅ <b>Bold enabled</b> for header & footer.', { parse_mode: 'HTML' });
 });
 
 // /disable_bold
@@ -260,12 +301,13 @@ bot.onText(/\/settings/, (msg) => {
     `🔑 <b>API Token:</b> ${u.apiToken ? '✅ Linked' : '❌ Not linked'}\n` +
     `📝 <b>Header:</b> ${u.header ? escapeHtml(u.header) : '<i>(none)</i>'}\n` +
     `📝 <b>Footer:</b> ${u.footer ? escapeHtml(u.footer) : '<i>(none)</i>'}\n` +
+    `💬 <b>Surrounding text:</b> ${u.enableText ? 'ON' : 'OFF'}\n` +
     `🅱️ <b>Bold:</b> ${u.bold ? 'ON' : 'OFF'}`;
   bot.sendMessage(chatId, text, { parse_mode: 'HTML' });
 });
 
 // ═══════════════════════════════════════════
-// 9. URL / MAGNET / TORRENT HANDLER
+// 10. URL / MAGNET / TORRENT HANDLER
 // ═══════════════════════════════════════════
 bot.on('message', async (msg) => {
   const chatId = msg.chat.id;
@@ -281,7 +323,6 @@ bot.on('message', async (msg) => {
 
   const user = getUser(chatId);
 
-  // API token required
   if (!user.apiToken) {
     return bot.sendMessage(chatId,
       `❌ <b>Pehle apna API token link karo:</b>\n\n<code>/api YOUR_TOKEN</code>`,
@@ -292,7 +333,6 @@ bot.on('message', async (msg) => {
   let statusMsg = null;
 
   try {
-    // Torrent — coming soon
     if (isMagnet || isTorrentUrl) {
       return bot.sendMessage(chatId,
         `🧲 <b>Torrent support coming soon!</b>\n\nAbhi ke liye direct URL bhejo.`,
@@ -300,13 +340,11 @@ bot.on('message', async (msg) => {
       );
     }
 
-    // Direct URL
     statusMsg = await bot.sendMessage(chatId,
       `🔄 <i>Downloading from URL...</i>`,
       { parse_mode: 'HTML' }
     );
 
-    // Filename nikaalo
     let fileName = 'file_' + Date.now();
     try {
       const urlObj = new URL(text);
@@ -315,7 +353,6 @@ bot.on('message', async (msg) => {
     } catch (e) {}
     fileName = fileName.replace(/[^a-zA-Z0-9._-]/g, '_').slice(0, 80) || 'file_' + Date.now();
 
-    // Download
     const response = await axios.get(text, {
       responseType: 'arraybuffer',
       timeout: 300000,
@@ -330,13 +367,11 @@ bot.on('message', async (msg) => {
     const contentType = response.headers['content-type'] || 'application/octet-stream';
     const sizeMB = (buffer.byteLength / 1024 / 1024).toFixed(2);
 
-    // Upload status
     await bot.editMessageText(
       `⬆️ <i>Uploading to MayaJaal cloud (${sizeMB} MB)...</i>`,
       { chat_id: chatId, message_id: statusMsg.message_id, parse_mode: 'HTML' }
     );
 
-    // B2 upload
     const uniqueKey = `uploads/${Date.now()}_${crypto.randomBytes(4).toString('hex')}_${fileName}`;
     await s3.send(new PutObjectCommand({
       Bucket: B2_BUCKET,
@@ -346,24 +381,21 @@ bot.on('message', async (msg) => {
       ContentLength: buffer.byteLength,
     }));
 
-    // Signed URL
     const signedUrl = await getSignedUrl(
       s3,
       new GetObjectCommand({ Bucket: B2_BUCKET, Key: uniqueKey }),
       { expiresIn: 86400 }
     );
 
-    // Short link
     const shortUrl = createShortLink(signedUrl);
 
-    // Status delete
     await bot.deleteMessage(chatId, statusMsg.message_id).catch(() => {});
     statusMsg = null;
 
-    // Final message with header/footer
+    // Build final message
     const parts = [];
 
-    if (user.header) {
+    if (user.enableText && user.header) {
       parts.push(user.bold ? `<b>${escapeHtml(user.header)}</b>` : escapeHtml(user.header));
       parts.push('');
     }
@@ -375,7 +407,7 @@ bot.on('message', async (msg) => {
     parts.push('');
     parts.push(`🔗 <b>Link:</b>\n${shortUrl}`);
 
-    if (user.footer) {
+    if (user.enableText && user.footer) {
       parts.push('');
       parts.push(user.bold ? `<b>${escapeHtml(user.footer)}</b>` : escapeHtml(user.footer));
     }
@@ -401,11 +433,17 @@ bot.on('message', async (msg) => {
 });
 
 // ═══════════════════════════════════════════
-// 10. ERRORS
+// 11. ERRORS
 // ═══════════════════════════════════════════
 bot.on('polling_error', (error) => console.log('Polling error:', error.code, error.message));
 bot.on('error', (error) => console.log('Bot error:', error.message));
 process.on('unhandledRejection', (r) => console.error('[unhandledRejection]', r));
 process.on('uncaughtException', (e) => console.error('[uncaughtException]', e.message));
 
-console.log('🚀 MayaJaal Uploader Bot chal pada hai...');
+// ═══════════════════════════════════════════
+// 12. STARTUP
+// ═══════════════════════════════════════════
+(async () => {
+  await setupBotCommands();
+  console.log('🚀 MayaJaal Remote URL Uploader Bot chal pada hai...');
+})();
