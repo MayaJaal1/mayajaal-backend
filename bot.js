@@ -64,7 +64,7 @@ function pickFile(msg) {
   return null;
 }
 
-// 6. URL Shortener (TinyURL — free, reliable)
+// 6. URL Shortener (TinyURL — free, no API key)
 async function shortenUrl(longUrl) {
   try {
     const res = await axios.get('https://tinyurl.com/api-create.php', {
