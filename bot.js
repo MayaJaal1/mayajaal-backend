@@ -83,4 +83,13 @@ bot.on('message', async (msg) => {
   }
 });
 
+// 5. Error Handlers taaki bot kabhi crash na ho
+bot.on('polling_error', (error) => {
+  console.log('Polling error encountered: code =', error.code);
+});
+
+bot.on('error', (error) => {
+  console.log('General bot error:', error.message);
+});
+
 console.log("MayaJaal Telegram Bot chal pada hai...");
