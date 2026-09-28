@@ -1,7 +1,7 @@
 {
   "name": "mayajaal-bot",
   "version": "1.0.0",
-  "description": "MayaJaal Telegram Bot with Backblaze B2 storage",
+  "description": "MayaJaal Uploader Bot",
   "main": "bot.js",
   "scripts": {
     "start": "node bot.js"
