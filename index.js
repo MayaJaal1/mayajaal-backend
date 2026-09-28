@@ -37,9 +37,7 @@ app.post('/save-key', async (req, res) => {
       return res.status(400).json({ error: 'telegram_id and key required' });
     }
 
-    // key → telegram_id (for verification)
     await redis.set(`key:${key}`, String(telegram_id), { ex: 60 * 60 * 24 * 30 });
-    // telegram_id → key (for showing existing key)
     await redis.set(`user:${telegram_id}`, key, { ex: 60 * 60 * 24 * 30 });
 
     res.json({ success: true, key, telegram_id });
@@ -50,7 +48,7 @@ app.post('/save-key', async (req, res) => {
 });
 
 // ═══════════════════════════════════════════
-// GET EXISTING KEY (called from Vercel page)
+// GET EXISTING KEY
 // ═══════════════════════════════════════════
 app.get('/get-key/:telegram_id', async (req, res) => {
   try {
@@ -62,7 +60,7 @@ app.get('/get-key/:telegram_id', async (req, res) => {
 });
 
 // ═══════════════════════════════════════════
-// VERIFY KEY (called from bot)
+// VERIFY KEY
 // ═══════════════════════════════════════════
 app.get('/verify-key/:key', async (req, res) => {
   try {
@@ -74,7 +72,7 @@ app.get('/verify-key/:key', async (req, res) => {
 });
 
 // ═══════════════════════════════════════════
-// STREAM ROUTES (existing)
+// SAVE FILE MAPPING
 // ═══════════════════════════════════════════
 app.post('/save', async (req, res) => {
   try {
@@ -90,6 +88,9 @@ app.post('/save', async (req, res) => {
   }
 });
 
+// ═══════════════════════════════════════════
+// MAYA STREAM ROUTE (Telegram files)
+// ═══════════════════════════════════════════
 app.get('/maya/:msgId', async (req, res) => {
   try {
     const msgId = req.params.msgId;
@@ -127,6 +128,118 @@ app.get('/maya/:msgId', async (req, res) => {
       <html><head><meta charset="UTF-8"><title>MayaJaal</title>
       <style>body{background:#000;color:#fff;font-family:sans-serif;text-align:center;padding:50px}h2{color:#9c27b0}</style></head>
       <body><h2>MayaJaal</h2><p>Error loading the media.</p></body></html>
+    `);
+  }
+});
+
+// ═══════════════════════════════════════════
+// TERABOX PLAYER ROUTE (NEW)
+// ═══════════════════════════════════════════
+app.get('/tb/:id', async (req, res) => {
+  try {
+    const id = req.params.id;
+    const data = await redis.get(`terabox:${id}`);
+
+    if (!data) {
+      return res.status(404).send(`
+        <!DOCTYPE html>
+        <html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>MayaJaal</title>
+        <style>body{background:#000;color:#fff;font-family:sans-serif;text-align:center;padding:50px}h2{color:#00ff88}</style></head>
+        <body><h2>MayaJaal</h2><p>File not found or expired.</p></body></html>
+      `);
+    }
+
+    const parsed = typeof data === 'string' ? JSON.parse(data) : data;
+    const videoUrl = parsed.url;
+    const fileName = parsed.name || 'MayaJaal Video';
+
+    res.send(`
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>${fileName} · MayaJaal</title>
+        <style>
+          html, body {
+            margin: 0; padding: 0;
+            width: 100%; height: 100%;
+            background: #000;
+            overflow: hidden;
+            font-family: 'Courier New', monospace;
+          }
+          #player-wrap {
+            position: relative;
+            width: 100%; height: 100%;
+            display: flex; align-items: center; justify-content: center;
+            background: #000;
+          }
+          video {
+            width: 100%; height: 100%;
+            object-fit: contain;
+            background: #000;
+          }
+          .brand-tag {
+            position: fixed;
+            top: 10px; left: 50%;
+            transform: translateX(-50%);
+            color: #00ff88;
+            font-size: 11px;
+            letter-spacing: 3px;
+            text-transform: uppercase;
+            text-shadow: 0 0 8px #00ff88;
+            opacity: 0.7;
+            z-index: 100;
+            pointer-events: none;
+          }
+          .loading {
+            color: #00ff88;
+            font-size: 14px;
+            letter-spacing: 2px;
+            position: absolute;
+            z-index: 5;
+          }
+        </style>
+      </head>
+      <body>
+        <div class="brand-tag">● MAYA JAAL PLAYER</div>
+        <div id="player-wrap">
+          <div class="loading" id="loadingTxt">loading stream...</div>
+          <video id="player" controls autoplay playsinline preload="metadata" style="display:none;">
+            <source src="${videoUrl}">
+          </video>
+        </div>
+
+        <script>
+          const video = document.getElementById('player');
+          const loading = document.getElementById('loadingTxt');
+
+          video.addEventListener('loadedmetadata', function() {
+            loading.style.display = 'none';
+            video.style.display = 'block';
+          });
+
+          video.addEventListener('error', function() {
+            loading.textContent = '❌ Stream unavailable';
+            loading.style.color = '#ff5555';
+          });
+
+          setTimeout(function() {
+            if (video.readyState < 2) {
+              loading.textContent = '⚠️ Stream slow hai, wait karein...';
+            }
+          }, 5000);
+        </script>
+      </body>
+      </html>
+    `);
+  } catch (err) {
+    console.error('TB play error:', err.message);
+    res.status(500).send(`
+      <!DOCTYPE html>
+      <html><head><meta charset="UTF-8"><title>MayaJaal</title>
+      <style>body{background:#000;color:#fff;font-family:sans-serif;text-align:center;padding:50px}h2{color:#00ff88}</style></head>
+      <body><h2>MayaJaal</h2><p>Error loading media.</p></body></html>
     `);
   }
 });
