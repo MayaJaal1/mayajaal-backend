@@ -46,12 +46,32 @@ app.get('/maya/:msgId', async (req, res) => {
   try {
     const msgId = req.params.msgId;
 
-    const fileId = await redis.get(`file:${msgId}`);
+    // ✅ Pehle query parameter se fileId lo
+    let fileId = req.query.fileId;
+
+    // ✅ Agar query parameter nahi hai, toh Redis se lo
+    if (!fileId) {
+      fileId = await redis.get(`file:${msgId}`);
+    }
 
     if (!fileId) {
       return res.status(404).send(`
-        <h2>MayaJaal</h2>
-        <p>File not found.</p>
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <meta charset="UTF-8">
+          <meta name="viewport" content="width=device-width, initial-scale=1.0">
+          <title>MayaJaal</title>
+          <style>
+            body { background: #000; color: #fff; font-family: sans-serif; text-align: center; padding: 50px; }
+            h2 { color: #9c27b0; }
+          </style>
+        </head>
+        <body>
+          <h2>MayaJaal</h2>
+          <p>File not found.</p>
+        </body>
+        </html>
       `);
     }
 
@@ -78,6 +98,7 @@ app.get('/maya/:msgId', async (req, res) => {
             width: 100%;
             height: 100%;
             background: #000;
+            overflow: hidden;
           }
 
           video {
@@ -101,8 +122,22 @@ app.get('/maya/:msgId', async (req, res) => {
     console.error('Stream error:', error.message);
 
     res.status(500).send(`
-      <h2>MayaJaal</h2>
-      <p>Error loading the media.</p>
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>MayaJaal</title>
+        <style>
+          body { background: #000; color: #fff; font-family: sans-serif; text-align: center; padding: 50px; }
+          h2 { color: #9c27b0; }
+        </style>
+      </head>
+      <body>
+        <h2>MayaJaal</h2>
+        <p>Error loading the media.</p>
+      </body>
+      </html>
     `);
   }
 });
