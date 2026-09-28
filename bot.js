@@ -83,7 +83,6 @@ const s3 = new S3Client({
 // 4. USER SETTINGS
 // ═══════════════════════════════════════════
 const userSettings = new Map();
-// chatId -> { apiToken, header, footer, bold, enableText }
 
 function getUser(chatId) {
   if (!userSettings.has(chatId)) {
@@ -121,6 +120,14 @@ function createShortLink(signedUrl) {
   return `${BASE_URL}/v/${id}`;
 }
 
+function pickFile(msg) {
+  if (msg.video) return msg.video;
+  if (msg.document) return msg.document;
+  if (msg.audio) return msg.audio;
+  if (Array.isArray(msg.photo) && msg.photo.length) return msg.photo[msg.photo.length - 1];
+  return null;
+}
+
 setInterval(() => {
   const now = Date.now();
   let removed = 0;
@@ -134,7 +141,7 @@ setInterval(() => {
 }, 10 * 60 * 1000);
 
 // ═══════════════════════════════════════════
-// 7. SET BOT COMMANDS (— "/" menu)
+// 7. SET BOT COMMANDS
 // ═══════════════════════════════════════════
 async function setupBotCommands() {
   const commands = [
@@ -163,22 +170,23 @@ async function setupBotCommands() {
 // 8. WELCOME
 // ═══════════════════════════════════════════
 const WELCOME_TEXT =
-  `🎬 <b>Welcome to MayaJaal Remote URL Uploader Bot!</b>\n\n` +
-  `Send me any of the following and I'll upload the content to MayaJaal and return a shareable link:\n\n` +
+  `🎬 <b>Welcome to MayaJaal Uploader Bot!</b>\n\n` +
+  `Send me any of the following and I'll upload it and return a shareable link:\n\n` +
+  `• <b>Telegram file</b> (video, document, audio)\n` +
   `• <b>Direct file URL</b> (e.g. https://example.com/video.mp4)\n` +
   `• <b>Magnet link</b> (magnet:?xt=urn:btih:…)\n` +
   `• <b>.torrent URL</b>\n\n` +
-  `For torrents, all video files will be uploaded as separate MayaJaal links.\n\n` +
   `<b>Commands:</b>\n` +
   `/api TOKEN — Link your MayaJaal account\n` +
   `/add_header TEXT — Add text above your link\n` +
   `/remove_header — Remove header\n` +
   `/add_footer TEXT — Add text below your link\n` +
   `/remove_footer — Remove footer\n` +
-  `/enable_text — Keep surrounding text in messages\n` +
-  `/disable_text — Remove surrounding text from messages\n` +
-  `/enable_bold — Make header & footer bold\n` +
-  `/disable_bold — Normal text`;
+  `/enable_text — Keep surrounding text\n` +
+  `/disable_text — Remove surrounding text\n` +
+  `/enable_bold — Make bold\n` +
+  `/disable_bold — Normal text\n` +
+  `/settings — View your settings`;
 
 bot.onText(/\/start/, (msg) => {
   bot.sendMessage(msg.chat.id, WELCOME_TEXT, { parse_mode: 'HTML' });
@@ -187,8 +195,6 @@ bot.onText(/\/start/, (msg) => {
 // ═══════════════════════════════════════════
 // 9. COMMANDS
 // ═══════════════════════════════════════════
-
-// /api TOKEN
 bot.onText(/\/api(?:\s+(.+))?/, (msg, match) => {
   const chatId = msg.chat.id;
   const token = match[1]?.trim();
@@ -211,88 +217,61 @@ bot.onText(/\/api(?:\s+(.+))?/, (msg, match) => {
 
   user.apiToken = token;
   bot.sendMessage(chatId,
-    `✅ <b>API Token linked successfully!</b>\n\nYou can now upload files.`,
+    `✅ <b>API Token linked successfully!</b>`,
     { parse_mode: 'HTML' }
   );
 });
 
-// /add_header
 bot.onText(/\/add_header(?:\s+([\s\S]+))?/, (msg, match) => {
   const chatId = msg.chat.id;
   const text = match[1]?.trim();
   if (!text) {
-    return bot.sendMessage(chatId,
-      `❌ <b>Usage:</b>\n<code>/add_header YOUR TEXT</code>`,
-      { parse_mode: 'HTML' }
-    );
+    return bot.sendMessage(chatId, `❌ <b>Usage:</b>\n<code>/add_header YOUR TEXT</code>`, { parse_mode: 'HTML' });
   }
   getUser(chatId).header = text;
-  bot.sendMessage(chatId,
-    `✅ <b>Header added:</b>\n${escapeHtml(text)}`,
-    { parse_mode: 'HTML' }
-  );
+  bot.sendMessage(chatId, `✅ <b>Header added:</b>\n${escapeHtml(text)}`, { parse_mode: 'HTML' });
 });
 
-// /remove_header
 bot.onText(/\/remove_header/, (msg) => {
   getUser(msg.chat.id).header = null;
   bot.sendMessage(msg.chat.id, '✅ Header removed.');
 });
 
-// /add_footer
 bot.onText(/\/add_footer(?:\s+([\s\S]+))?/, (msg, match) => {
   const chatId = msg.chat.id;
   const text = match[1]?.trim();
   if (!text) {
-    return bot.sendMessage(chatId,
-      `❌ <b>Usage:</b>\n<code>/add_footer YOUR TEXT</code>`,
-      { parse_mode: 'HTML' }
-    );
+    return bot.sendMessage(chatId, `❌ <b>Usage:</b>\n<code>/add_footer YOUR TEXT</code>`, { parse_mode: 'HTML' });
   }
   getUser(chatId).footer = text;
-  bot.sendMessage(chatId,
-    `✅ <b>Footer added:</b>\n${escapeHtml(text)}`,
-    { parse_mode: 'HTML' }
-  );
+  bot.sendMessage(chatId, `✅ <b>Footer added:</b>\n${escapeHtml(text)}`, { parse_mode: 'HTML' });
 });
 
-// /remove_footer
 bot.onText(/\/remove_footer/, (msg) => {
   getUser(msg.chat.id).footer = null;
   bot.sendMessage(msg.chat.id, '✅ Footer removed.');
 });
 
-// /enable_text
 bot.onText(/\/enable_text/, (msg) => {
   getUser(msg.chat.id).enableText = true;
-  bot.sendMessage(msg.chat.id,
-    '✅ <b>Surrounding text enabled.</b>\nHeader/footer will appear in messages.',
-    { parse_mode: 'HTML' }
-  );
+  bot.sendMessage(msg.chat.id, '✅ <b>Surrounding text enabled.</b>', { parse_mode: 'HTML' });
 });
 
-// /disable_text
 bot.onText(/\/disable_text/, (msg) => {
   getUser(msg.chat.id).enableText = false;
-  bot.sendMessage(msg.chat.id,
-    '✅ <b>Surrounding text disabled.</b>\nHeader/footer will NOT appear in messages.',
-    { parse_mode: 'HTML' }
-  );
+  bot.sendMessage(msg.chat.id, '✅ <b>Surrounding text disabled.</b>', { parse_mode: 'HTML' });
 });
 
-// /enable_bold
 bot.onText(/\/enable_bold/, (msg) => {
   getUser(msg.chat.id).bold = true;
-  bot.sendMessage(msg.chat.id, '✅ <b>Bold enabled</b> for header & footer.', { parse_mode: 'HTML' });
+  bot.sendMessage(msg.chat.id, '✅ <b>Bold enabled</b>.', { parse_mode: 'HTML' });
 });
 
-// /disable_bold
 bot.onText(/\/disable_bold/, (msg) => {
   getUser(msg.chat.id).bold = false;
   bot.sendMessage(msg.chat.id, '✅ Bold disabled.');
 });
 
-// /settings
 bot.onText(/\/settings/, (msg) => {
   const chatId = msg.chat.id;
   const u = getUser(chatId);
@@ -307,35 +286,130 @@ bot.onText(/\/settings/, (msg) => {
 });
 
 // ═══════════════════════════════════════════
-// 10. URL / MAGNET / TORRENT HANDLER
+// 10. BUILD FINAL MESSAGE (header + link + footer)
+// ═══════════════════════════════════════════
+function buildSuccessMessage(user, fileName, sizeMB, shortUrl) {
+  const parts = [];
+
+  if (user.enableText && user.header) {
+    parts.push(user.bold ? `<b>${escapeHtml(user.header)}</b>` : escapeHtml(user.header));
+    parts.push('');
+  }
+
+  parts.push(`✨ <b>MayaJaal Upload Complete!</b>`);
+  parts.push('');
+  parts.push(`📌 <b>File:</b> ${escapeHtml(fileName)}`);
+  if (sizeMB) parts.push(`📦 <b>Size:</b> ${sizeMB} MB`);
+  parts.push('');
+  parts.push(`🔗 <b>Link:</b>\n${shortUrl}`);
+
+  if (user.enableText && user.footer) {
+    parts.push('');
+    parts.push(user.bold ? `<b>${escapeHtml(user.footer)}</b>` : escapeHtml(user.footer));
+  }
+
+  parts.push('');
+  parts.push(`⏰ <i>Valid 24 hours</i>`);
+
+  return parts.join('\n');
+}
+
+// ═══════════════════════════════════════════
+// 11. MEDIA HANDLER (Telegram files + URLs)
 // ═══════════════════════════════════════════
 bot.on('message', async (msg) => {
   const chatId = msg.chat.id;
   const text = msg.text || '';
 
+  // Commands ignore karo
   if (text.startsWith('/')) return;
-
-  const isMagnet = text.startsWith('magnet:?');
-  const isTorrentUrl = /\.torrent(\?|$)/i.test(text);
-  const isHttpUrl = /^https?:\/\//i.test(text);
-
-  if (!isMagnet && !isTorrentUrl && !isHttpUrl) return;
 
   const user = getUser(chatId);
 
+  // API token check
   if (!user.apiToken) {
-    return bot.sendMessage(chatId,
-      `❌ <b>Pehle apna API token link karo:</b>\n\n<code>/api YOUR_TOKEN</code>`,
-      { parse_mode: 'HTML' }
-    );
+    // Sirf tab error bhejo jab file ya URL bheja ho
+    const fileCheck = pickFile(msg);
+    const isUrl = /^https?:\/\//i.test(text) || text.startsWith('magnet:?');
+    if (fileCheck || isUrl) {
+      return bot.sendMessage(chatId,
+        `❌ <b>Pehle apna API token link karo:</b>\n\n<code>/api YOUR_TOKEN</code>`,
+        { parse_mode: 'HTML' }
+      );
+    }
+    return;
   }
 
   let statusMsg = null;
 
   try {
+    // ─── CASE 1: Telegram file ───
+    const file = pickFile(msg);
+
+    if (file) {
+      const rawName = file.file_name || msg.caption || `file_${Date.now()}`;
+      const fileName = rawName.replace(/[^a-zA-Z0-9._-]/g, '_').slice(0, 80);
+
+      statusMsg = await bot.sendMessage(chatId,
+        `🔄 <i>Downloading from Telegram...</i>`,
+        { parse_mode: 'HTML' }
+      );
+
+      const fileInfo = await bot.getFile(file.file_id);
+      const tgFileUrl = `https://api.telegram.org/file/bot${TOKEN}/${fileInfo.file_path}`;
+
+      const response = await axios.get(tgFileUrl, {
+        responseType: 'arraybuffer',
+        timeout: 300000,
+        maxContentLength: 500 * 1024 * 1024,
+        maxBodyLength: 500 * 1024 * 1024,
+      });
+
+      const buffer = Buffer.from(response.data);
+      const sizeMB = (buffer.byteLength / 1024 / 1024).toFixed(2);
+
+      await bot.editMessageText(
+        `⬆️ <i>Uploading to MayaJaal cloud (${sizeMB} MB)...</i>`,
+        { chat_id: chatId, message_id: statusMsg.message_id, parse_mode: 'HTML' }
+      );
+
+      const uniqueKey = `uploads/${Date.now()}_${crypto.randomBytes(4).toString('hex')}_${fileName}`;
+      await s3.send(new PutObjectCommand({
+        Bucket: B2_BUCKET,
+        Key: uniqueKey,
+        Body: buffer,
+        ContentType: file.mime_type || 'application/octet-stream',
+        ContentLength: buffer.byteLength,
+      }));
+
+      const signedUrl = await getSignedUrl(
+        s3,
+        new GetObjectCommand({ Bucket: B2_BUCKET, Key: uniqueKey }),
+        { expiresIn: 86400 }
+      );
+
+      const shortUrl = createShortLink(signedUrl);
+
+      await bot.deleteMessage(chatId, statusMsg.message_id).catch(() => {});
+      statusMsg = null;
+
+      await bot.sendMessage(chatId, buildSuccessMessage(user, fileName, sizeMB, shortUrl), {
+        parse_mode: 'HTML',
+        disable_web_page_preview: true,
+      });
+      return;
+    }
+
+    // ─── CASE 2: URL / Magnet / Torrent ───
+    const isMagnet = text.startsWith('magnet:?');
+    const isTorrentUrl = /\.torrent(\?|$)/i.test(text);
+    const isHttpUrl = /^https?:\/\//i.test(text);
+
+    if (!isMagnet && !isTorrentUrl && !isHttpUrl) return;
+
     if (isMagnet || isTorrentUrl) {
       return bot.sendMessage(chatId,
-        `🧲 <b>Torrent support coming soon!</b>\n\nAbhi ke liye direct URL bhejo.`,
+        `🧲 <b>Torrent support coming soon!</b>`,
         { parse_mode: 'HTML' }
       );
     }
@@ -359,7 +433,7 @@ bot.on('message', async (msg) => {
       maxContentLength: 500 * 1024 * 1024,
       maxBodyLength: 500 * 1024 * 1024,
       headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0 Safari/537.36',
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120.0 Safari/537.36',
       },
     });
 
@@ -392,30 +466,7 @@ bot.on('message', async (msg) => {
     await bot.deleteMessage(chatId, statusMsg.message_id).catch(() => {});
     statusMsg = null;
 
-    // Build final message
-    const parts = [];
-
-    if (user.enableText && user.header) {
-      parts.push(user.bold ? `<b>${escapeHtml(user.header)}</b>` : escapeHtml(user.header));
-      parts.push('');
-    }
-
-    parts.push(`✨ <b>MayaJaal Upload Complete!</b>`);
-    parts.push('');
-    parts.push(`📌 <b>File:</b> ${escapeHtml(fileName)}`);
-    parts.push(`📦 <b>Size:</b> ${sizeMB} MB`);
-    parts.push('');
-    parts.push(`🔗 <b>Link:</b>\n${shortUrl}`);
-
-    if (user.enableText && user.footer) {
-      parts.push('');
-      parts.push(user.bold ? `<b>${escapeHtml(user.footer)}</b>` : escapeHtml(user.footer));
-    }
-
-    parts.push('');
-    parts.push(`⏰ <i>Valid 24 hours</i>`);
-
-    await bot.sendMessage(chatId, parts.join('\n'), {
+    await bot.sendMessage(chatId, buildSuccessMessage(user, fileName, sizeMB, shortUrl), {
       parse_mode: 'HTML',
       disable_web_page_preview: true,
     });
@@ -433,7 +484,7 @@ bot.on('message', async (msg) => {
 });
 
 // ═══════════════════════════════════════════
-// 11. ERRORS
+// 12. ERRORS
 // ═══════════════════════════════════════════
 bot.on('polling_error', (error) => console.log('Polling error:', error.code, error.message));
 bot.on('error', (error) => console.log('Bot error:', error.message));
@@ -441,7 +492,7 @@ process.on('unhandledRejection', (r) => console.error('[unhandledRejection]', r)
 process.on('uncaughtException', (e) => console.error('[uncaughtException]', e.message));
 
 // ═══════════════════════════════════════════
-// 12. STARTUP
+// 13. STARTUP
 // ═══════════════════════════════════════════
 (async () => {
   await setupBotCommands();
