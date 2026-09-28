@@ -17,10 +17,14 @@ app.listen(PORT, () => {
 // Telegram Bot Configuration
 const TOKEN = process.env.BOT_TOKEN;
 
-// ⚠️ YAHAN APNA RAILWAY URL DAALO
+// ✅ Railway URL Automatic Detect Hoga
 const BACKEND_URL =
   process.env.BACKEND_URL ||
-  'https://mayajaal-backend-production.up.railway.app';
+  (process.env.RAILWAY_PUBLIC_DOMAIN
+    ? `https://${process.env.RAILWAY_PUBLIC_DOMAIN}`
+    : 'https://mayajaal-backend.vercel.app');
+
+console.log(`Backend URL: ${BACKEND_URL}`);
 
 const STORAGE_CHANNEL = '@maya_jaal1';
 
@@ -92,7 +96,6 @@ bot.on('message', async (msg) => {
       { parse_mode: 'Markdown' }
     );
 
-    // IMPORTANT:
     // Save the ORIGINAL Telegram file_id
     const originalFileId = file.file_id;
 
@@ -111,7 +114,7 @@ bot.on('message', async (msg) => {
       fileId: originalFileId
     });
 
-    // ✅ fileId ke saath link banao
+    // fileId ke saath link banao
     const accessLink =
       `${BACKEND_URL}/maya/${fileMessageId}?fileId=${originalFileId}`;
 
