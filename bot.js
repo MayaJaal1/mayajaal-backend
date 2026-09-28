@@ -18,7 +18,7 @@ app.listen(PORT, () => {
 const TOKEN = process.env.BOT_TOKEN;
 const BACKEND_URL =
   process.env.BACKEND_URL ||
-  'https://mayajaal-backend-git-main-ajayr0201-9102.vercel.app';
+  'https://mayajaal-backend.vercel.app';
 
 const STORAGE_CHANNEL = '@maya_jaal1';
 
@@ -109,9 +109,9 @@ bot.on('message', async (msg) => {
       fileId: originalFileId
     });
 
-    // New short backend link
+    // ✅ fileId ke saath link banao
     const accessLink =
-      `${BACKEND_URL}/maya/${fileMessageId}`;
+      `${BACKEND_URL}/maya/${fileMessageId}?fileId=${originalFileId}`;
 
     // Delete processing message
     await bot.deleteMessage(
