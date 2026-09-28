@@ -7,9 +7,7 @@ const { S3Client, PutObjectCommand, GetObjectCommand } = require('@aws-sdk/clien
 const { getSignedUrl } = require('@aws-sdk/s3-request-presigner');
 const crypto = require('crypto');
 
-// ─────────────────────────────────────────────
 // 1. Express Server
-// ─────────────────────────────────────────────
 const app = express();
 const PORT = process.env.PORT || 3000;
 
@@ -25,9 +23,7 @@ app.listen(PORT, () => {
   console.log(`Server is listening on port ${PORT}`);
 });
 
-// ─────────────────────────────────────────────
-// 2. Config (Environment Variables)
-// ─────────────────────────────────────────────
+// 2. Config
 const TOKEN = process.env.BOT_TOKEN;
 const B2_KEY_ID = process.env.B2_KEY_ID;
 const B2_APP_KEY = process.env.B2_APP_KEY;
@@ -36,13 +32,11 @@ const B2_ENDPOINT = process.env.B2_ENDPOINT || 's3.us-east-005.backblazeb2.com';
 const B2_REGION = process.env.B2_REGION || 'us-east-005';
 
 if (!TOKEN || !B2_KEY_ID || !B2_APP_KEY || !B2_BUCKET) {
-  console.error('❌ Missing env variables! Check: BOT_TOKEN, B2_KEY_ID, B2_APP_KEY, B2_BUCKET');
+  console.error('❌ Missing env variables!');
   process.exit(1);
 }
 
-// ─────────────────────────────────────────────
-// 3. Backblaze B2 Client (S3-compatible)
-// ─────────────────────────────────────────────
+// 3. B2 Client
 const s3 = new S3Client({
   region: B2_REGION,
   endpoint: `https://${B2_ENDPOINT}`,
@@ -52,14 +46,10 @@ const s3 = new S3Client({
   },
 });
 
-// ─────────────────────────────────────────────
-// 4. Telegram Bot
-// ─────────────────────────────────────────────
+// 4. Bot
 const bot = new TelegramBot(TOKEN, { polling: true });
 
-// ─────────────────────────────────────────────
 // 5. Helpers
-// ─────────────────────────────────────────────
 function escapeHtml(str = '') {
   return String(str).replace(/[&<>"']/g, (c) => (
     { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]
@@ -74,9 +64,7 @@ function pickFile(msg) {
   return null;
 }
 
-// ─────────────────────────────────────────────
-// 6. /start Command
-// ─────────────────────────────────────────────
+// 6. /start
 bot.onText(/\/start/, async (msg) => {
   const chatId = msg.chat.id;
   const firstName = msg.from.first_name || 'User';
@@ -91,9 +79,7 @@ bot.onText(/\/start/, async (msg) => {
   bot.sendMessage(chatId, welcomeText, { parse_mode: 'HTML' });
 });
 
-// ─────────────────────────────────────────────
 // 7. Media Handler
-// ─────────────────────────────────────────────
 bot.on('message', async (msg) => {
   const chatId = msg.chat.id;
   if (msg.text && msg.text.startsWith('/start')) return;
@@ -113,17 +99,14 @@ bot.on('message', async (msg) => {
       { parse_mode: 'HTML' }
     );
 
-    // 1. Telegram se file URL lo
     const fileInfo = await bot.getFile(file.file_id);
     const tgFileUrl = `https://api.telegram.org/file/bot${TOKEN}/${fileInfo.file_path}`;
 
-    // 2. File download (stream)
     const fileResponse = await axios.get(tgFileUrl, {
       responseType: 'stream',
       timeout: 120000,
     });
 
-    // 3. B2 pe upload karo
     const uniqueKey = `videos/${Date.now()}_${crypto.randomBytes(4).toString('hex')}_${fileName}`;
 
     await s3.send(new PutObjectCommand({
@@ -133,20 +116,17 @@ bot.on('message', async (msg) => {
       ContentType: file.mime_type || 'video/mp4',
     }));
 
-    // 4. Signed URL banao (24 hours = 86400 seconds)
     const signedUrl = await getSignedUrl(
       s3,
       new GetObjectCommand({ Bucket: B2_BUCKET, Key: uniqueKey }),
       { expiresIn: 86400 }
     );
 
-    // 5. Processing message delete karo
     if (processingMsg) {
       await bot.deleteMessage(chatId, processingMsg.message_id).catch(() => {});
       processingMsg = null;
     }
 
-    // 6. Success message
     const successText =
       `✨ <b>MayaJaal Media Link Generated!</b> ✨\n\n` +
       `📌 <b>File:</b> ${escapeHtml(fileName)}\n\n` +
@@ -172,9 +152,7 @@ bot.on('message', async (msg) => {
   }
 });
 
-// ─────────────────────────────────────────────
-// 8. Error Handlers
-// ─────────────────────────────────────────────
+// 8. Errors
 bot.on('polling_error', (error) => {
   console.log('Polling error:', error.code, error.message);
 });
