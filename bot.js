@@ -3,41 +3,45 @@ require('dotenv').config();
 const express = require('express');
 const TelegramBot = require('node-telegram-bot-api');
 const axios = require('axios');
+const { S3Client, PutObjectCommand, GetObjectCommand } = require('@aws-sdk/client-s3');
+const { getSignedUrl } = require('@aws-sdk/s3-request-presigner');
+const crypto = require('crypto');
 
 // ─────────────────────────────────────────────
-// 1. Express Server (Railway/Render port binding)
-// ─────────────────────────────────────────────
-const app = express();
-const PORT = process.env.PORT || 3000;
-
-app.get('/', (req, res) => {
-  res.send('MayaJaal Bot is running and alive!');
-});
-
-app.get('/health', (req, res) => {
-  res.status(200).json({ status: 'ok', uptime: process.uptime() });
-});
-
-app.listen(PORT, () => {
-  console.log(`Server is listening on port ${PORT}`);
-});
-
-// ─────────────────────────────────────────────
-// 2. Config (ENV se — hardcode nahi)
+// Config
 // ─────────────────────────────────────────────
 const TOKEN = process.env.BOT_TOKEN;
-const BACKEND_URL = process.env.BACKEND_URL || 'https://mayajaal-backend-git-main-ajayr0201-9102.vercel.app';
-const STORAGE_CHANNEL = process.env.STORAGE_CHANNEL || '@maya_jaal1';
+const B2_KEY_ID = process.env.B2_KEY_ID;
+const B2_APP_KEY = process.env.B2_APP_KEY;
+const B2_BUCKET = process.env.B2_BUCKET;
+const B2_ENDPOINT = process.env.B2_ENDPOINT || 's3.us-east-005.backblazeb2.com';
+const B2_REGION = process.env.B2_REGION || 'us-east-005';
 
-if (!TOKEN) {
-  console.error('❌ BOT_TOKEN environment variable is missing!');
+if (!TOKEN || !B2_KEY_ID || !B2_APP_KEY || !B2_BUCKET) {
+  console.error('❌ Missing env variables!');
   process.exit(1);
 }
 
+// B2 (S3-compatible) client
+const s3 = new S3Client({
+  region: B2_REGION,
+  endpoint: `https://${B2_ENDPOINT}`,
+  credentials: {
+    accessKeyId: B2_KEY_ID,
+    secretAccessKey: B2_APP_KEY,
+  },
+});
+
 const bot = new TelegramBot(TOKEN, { polling: true });
 
+const app = express();
+const PORT = process.env.PORT || 3000;
+
+app.get('/', (req, res) => res.send('MayaJaal Bot is alive!'));
+app.listen(PORT, () => console.log(`Server is listening on port ${PORT}`));
+
 // ─────────────────────────────────────────────
-// 3. Helpers
+// Helpers
 // ─────────────────────────────────────────────
 function escapeHtml(str = '') {
   return String(str).replace(/[&<>"']/g, (c) => (
@@ -54,38 +58,25 @@ function pickFile(msg) {
 }
 
 // ─────────────────────────────────────────────
-// 4. /start Command
+// /start
 // ─────────────────────────────────────────────
 bot.onText(/\/start/, async (msg) => {
   const chatId = msg.chat.id;
-  const telegramId = String(msg.from.id);
   const firstName = msg.from.first_name || 'User';
 
-  try {
-    await axios.get(`${BACKEND_URL}/?id=${telegramId}&name=${encodeURIComponent(firstName)}`, {
-      timeout: 10000,
-    });
+  const welcomeText =
+    `🎬 <b>Welcome to MayaJaal, ${escapeHtml(firstName)}!</b>\n\n` +
+    `⚡ Send any Video, Movie, or Document — I'll give you a streaming link.\n\n` +
+    `⏰ <i>Links valid for 24 hours only.</i>`;
 
-    const welcomeText =
-      `🎬 <b>Welcome to MayaJaal, ${escapeHtml(firstName)}!</b>\n\n` +
-      `⚡ Your personal high-speed streaming portal is now successfully linked.\n\n` +
-      `📂 <b>How to use:</b>\n` +
-      `Simply send any Video, Movie, or Document here, and MayaJaal will instantly generate a direct streaming link for your app!`;
-
-    bot.sendMessage(chatId, welcomeText, { parse_mode: 'HTML' });
-  } catch (error) {
-    console.error('Start error:', error.message);
-    bot.sendMessage(chatId, '⚠️ MayaJaal server connection error. Please try again later.');
-  }
+  bot.sendMessage(chatId, welcomeText, { parse_mode: 'HTML' });
 });
 
 // ─────────────────────────────────────────────
-// 5. Media Handler
+// Media handler
 // ─────────────────────────────────────────────
 bot.on('message', async (msg) => {
   const chatId = msg.chat.id;
-
-  // /start alag se handle hota hai
   if (msg.text && msg.text.startsWith('/start')) return;
 
   const file = pickFile(msg);
@@ -94,32 +85,52 @@ bot.on('message', async (msg) => {
   let processingMsg = null;
 
   try {
-    const rawName = file.file_name || msg.caption || 'MayaJaal_Media_File';
-    const fileName = rawName.length > 60 ? rawName.slice(0, 59) + '…' : rawName;
+    const rawName = file.file_name || msg.caption || `video_${Date.now()}.mp4`;
+    const fileName = rawName.replace(/[^a-zA-Z0-9._-]/g, '_').slice(0, 80);
 
-    // Processing notice
     processingMsg = await bot.sendMessage(
       chatId,
-      '🔄 <i>Processing your media through MayaJaal core...</i>',
+      '🔄 <i>Uploading to cloud, please wait...</i>',
       { parse_mode: 'HTML' }
     );
 
-    // Forward file to private storage channel
-    const forwardedMsg = await bot.forwardMessage(STORAGE_CHANNEL, chatId, msg.message_id);
-    const fileMessageId = forwardedMsg.message_id;
+    // 1. Telegram se file URL lo
+    const fileInfo = await bot.getFile(file.file_id);
+    const tgFileUrl = `https://api.telegram.org/file/bot${TOKEN}/${fileInfo.file_path}`;
 
-    // Stream link
-    const accessLink = `${BACKEND_URL}/stream?msgId=${fileMessageId}`;
+    // 2. File download (stream)
+    const fileResponse = await axios.get(tgFileUrl, {
+      responseType: 'stream',
+      timeout: 120000,
+    });
 
-    // Delete processing message
+    // 3. B2 pe upload karo
+    const uniqueKey = `videos/${Date.now()}_${crypto.randomBytes(4).toString('hex')}_${fileName}`;
+
+    await s3.send(new PutObjectCommand({
+      Bucket: B2_BUCKET,
+      Key: uniqueKey,
+      Body: fileResponse.data,
+      ContentType: file.mime_type || 'video/mp4',
+    }));
+
+    // 4. Signed URL banao (24 hours = 86400 seconds)
+    const signedUrl = await getSignedUrl(
+      s3,
+      new GetObjectCommand({ Bucket: B2_BUCKET, Key: uniqueKey }),
+      { expiresIn: 86400 }
+    );
+
+    // 5. Processing message delete karo
     await bot.deleteMessage(chatId, processingMsg.message_id).catch(() => {});
     processingMsg = null;
 
+    // 6. Success message
     const successText =
       `✨ <b>MayaJaal Media Link Generated!</b> ✨\n\n` +
       `📌 <b>File:</b> ${escapeHtml(fileName)}\n\n` +
-      `🔗 <b>Stream Link:</b>\n${accessLink}\n\n` +
-      `💡 <i>Click the link above to stream directly inside your MayaJaal app!</i>`;
+      `🔗 <b>Stream Link:</b>\n${signedUrl}\n\n` +
+      `⏰ <i>Valid for 24 hours.</i>`;
 
     await bot.sendMessage(chatId, successText, {
       parse_mode: 'HTML',
@@ -127,48 +138,20 @@ bot.on('message', async (msg) => {
     });
 
   } catch (error) {
-    console.error('File processing error:', error.message);
+    console.error('Upload error:', error.message);
 
     if (processingMsg) {
       await bot.deleteMessage(chatId, processingMsg.message_id).catch(() => {});
     }
 
-    bot.sendMessage(
-      chatId,
-      '❌ Failed to process media. Please ensure the bot is Admin in the storage channel and the MayaJaal backend is running.'
-    ).catch(() => {});
+    bot.sendMessage(chatId, '❌ Failed to upload media. Please try again.').catch(() => {});
   }
 });
 
 // ─────────────────────────────────────────────
-// 6. Error Handlers
+// Error handlers
 // ─────────────────────────────────────────────
-bot.on('polling_error', (err) => {
-  console.error('[polling_error]', err.code, err.message);
-});
+process.on('unhandledRejection', (reason) => console.error('[unhandledRejection]', reason));
+process.on('uncaughtException', (err) => console.error('[uncaughtException]', err.message));
 
-bot.on('webhook_error', (err) => {
-  console.error('[webhook_error]', err.message);
-});
-
-process.on('unhandledRejection', (reason) => {
-  console.error('[unhandledRejection]', reason);
-});
-
-process.on('uncaughtException', (err) => {
-  console.error('[uncaughtException]', err.message);
-});
-
-// ─────────────────────────────────────────────
-// 7. Graceful Shutdown
-// ─────────────────────────────────────────────
-function shutdown(signal) {
-  console.log(`\n${signal} received. Shutting down...`);
-  bot.stopPolling().catch(() => {});
-  setTimeout(() => process.exit(0), 2000);
-}
-
-process.on('SIGTERM', () => shutdown('SIGTERM'));
-process.on('SIGINT', () => shutdown('SIGINT'));
-
-console.log('🚀 MayaJaal Telegram Bot chal pada hai...');
+console.log('🚀 MayaJaal Bot chal pada hai...');
