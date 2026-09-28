@@ -13,8 +13,9 @@ const { Redis } = require('@upstash/redis');
 // ═══════════════════════════════════════════
 const redis = Redis.fromEnv();
 
-const WEB_PAGE_URL = process.env.WEB_PAGE_URL || 'https://1-9102.vercel.app';
+const WEB_PAGE_URL = process.env.WEB_PAGE_URL || 'https://matrix-api-seven.vercel.app';
 const BACKEND_URL = process.env.BACKEND_URL || 'https://mayajaal-backend.vercel.app';
+const TERABOX_API = 'https://terabox-worker.robinkumarshakya103.workers.dev/api';
 
 // ═══════════════════════════════════════════
 // 1. EXPRESS SERVER
@@ -32,12 +33,13 @@ const BASE_URL = process.env.RAILWAY_PUBLIC_DOMAIN
 app.get('/', (req, res) => res.send('MayaJaal Bot is running!'));
 app.get('/health', (req, res) => res.json({ status: 'ok', uptime: process.uptime() }));
 
+// ─── Short link redirect (regular files) ───
 app.get('/v/:id', (req, res) => {
   const data = linkStore.get(req.params.id);
   if (!data) {
     return res.status(404).send(`
       <html><body style="background:#0a0a0a;color:#fff;font-family:sans-serif;text-align:center;padding:80px 20px;">
-      <h1 style="color:#8b5cf6;">MayaJaal</h1>
+      <h1 style="color:#00ff88;">MayaJaal</h1>
       <h2>🔗 Link Not Found</h2>
       <p>Ye link invalid hai ya expire ho chuka hai.</p>
       </body></html>
@@ -47,13 +49,119 @@ app.get('/v/:id', (req, res) => {
     linkStore.delete(req.params.id);
     return res.status(410).send(`
       <html><body style="background:#0a0a0a;color:#fff;font-family:sans-serif;text-align:center;padding:80px 20px;">
-      <h1 style="color:#8b5cf6;">MayaJaal</h1>
+      <h1 style="color:#00ff88;">MayaJaal</h1>
       <h2>⏰ Link Expired</h2>
       <p>Ye link sirf 24 ghante ke liye valid tha.</p>
       </body></html>
     `);
   }
   res.redirect(data.url);
+});
+
+// ─── Terabox player route (MAYA JAAL branded) ───
+app.get('/tb/:id', async (req, res) => {
+  try {
+    const id = req.params.id;
+    const data = await redis.get(`terabox:${id}`);
+
+    if (!data) {
+      return res.status(404).send(`
+        <!DOCTYPE html>
+        <html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>MayaJaal</title>
+        <style>body{background:#000;color:#fff;font-family:sans-serif;text-align:center;padding:50px}h2{color:#00ff88;text-shadow:0 0 10px #00ff88}</style></head>
+        <body><h2>MayaJaal</h2><p>File not found or expired.</p></body></html>
+      `);
+    }
+
+    const parsed = typeof data === 'string' ? JSON.parse(data) : data;
+    const videoUrl = parsed.url;
+    const fileName = parsed.name || 'MayaJaal Video';
+
+    res.send(`
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>${fileName} · MayaJaal</title>
+        <style>
+          html, body {
+            margin: 0; padding: 0;
+            width: 100%; height: 100%;
+            background: #000;
+            overflow: hidden;
+            font-family: 'Courier New', monospace;
+          }
+          #player-wrap {
+            position: relative;
+            width: 100%; height: 100%;
+            display: flex; align-items: center; justify-content: center;
+            background: #000;
+          }
+          video {
+            width: 100%; height: 100%;
+            object-fit: contain;
+            background: #000;
+          }
+          .brand-tag {
+            position: fixed;
+            top: 10px; left: 50%;
+            transform: translateX(-50%);
+            color: #00ff88;
+            font-size: 11px;
+            letter-spacing: 3px;
+            text-transform: uppercase;
+            text-shadow: 0 0 8px #00ff88;
+            opacity: 0.75;
+            z-index: 100;
+            pointer-events: none;
+          }
+          .loading {
+            color: #00ff88;
+            font-size: 14px;
+            letter-spacing: 2px;
+            position: absolute;
+            z-index: 5;
+          }
+        </style>
+      </head>
+      <body>
+        <div class="brand-tag">● MAYA JAAL PLAYER</div>
+        <div id="player-wrap">
+          <div class="loading" id="loadingTxt">loading stream...</div>
+          <video id="player" controls autoplay playsinline preload="metadata" style="display:none;">
+            <source src="${videoUrl}">
+          </video>
+        </div>
+        <script>
+          const video = document.getElementById('player');
+          const loading = document.getElementById('loadingTxt');
+          video.addEventListener('loadedmetadata', function() {
+            loading.style.display = 'none';
+            video.style.display = 'block';
+          });
+          video.addEventListener('error', function() {
+            loading.textContent = '❌ Stream unavailable';
+            loading.style.color = '#ff5555';
+          });
+          setTimeout(function() {
+            if (video.readyState < 2) {
+              loading.textContent = '⚠️ Stream slow hai, wait karein...';
+            }
+          }, 5000);
+        </script>
+      </body>
+      </html>
+    `);
+  } catch (err) {
+    console.error('TB play error:', err.message);
+    res.status(500).send(`
+      <!DOCTYPE html>
+      <html><head><meta charset="UTF-8"><title>MayaJaal</title>
+      <style>body{background:#000;color:#fff;font-family:sans-serif;text-align:center;padding:50px}h2{color:#00ff88}</style></head>
+      <body><h2>MayaJaal</h2><p>Error loading media.</p></body></html>
+    `);
+  }
 });
 
 app.listen(PORT, () => {
@@ -137,6 +245,37 @@ function pickFile(msg) {
   return null;
 }
 
+// ═══════════════════════════════════════════
+// 7. TERABOX EXTRACTOR
+// ═══════════════════════════════════════════
+async function extractTeraboxLink(teraboxUrl) {
+  try {
+    const res = await axios.get(TERABOX_API, {
+      params: { url: teraboxUrl },
+      timeout: 60000,
+    });
+
+    if (!res.data || !res.data.success || !res.data.files || !res.data.files.length) {
+      return null;
+    }
+
+    const file = res.data.files[0];
+    const streamUrl = file.streaming_url || file.download_url;
+
+    if (!streamUrl) return null;
+
+    return {
+      url: streamUrl,
+      name: file.file_name || 'Terabox Video',
+      size: file.file_size || null,
+    };
+  } catch (err) {
+    console.error('Terabox extract error:', err.message);
+    return null;
+  }
+}
+
+// Cleanup expired short links
 setInterval(() => {
   const now = Date.now();
   let removed = 0;
@@ -150,7 +289,7 @@ setInterval(() => {
 }, 10 * 60 * 1000);
 
 // ═══════════════════════════════════════════
-// 7. SET BOT COMMANDS
+// 8. SET BOT COMMANDS
 // ═══════════════════════════════════════════
 async function setupBotCommands() {
   const commands = [
@@ -176,13 +315,14 @@ async function setupBotCommands() {
 }
 
 // ═══════════════════════════════════════════
-// 8. WELCOME
+// 9. WELCOME
 // ═══════════════════════════════════════════
 const WELCOME_TEXT =
   `🎬 <b>Welcome to MayaJaal Uploader Bot!</b>\n\n` +
   `Send me any of the following and I'll upload it and return a shareable link:\n\n` +
   `• <b>Telegram file</b> (video, document, audio)\n` +
   `• <b>Direct file URL</b> (e.g. https://example.com/video.mp4)\n` +
+  `• <b>Terabox link</b> (terabox.com / terasharefile.com)\n` +
   `• <b>Magnet link</b> (magnet:?xt=urn:btih:…)\n` +
   `• <b>.torrent URL</b>\n\n` +
   `<b>Commands:</b>\n` +
@@ -202,14 +342,13 @@ bot.onText(/\/start/, (msg) => {
 });
 
 // ═══════════════════════════════════════════
-// 9. /api COMMAND (WITH BUTTON + VERIFY)
+// 10. /api COMMAND
 // ═══════════════════════════════════════════
 bot.onText(/\/api(?:\s+(.+))?/, async (msg, match) => {
   const chatId = msg.chat.id;
   const token = match[1]?.trim();
   const user = getUser(chatId);
 
-  // ═══ CASE 1: No token → show button to open page ═══
   if (!token) {
     const keyboard = {
       inline_keyboard: [[
@@ -237,7 +376,6 @@ bot.onText(/\/api(?:\s+(.+))?/, async (msg, match) => {
     );
   }
 
-  // ═══ CASE 2: Token provided → verify via backend ═══
   try {
     const verifyRes = await axios.get(
       `${BACKEND_URL}/verify-key/${encodeURIComponent(token)}`
@@ -276,7 +414,7 @@ bot.onText(/\/api(?:\s+(.+))?/, async (msg, match) => {
 });
 
 // ═══════════════════════════════════════════
-// 10. OTHER COMMANDS
+// 11. OTHER COMMANDS
 // ═══════════════════════════════════════════
 bot.onText(/\/add_header(?:\s+([\s\S]+))?/, (msg, match) => {
   const chatId = msg.chat.id;
@@ -342,7 +480,7 @@ bot.onText(/\/settings/, (msg) => {
 });
 
 // ═══════════════════════════════════════════
-// 11. BUILD FINAL MESSAGE (header + link + footer)
+// 12. BUILD SUCCESS MESSAGE
 // ═══════════════════════════════════════════
 function buildSuccessMessage(user, fileName, sizeMB, shortUrl) {
   const parts = [];
@@ -371,13 +509,12 @@ function buildSuccessMessage(user, fileName, sizeMB, shortUrl) {
 }
 
 // ═══════════════════════════════════════════
-// 12. MEDIA HANDLER (Telegram files + URLs)
+// 13. MEDIA HANDLER
 // ═══════════════════════════════════════════
 bot.on('message', async (msg) => {
   const chatId = msg.chat.id;
   const text = msg.text || '';
 
-  // Commands ignore karo
   if (text.startsWith('/')) return;
 
   const user = getUser(chatId);
@@ -398,10 +535,65 @@ bot.on('message', async (msg) => {
   let statusMsg = null;
 
   try {
-    // ─── CASE 1: Telegram file ───
+    // ─── CASE 1: TERABOX LINK ───
+    const isTerabox = /terabox\.com|terasharefile\.com|1024terabox\.com|teraboxapp\.com|mirrorace\./i.test(text);
+
+    if (isTerabox && /^https?:\/\//i.test(text)) {
+      statusMsg = await bot.sendMessage(chatId,
+        `🔄 <i>Extracting Terabox link...</i>`,
+        { parse_mode: 'HTML' }
+      );
+
+      const extracted = await extractTeraboxLink(text);
+
+      if (!extracted || !extracted.url) {
+        await bot.deleteMessage(chatId, statusMsg.message_id).catch(() => {});
+        return bot.sendMessage(chatId,
+          `❌ <b>Terabox link extract nahi ho paya.</b>\n\n` +
+          `Possible reasons:\n` +
+          `• Link private hai\n` +
+          `• Link expire ho gaya\n` +
+          `• API temporarily down hai\n\n` +
+          `Kripya dusra link try karein.`,
+          { parse_mode: 'HTML' }
+        );
+      }
+
+      // Save to Redis
+      const shortId = crypto.randomBytes(4).toString('hex');
+      await redis.set(
+        `terabox:${shortId}`,
+        JSON.stringify({ url: extracted.url, name: extracted.name }),
+        { ex: 86400 }
+      );
+
+      const myLink = `${BASE_URL}/tb/${shortId}`;
+
+      await bot.deleteMessage(chatId, statusMsg.message_id).catch(() => {});
+      statusMsg = null;
+
+      await bot.sendMessage(chatId,
+        buildSuccessMessage(user, extracted.name, null, myLink),
+        { parse_mode: 'HTML', disable_web_page_preview: true }
+      );
+      return;
+    }
+
+    // ─── CASE 2: Telegram file ───
     const file = pickFile(msg);
 
     if (file) {
+      // 20MB check
+      if (file.file_size && file.file_size > 20 * 1024 * 1024) {
+        return bot.sendMessage(chatId,
+          `❌ <b>File is too big!</b>\n\n` +
+          `Telegram Bot API ki limit <b>20 MB</b> hai.\n` +
+          `Aapki file: <b>${(file.file_size / 1024 / 1024).toFixed(2)} MB</b>\n\n` +
+          `Kripya chhoti file bhejein ya direct URL use karein.`,
+          { parse_mode: 'HTML' }
+        );
+      }
+
       const rawName = file.file_name || msg.caption || `file_${Date.now()}`;
       const fileName = rawName.replace(/[^a-zA-Z0-9._-]/g, '_').slice(0, 80);
 
@@ -410,146 +602,4 @@ bot.on('message', async (msg) => {
         { parse_mode: 'HTML' }
       );
 
-      const fileInfo = await bot.getFile(file.file_id);
-      const tgFileUrl = `https://api.telegram.org/file/bot${TOKEN}/${fileInfo.file_path}`;
-
-      const response = await axios.get(tgFileUrl, {
-        responseType: 'arraybuffer',
-        timeout: 300000,
-        maxContentLength: 500 * 1024 * 1024,
-        maxBodyLength: 500 * 1024 * 1024,
-      });
-
-      const buffer = Buffer.from(response.data);
-      const sizeMB = (buffer.byteLength / 1024 / 1024).toFixed(2);
-
-      await bot.editMessageText(
-        `⬆️ <i>Uploading to MayaJaal cloud (${sizeMB} MB)...</i>`,
-        { chat_id: chatId, message_id: statusMsg.message_id, parse_mode: 'HTML' }
-      );
-
-      const uniqueKey = `uploads/${Date.now()}_${crypto.randomBytes(4).toString('hex')}_${fileName}`;
-      await s3.send(new PutObjectCommand({
-        Bucket: B2_BUCKET,
-        Key: uniqueKey,
-        Body: buffer,
-        ContentType: file.mime_type || 'application/octet-stream',
-        ContentLength: buffer.byteLength,
-      }));
-
-      const signedUrl = await getSignedUrl(
-        s3,
-        new GetObjectCommand({ Bucket: B2_BUCKET, Key: uniqueKey }),
-        { expiresIn: 86400 }
-      );
-
-      const shortUrl = createShortLink(signedUrl);
-
-      await bot.deleteMessage(chatId, statusMsg.message_id).catch(() => {});
-      statusMsg = null;
-
-      await bot.sendMessage(chatId, buildSuccessMessage(user, fileName, sizeMB, shortUrl), {
-        parse_mode: 'HTML',
-        disable_web_page_preview: true,
-      });
-      return;
-    }
-
-    // ─── CASE 2: URL / Magnet / Torrent ───
-    const isMagnet = text.startsWith('magnet:?');
-    const isTorrentUrl = /\.torrent(\?|$)/i.test(text);
-    const isHttpUrl = /^https?:\/\//i.test(text);
-
-    if (!isMagnet && !isTorrentUrl && !isHttpUrl) return;
-
-    if (isMagnet || isTorrentUrl) {
-      return bot.sendMessage(chatId,
-        `🧲 <b>Torrent support coming soon!</b>`,
-        { parse_mode: 'HTML' }
-      );
-    }
-
-    statusMsg = await bot.sendMessage(chatId,
-      `🔄 <i>Downloading from URL...</i>`,
-      { parse_mode: 'HTML' }
-    );
-
-    let fileName = 'file_' + Date.now();
-    try {
-      const urlObj = new URL(text);
-      const last = urlObj.pathname.split('/').pop();
-      if (last) fileName = decodeURIComponent(last);
-    } catch (e) {}
-    fileName = fileName.replace(/[^a-zA-Z0-9._-]/g, '_').slice(0, 80) || 'file_' + Date.now();
-
-    const response = await axios.get(text, {
-      responseType: 'arraybuffer',
-      timeout: 300000,
-      maxContentLength: 500 * 1024 * 1024,
-      maxBodyLength: 500 * 1024 * 1024,
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120.0 Safari/537.36',
-      },
-    });
-
-    const buffer = Buffer.from(response.data);
-    const contentType = response.headers['content-type'] || 'application/octet-stream';
-    const sizeMB = (buffer.byteLength / 1024 / 1024).toFixed(2);
-
-    await bot.editMessageText(
-      `⬆️ <i>Uploading to MayaJaal cloud (${sizeMB} MB)...</i>`,
-      { chat_id: chatId, message_id: statusMsg.message_id, parse_mode: 'HTML' }
-    );
-
-    const uniqueKey = `uploads/${Date.now()}_${crypto.randomBytes(4).toString('hex')}_${fileName}`;
-    await s3.send(new PutObjectCommand({
-      Bucket: B2_BUCKET,
-      Key: uniqueKey,
-      Body: buffer,
-      ContentType: contentType,
-      ContentLength: buffer.byteLength,
-    }));
-
-    const signedUrl = await getSignedUrl(
-      s3,
-      new GetObjectCommand({ Bucket: B2_BUCKET, Key: uniqueKey }),
-      { expiresIn: 86400 }
-    );
-
-    const shortUrl = createShortLink(signedUrl);
-
-    await bot.deleteMessage(chatId, statusMsg.message_id).catch(() => {});
-    statusMsg = null;
-
-    await bot.sendMessage(chatId, buildSuccessMessage(user, fileName, sizeMB, shortUrl), {
-      parse_mode: 'HTML',
-      disable_web_page_preview: true,
-    });
-
-  } catch (error) {
-    console.error('Upload error:', error.message);
-    if (statusMsg) {
-      await bot.deleteMessage(chatId, statusMsg.message_id).catch(() => {});
-    }
-    bot.sendMessage(chatId,
-      `❌ <b>Upload failed:</b>\n<code>${escapeHtml(error.message)}</code>`,
-      { parse_mode: 'HTML' }
-    ).catch(() => {});
-  }
-});
-
-// ═══════════════════════════════════════════
-// 13. ERRORS
-// ═══════════════════════════════════════════
-bot.on('polling_error', (error) => console.log('Polling error:', error.code, error.message));
-bot.on('error', (error) => console.log('Bot error:', error.message));
-process.on('unhandledRejection', (r) => console.error('[unhandledRejection]', r));
-process.on('uncaughtException', (e) => console.error('[uncaughtException]', e.message));
-
-// ═══════════════════════════════════════════
-// 14. STARTUP
-// ═══════════════════════════════════════════
-(async () => {
-  await setupBotCommands();
-  console.log('🚀 MayaJaal Remote URL Uploader Bot chal pada hai...');
-})();
+      const fileInfo = await bot.getFile(file.fil
