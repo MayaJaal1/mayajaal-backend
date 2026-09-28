@@ -17,7 +17,7 @@ app.listen(PORT, () => {
 // Telegram Bot Configuration
 const TOKEN = process.env.BOT_TOKEN;
 
-// ⚠️ YAHAN RAILWAY URL DAALO
+// ⚠️ YAHAN APNA RAILWAY URL DAALO
 const BACKEND_URL =
   process.env.BACKEND_URL ||
   'https://mayajaal-backend-production.up.railway.app';
