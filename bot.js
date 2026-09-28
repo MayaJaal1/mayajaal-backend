@@ -6,6 +6,15 @@ const axios = require('axios');
 const { S3Client, PutObjectCommand, GetObjectCommand } = require('@aws-sdk/client-s3');
 const { getSignedUrl } = require('@aws-sdk/s3-request-presigner');
 const crypto = require('crypto');
+const { Redis } = require('@upstash/redis');
+
+// ═══════════════════════════════════════════
+// 0. REDIS + CONFIG
+// ═══════════════════════════════════════════
+const redis = Redis.fromEnv();
+
+const WEB_PAGE_URL = process.env.WEB_PAGE_URL || 'https://1-9102.vercel.app';
+const BACKEND_URL = process.env.BACKEND_URL || 'https://mayajaal-backend.vercel.app';
 
 // ═══════════════════════════════════════════
 // 1. EXPRESS SERVER
@@ -146,7 +155,7 @@ setInterval(() => {
 async function setupBotCommands() {
   const commands = [
     { command: 'start', description: 'Get started & view all commands' },
-    { command: 'api', description: 'Link your MayaJaal account' },
+    { command: 'api', description: 'Get your Matrix Key & link account' },
     { command: 'add_header', description: 'Add text above your links' },
     { command: 'remove_header', description: 'Remove header text' },
     { command: 'add_footer', description: 'Add text below your links' },
@@ -177,7 +186,7 @@ const WELCOME_TEXT =
   `• <b>Magnet link</b> (magnet:?xt=urn:btih:…)\n` +
   `• <b>.torrent URL</b>\n\n` +
   `<b>Commands:</b>\n` +
-  `/api TOKEN — Link your MayaJaal account\n` +
+  `/api — Get your Matrix Key & link account\n` +
   `/add_header TEXT — Add text above your link\n` +
   `/remove_header — Remove header\n` +
   `/add_footer TEXT — Add text below your link\n` +
@@ -193,35 +202,82 @@ bot.onText(/\/start/, (msg) => {
 });
 
 // ═══════════════════════════════════════════
-// 9. COMMANDS
+// 9. /api COMMAND (WITH BUTTON + VERIFY)
 // ═══════════════════════════════════════════
-bot.onText(/\/api(?:\s+(.+))?/, (msg, match) => {
+bot.onText(/\/api(?:\s+(.+))?/, async (msg, match) => {
   const chatId = msg.chat.id;
   const token = match[1]?.trim();
   const user = getUser(chatId);
 
+  // ═══ CASE 1: No token → show button to open page ═══
   if (!token) {
+    const keyboard = {
+      inline_keyboard: [[
+        { text: '🔑 Get Matrix Key', url: `${WEB_PAGE_URL}?tg=${chatId}` }
+      ]]
+    };
+
     if (user.apiToken) {
       const masked = user.apiToken.slice(0, 6) + '...' + user.apiToken.slice(-4);
       return bot.sendMessage(chatId,
-        `✅ <b>API Token already linked:</b>\n<code>${escapeHtml(masked)}</code>\n\n` +
-        `Use <code>/api NEW_TOKEN</code> to update.`,
-        { parse_mode: 'HTML' }
+        `✅ <b>Matrix Key already linked:</b>\n<code>${escapeHtml(masked)}</code>\n\n` +
+        `Naya key lene ke liye niche button dabayein 👇`,
+        { parse_mode: 'HTML', reply_markup: keyboard }
       );
     }
+
     return bot.sendMessage(chatId,
-      `❌ <b>No API token linked.</b>\n\nUse:\n<code>/api YOUR_TOKEN</code>`,
-      { parse_mode: 'HTML' }
+      `🔐 <b>MayaJaal Account Linking</b>\n\n` +
+      `Apni <b>Matrix Key</b> lene ke liye niche button dabayein 👇\n\n` +
+      `<b>📌 Steps:</b>\n` +
+      `1️⃣ Button par tap karein\n` +
+      `2️⃣ Matrix Key copy karein\n` +
+      `3️⃣ Yahan bhejein: <code>/api YOUR_KEY</code>`,
+      { parse_mode: 'HTML', reply_markup: keyboard }
     );
   }
 
-  user.apiToken = token;
-  bot.sendMessage(chatId,
-    `✅ <b>API Token linked successfully!</b>`,
-    { parse_mode: 'HTML' }
-  );
+  // ═══ CASE 2: Token provided → verify via backend ═══
+  try {
+    const verifyRes = await axios.get(
+      `${BACKEND_URL}/verify-key/${encodeURIComponent(token)}`
+    );
+
+    if (!verifyRes.data.valid) {
+      return bot.sendMessage(chatId,
+        `❌ <b>Invalid Matrix Key</b>\n\n` +
+        `Sahi key lene ke liye <code>/api</code> bhejein.`,
+        { parse_mode: 'HTML' }
+      );
+    }
+
+    if (String(verifyRes.data.telegram_id) !== String(chatId)) {
+      return bot.sendMessage(chatId,
+        `❌ <b>Ye key kisi aur user ki hai.</b>\n\n` +
+        `Apni khud ki key lene ke liye <code>/api</code> bhejein.`,
+        { parse_mode: 'HTML' }
+      );
+    }
+
+    user.apiToken = token;
+    bot.sendMessage(chatId,
+      `✅ <b>Matrix Key linked successfully!</b>\n\n` +
+      `Ab aap files upload kar sakte hain. 🚀`,
+      { parse_mode: 'HTML' }
+    );
+
+  } catch (err) {
+    console.error('Verify error:', err.message);
+    bot.sendMessage(chatId,
+      `❌ <b>Verification failed.</b>\n\nThodi der baad try karein.`,
+      { parse_mode: 'HTML' }
+    );
+  }
 });
 
+// ═══════════════════════════════════════════
+// 10. OTHER COMMANDS
+// ═══════════════════════════════════════════
 bot.onText(/\/add_header(?:\s+([\s\S]+))?/, (msg, match) => {
   const chatId = msg.chat.id;
   const text = match[1]?.trim();
@@ -277,7 +333,7 @@ bot.onText(/\/settings/, (msg) => {
   const u = getUser(chatId);
   const text =
     `⚙️ <b>Your MayaJaal Settings</b>\n\n` +
-    `🔑 <b>API Token:</b> ${u.apiToken ? '✅ Linked' : '❌ Not linked'}\n` +
+    `🔑 <b>Matrix Key:</b> ${u.apiToken ? '✅ Linked' : '❌ Not linked'}\n` +
     `📝 <b>Header:</b> ${u.header ? escapeHtml(u.header) : '<i>(none)</i>'}\n` +
     `📝 <b>Footer:</b> ${u.footer ? escapeHtml(u.footer) : '<i>(none)</i>'}\n` +
     `💬 <b>Surrounding text:</b> ${u.enableText ? 'ON' : 'OFF'}\n` +
@@ -286,7 +342,7 @@ bot.onText(/\/settings/, (msg) => {
 });
 
 // ═══════════════════════════════════════════
-// 10. BUILD FINAL MESSAGE (header + link + footer)
+// 11. BUILD FINAL MESSAGE (header + link + footer)
 // ═══════════════════════════════════════════
 function buildSuccessMessage(user, fileName, sizeMB, shortUrl) {
   const parts = [];
@@ -315,7 +371,7 @@ function buildSuccessMessage(user, fileName, sizeMB, shortUrl) {
 }
 
 // ═══════════════════════════════════════════
-// 11. MEDIA HANDLER (Telegram files + URLs)
+// 12. MEDIA HANDLER (Telegram files + URLs)
 // ═══════════════════════════════════════════
 bot.on('message', async (msg) => {
   const chatId = msg.chat.id;
@@ -328,12 +384,11 @@ bot.on('message', async (msg) => {
 
   // API token check
   if (!user.apiToken) {
-    // Sirf tab error bhejo jab file ya URL bheja ho
     const fileCheck = pickFile(msg);
     const isUrl = /^https?:\/\//i.test(text) || text.startsWith('magnet:?');
     if (fileCheck || isUrl) {
       return bot.sendMessage(chatId,
-        `❌ <b>Pehle apna API token link karo:</b>\n\n<code>/api YOUR_TOKEN</code>`,
+        `❌ <b>Pehle apna Matrix Key link karo:</b>\n\n<code>/api</code> bhejein`,
         { parse_mode: 'HTML' }
       );
     }
@@ -484,7 +539,7 @@ bot.on('message', async (msg) => {
 });
 
 // ═══════════════════════════════════════════
-// 12. ERRORS
+// 13. ERRORS
 // ═══════════════════════════════════════════
 bot.on('polling_error', (error) => console.log('Polling error:', error.code, error.message));
 bot.on('error', (error) => console.log('Bot error:', error.message));
@@ -492,7 +547,7 @@ process.on('unhandledRejection', (r) => console.error('[unhandledRejection]', r)
 process.on('uncaughtException', (e) => console.error('[uncaughtException]', e.message));
 
 // ═══════════════════════════════════════════
-// 13. STARTUP
+// 14. STARTUP
 // ═══════════════════════════════════════════
 (async () => {
   await setupBotCommands();
