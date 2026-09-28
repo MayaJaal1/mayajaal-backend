@@ -64,23 +64,71 @@ function pickFile(msg) {
   return null;
 }
 
-// 6. URL Shortener (TinyURL — free, no API key)
+// 6. URL Shortener — Multi-provider fallback
 async function shortenUrl(longUrl) {
+  // Provider 1: TinyURL
   try {
     const res = await axios.get('https://tinyurl.com/api-create.php', {
       params: { url: longUrl },
       timeout: 8000,
     });
-    const shortUrl = String(res.data).trim();
-    if (!shortUrl.startsWith('http')) {
-      console.error('Shorten returned invalid:', shortUrl);
-      return longUrl;
+    const s = String(res.data).trim();
+    if (s.startsWith('http') && s.length < longUrl.length) {
+      console.log('✅ Shortened via TinyURL:', s);
+      return s;
     }
-    return shortUrl;
-  } catch (err) {
-    console.error('Shorten failed:', err.message);
-    return longUrl;
+  } catch (e) {
+    console.error('TinyURL failed:', e.message);
   }
+
+  // Provider 2: is.gd
+  try {
+    const res = await axios.get('https://is.gd/create.php', {
+      params: { format: 'simple', url: longUrl },
+      timeout: 8000,
+    });
+    const s = String(res.data).trim();
+    if (s.startsWith('http') && s.length < longUrl.length) {
+      console.log('✅ Shortened via is.gd:', s);
+      return s;
+    }
+  } catch (e) {
+    console.error('is.gd failed:', e.message);
+  }
+
+  // Provider 3: v.gd
+  try {
+    const res = await axios.get('https://v.gd/create.php', {
+      params: { format: 'simple', url: longUrl },
+      timeout: 8000,
+    });
+    const s = String(res.data).trim();
+    if (s.startsWith('http') && s.length < longUrl.length) {
+      console.log('✅ Shortened via v.gd:', s);
+      return s;
+    }
+  } catch (e) {
+    console.error('v.gd failed:', e.message);
+  }
+
+  // Provider 4: clck.ru
+  try {
+    const res = await axios.get('https://clck.ru/--', {
+      params: { url: longUrl },
+      timeout: 8000,
+    });
+    const s = String(res.data).trim();
+    if (s.startsWith('http') && s.length < longUrl.length) {
+      console.log('✅ Shortened via clck.ru:', s);
+      return s;
+    }
+  } catch (e) {
+    console.error('clck.ru failed:', e.message);
+  }
+
+  // Sab fail — original bhej do
+  console.error('❌ All shorteners failed, using original URL');
+  return longUrl;
 }
 
 // 7. /start
