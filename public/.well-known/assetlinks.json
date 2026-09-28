@@ -1,0 +1,12 @@
+[
+  {
+    "relation": ["delegate_permission/common.handle_all_urls"],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "com.example.mayajaall",
+      "sha256_cert_fingerprints": [
+        "10:8B:E2:17:FD:2C:1C:7A:36:B4:35:61:2F:06:DD:69:DC:04:DE:16:B7:8A:42:F1:4B:05:B9:C1:47:18:3A:BA"
+      ]
+    }
+  }
+]
