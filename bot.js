@@ -33,7 +33,7 @@ bot.onText(/\/start/, async (msg) => {
     const welcomeText = `🎬 **Welcome to MayaJaal, ${firstName}!**\n\n` +
       `⚡ Your personal high-speed streaming portal is now successfully linked.\n\n` +
       `📂 **How to use:**\n` +
-      `Simply send any Video, Movie, or Document here, and MayaJaal will instantly generate a direct app streaming link!`;
+      `Simply send any Video, Movie, or Document here, and MayaJaal will instantly generate a clickable direct streaming link!`;
 
     bot.sendMessage(chatId, welcomeText, { parse_mode: 'Markdown' });
   } catch (error) {
@@ -42,7 +42,7 @@ bot.onText(/\/start/, async (msg) => {
   }
 });
 
-// 4. File, Video, Photo Message Handling & Custom App Deep Link Generation
+// 4. File Message Handling & Clickable Web Link Generation
 bot.on('message', async (msg) => {
   const chatId = msg.chat.id;
 
@@ -63,16 +63,16 @@ bot.on('message', async (msg) => {
       const forwardedMsg = await bot.forwardMessage(STORAGE_CHANNEL, chatId, msg.message_id);
       const fileMessageId = forwardedMsg.message_id;
 
-      // Generate Custom App Deep Link (yeh seedha app ko trigger karega)
-      const accessLink = `mayajaal://stream?msgId=${fileMessageId}`;
+      // Generate Clickable Web Link (Diskwala style)
+      const accessLink = `${BACKEND_URL}/stream?msgId=${fileMessageId}`;
 
       // Delete processing notice and send final clickable link success box
       await bot.deleteMessage(chatId, processingMsg.message_id);
 
       const successText = `✨ **MayaJaal Media Link Generated!** ✨\n\n` +
         `📌 **File:** ${fileName}\n\n` +
-        `🔗 **Stream Link:**\n\`${accessLink}\`\n\n` +
-        `💡 *Click the link above to open and stream directly inside your MayaJaal app!*`;
+        `🔗 **Stream Link:**\n${accessLink}\n\n` +
+        `💡 *Click the link above to stream directly inside your MayaJaal app!*`;
 
       bot.sendMessage(chatId, successText, { parse_mode: 'Markdown' });
 
