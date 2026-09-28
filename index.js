@@ -1,106 +1,109 @@
 const express = require('express');
 const axios = require('axios');
+const { Redis } = require('@upstash/redis');
 
 const app = express();
 app.use(express.json());
 
-const TOKEN = process.env.BOT_TOKEN || '8697090840:AAHuAlkm2mmbHx_pCtu9ZDy5kfpVtvVQ8ZA';
-const VERCEL_URL = process.env.VERCEL_URL || 'https://mayajaal-backend-git-main-ajayr0201-9102.vercel.app';
+const TOKEN = process.env.BOT_TOKEN;
+
+if (!TOKEN) {
+  console.error('BOT_TOKEN environment variable is missing');
+}
+
+const redis = Redis.fromEnv();
 
 app.get('/', (req, res) => {
   res.send('MayaJaal Backend Streaming Server is Active!');
 });
 
-// Telegram Webhook Endpoint
-app.post('/webhook', async (req, res) => {
-  res.status(200).send('OK');
-
+// Save mapping: message ID -> Telegram file ID
+app.post('/save', async (req, res) => {
   try {
-    const update = req.body;
-    if (update && update.message) {
-      const chatId = update.message.chat.id;
-      const text = update.message.text;
+    const { msgId, fileId } = req.body;
 
-      if (text && text.startsWith('/start')) {
-        await axios.post(`https://api.telegram.org/bot${TOKEN}/sendMessage`, {
-          chat_id: chatId,
-          text: 'Welcome to MayaJaal! 🎬\n\nAb koi bhi video yahan bhejo, main turant aapko direct streaming link de dunga!'
-        });
-      } else {
-        const media = update.message.video || update.message.document || update.message.audio;
-        if (media) {
-          const fileId = media.file_id;
-          const streamLink = `${VERCEL_URL}/stream?fileId=${encodeURIComponent(fileId)}`;
-          
-          await axios.post(`https://api.telegram.org/bot${TOKEN}/sendMessage`, {
-            chat_id: chatId,
-            text: `✅ File processed successfully!\n\n🔗 Click to watch or copy link for App:\n${streamLink}`,
-            disable_web_page_preview: true
-          });
-        }
-      }
+    if (!msgId || !fileId) {
+      return res.status(400).json({
+        error: 'msgId and fileId are required'
+      });
     }
+
+    await redis.set(`file:${msgId}`, fileId);
+
+    res.json({
+      success: true,
+      msgId,
+      message: 'File mapping saved'
+    });
   } catch (error) {
-    console.error('Webhook error:', error.message);
+    console.error('Redis save error:', error.message);
+    res.status(500).json({ error: 'Failed to save mapping' });
   }
 });
 
-// Streaming Page Route with Video Player
-app.get('/stream', async (req, res) => {
-  const fileId = req.query.fileId;
+// MayaJaal short stream route
+app.get('/maya/:msgId', async (req, res) => {
+  try {
+    const msgId = req.params.msgId;
 
-  if (!fileId) {
-    return res.send(`
+    const fileId = await redis.get(`file:${msgId}`);
+
+    if (!fileId) {
+      return res.status(404).send(`
+        <h2>MayaJaal</h2>
+        <p>File not found.</p>
+      `);
+    }
+
+    const fileResponse = await axios.get(
+      `https://api.telegram.org/bot${TOKEN}/getFile?file_id=${encodeURIComponent(fileId)}`
+    );
+
+    const filePath = fileResponse.data.result.file_path;
+
+    const directVideoUrl =
+      `https://api.telegram.org/file/bot${TOKEN}/${filePath}`;
+
+    res.send(`
       <!DOCTYPE html>
-      <html lang="en">
+      <html>
       <head>
-          <meta charset="UTF-8">
-          <meta name="viewport" content="width=device-width, initial-scale=1.0">
-          <title>MayaJaal Stream</title>
-          <style>
-              body { margin: 0; background-color: #000; color: #fff; display: flex; justify-content: center; align-items: center; height: 100vh; font-family: sans-serif; text-align: center; }
-          </style>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>MayaJaal Stream</title>
+        <style>
+          html, body {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100%;
+            background: #000;
+          }
+
+          video {
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
+          }
+        </style>
       </head>
+
       <body>
-          <div>
-              <h2>🎬 MayaJaal Secure Stream</h2>
-              <p>Please open a valid video link generated from your Telegram Bot.</p>
-          </div>
+        <video controls autoplay playsinline>
+          <source src="${directVideoUrl}">
+          Your browser does not support video playback.
+        </video>
       </body>
       </html>
     `);
-  }
 
-  try {
-    const fileResponse = await axios.get(`https://api.telegram.org/bot${TOKEN}/getFile?file_id=${fileId}`);
-    const filePath = fileResponse.data.result.file_path;
-    const directVideoUrl = `https://api.telegram.org/file/bot${TOKEN}/${filePath}`;
-
-    const htmlResponse = `
-      <!DOCTYPE html>
-      <html lang="en">
-      <head>
-          <meta charset="UTF-8">
-          <meta name="viewport" content="width=device-width, initial-scale=1.0">
-          <title>MayaJaal Secure Stream</title>
-          <style>
-              body { margin: 0; background-color: #000; display: flex; justify-content: center; align-items: center; height: 100vh; }
-              video { width: 100%; height: 100%; max-height: 100vh; outline: none; }
-          </style>
-      </head>
-      <body>
-          <video controls autoplay playsinline>
-              <source src="${directVideoUrl}" type="video/mp4">
-              Your browser does not support the video tag.
-          </video>
-      </body>
-      </html>
-    `;
-
-    res.send(htmlResponse);
   } catch (error) {
-    console.error('Streaming error:', error.message);
-    res.status(500).send('<h3>Error loading media stream from Telegram.</h3>');
+    console.error('Stream error:', error.message);
+
+    res.status(500).send(`
+      <h2>MayaJaal</h2>
+      <p>Error loading the media.</p>
+    `);
   }
 });
 
