@@ -276,7 +276,7 @@ const WELCOME_TEXT =
   `Send me any of the following and I'll upload it and return a shareable link:\n\n` +
   `• <b>Telegram file</b> (video, document, audio)\n` +
   `• <b>Direct file URL</b> (e.g. https://example.com/video.mp4)\n` +
-  `• <b>Terabox link</b> (all Terabox domains supported)\n` +
+  `• <b>Terabox link</b> (terabox.com / terasharefile.com)\n` +
   `• <b>Magnet link</b> (magnet:?xt=urn:btih:…)\n` +
   `• <b>.torrent URL</b>\n\n` +
   `<b>Commands:</b>\n` +
@@ -488,8 +488,8 @@ bot.on('message', async (msg) => {
   let statusMsg = null;
 
   try {
-    // ─── CASE 1: TERABOX LINK (ALL DOMAINS) ───
-    const isTerabox = /(terabox|terasharefile|1024tera|teraboxapp|teraboxshare|teraboxlink|tibibox|momerybox|mirrorbox|4funbox|dubox|freeterabox|nekopoi)/i.test(text);
+    // ─── CASE 1: TERABOX LINK ───
+    const isTerabox = /terabox\.com|terasharefile\.com|1024terabox\.com|teraboxapp\.com/i.test(text);
 
     if (isTerabox && /^https?:\/\//i.test(text)) {
       statusMsg = await bot.sendMessage(chatId,
