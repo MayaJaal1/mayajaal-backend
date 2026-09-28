@@ -64,7 +64,21 @@ function pickFile(msg) {
   return null;
 }
 
-// 6. /start
+// 6. URL Shortener (is.gd — free)
+async function shortenUrl(longUrl) {
+  try {
+    const res = await axios.get('https://is.gd/create.php', {
+      params: { format: 'simple', url: longUrl },
+      timeout: 5000,
+    });
+    return res.data; // short URL
+  } catch (err) {
+    console.error('Shorten failed:', err.message);
+    return longUrl; // fail hone pe original link bhej do
+  }
+}
+
+// 7. /start
 bot.onText(/\/start/, async (msg) => {
   const chatId = msg.chat.id;
   const firstName = msg.from.first_name || 'User';
@@ -79,7 +93,7 @@ bot.onText(/\/start/, async (msg) => {
   bot.sendMessage(chatId, welcomeText, { parse_mode: 'HTML' });
 });
 
-// 7. Media Handler
+// 8. Media Handler
 bot.on('message', async (msg) => {
   const chatId = msg.chat.id;
   if (msg.text && msg.text.startsWith('/start')) return;
@@ -99,21 +113,17 @@ bot.on('message', async (msg) => {
       { parse_mode: 'HTML' }
     );
 
-    // 1. Telegram se file info lo
     const fileInfo = await bot.getFile(file.file_id);
     const tgFileUrl = `https://api.telegram.org/file/bot${TOKEN}/${fileInfo.file_path}`;
 
-    // 2. File download as BUFFER (not stream)
     const fileResponse = await axios.get(tgFileUrl, {
       responseType: 'arraybuffer',
       timeout: 120000,
-      maxContentLength: 100 * 1024 * 1024, // 100 MB
+      maxContentLength: 100 * 1024 * 1024,
       maxBodyLength: 100 * 1024 * 1024,
     });
 
     const fileBuffer = Buffer.from(fileResponse.data);
-
-    // 3. B2 pe upload (ContentLength ke saath)
     const uniqueKey = `videos/${Date.now()}_${crypto.randomBytes(4).toString('hex')}_${fileName}`;
 
     await s3.send(new PutObjectCommand({
@@ -124,24 +134,23 @@ bot.on('message', async (msg) => {
       ContentLength: fileBuffer.byteLength,
     }));
 
-    // 4. Signed URL (24 hours)
     const signedUrl = await getSignedUrl(
       s3,
       new GetObjectCommand({ Bucket: B2_BUCKET, Key: uniqueKey }),
       { expiresIn: 86400 }
     );
 
-    // 5. Processing message delete
+    const shortUrl = await shortenUrl(signedUrl);
+
     if (processingMsg) {
       await bot.deleteMessage(chatId, processingMsg.message_id).catch(() => {});
       processingMsg = null;
     }
 
-    // 6. Success message
     const successText =
       `✨ <b>MayaJaal Media Link Generated!</b> ✨\n\n` +
       `📌 <b>File:</b> ${escapeHtml(fileName)}\n\n` +
-      `🔗 <b>Stream Link:</b>\n${signedUrl}\n\n` +
+      `🔗 <b>Stream Link:</b>\n${shortUrl}\n\n` +
       `⏰ <i>Valid for 24 hours. File will be auto-deleted after that.</i>`;
 
     await bot.sendMessage(chatId, successText, {
@@ -163,7 +172,7 @@ bot.on('message', async (msg) => {
   }
 });
 
-// 8. Error Handlers
+// 9. Errors
 bot.on('polling_error', (error) => {
   console.log('Polling error:', error.code, error.message);
 });
