@@ -99,34 +99,45 @@ bot.on('message', async (msg) => {
       { parse_mode: 'HTML' }
     );
 
+    // 1. Telegram se file info lo
     const fileInfo = await bot.getFile(file.file_id);
     const tgFileUrl = `https://api.telegram.org/file/bot${TOKEN}/${fileInfo.file_path}`;
 
+    // 2. File download as BUFFER (not stream)
     const fileResponse = await axios.get(tgFileUrl, {
-      responseType: 'stream',
+      responseType: 'arraybuffer',
       timeout: 120000,
+      maxContentLength: 100 * 1024 * 1024, // 100 MB
+      maxBodyLength: 100 * 1024 * 1024,
     });
 
+    const fileBuffer = Buffer.from(fileResponse.data);
+
+    // 3. B2 pe upload (ContentLength ke saath)
     const uniqueKey = `videos/${Date.now()}_${crypto.randomBytes(4).toString('hex')}_${fileName}`;
 
     await s3.send(new PutObjectCommand({
       Bucket: B2_BUCKET,
       Key: uniqueKey,
-      Body: fileResponse.data,
+      Body: fileBuffer,
       ContentType: file.mime_type || 'video/mp4',
+      ContentLength: fileBuffer.byteLength,
     }));
 
+    // 4. Signed URL (24 hours)
     const signedUrl = await getSignedUrl(
       s3,
       new GetObjectCommand({ Bucket: B2_BUCKET, Key: uniqueKey }),
       { expiresIn: 86400 }
     );
 
+    // 5. Processing message delete
     if (processingMsg) {
       await bot.deleteMessage(chatId, processingMsg.message_id).catch(() => {});
       processingMsg = null;
     }
 
+    // 6. Success message
     const successText =
       `✨ <b>MayaJaal Media Link Generated!</b> ✨\n\n` +
       `📌 <b>File:</b> ${escapeHtml(fileName)}\n\n` +
@@ -152,7 +163,7 @@ bot.on('message', async (msg) => {
   }
 });
 
-// 8. Errors
+// 8. Error Handlers
 bot.on('polling_error', (error) => {
   console.log('Polling error:', error.code, error.message);
 });
