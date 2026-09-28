@@ -64,17 +64,22 @@ function pickFile(msg) {
   return null;
 }
 
-// 6. URL Shortener (is.gd — free)
+// 6. URL Shortener (TinyURL — free, reliable)
 async function shortenUrl(longUrl) {
   try {
-    const res = await axios.get('https://is.gd/create.php', {
-      params: { format: 'simple', url: longUrl },
-      timeout: 5000,
+    const res = await axios.get('https://tinyurl.com/api-create.php', {
+      params: { url: longUrl },
+      timeout: 8000,
     });
-    return res.data; // short URL
+    const shortUrl = String(res.data).trim();
+    if (!shortUrl.startsWith('http')) {
+      console.error('Shorten returned invalid:', shortUrl);
+      return longUrl;
+    }
+    return shortUrl;
   } catch (err) {
     console.error('Shorten failed:', err.message);
-    return longUrl; // fail hone pe original link bhej do
+    return longUrl;
   }
 }
 
