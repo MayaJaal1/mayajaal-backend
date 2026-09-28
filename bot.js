@@ -11,6 +11,16 @@ const crypto = require('crypto');
 const app = express();
 const PORT = process.env.PORT || 3000;
 
+// Short link store (in-memory)
+const linkStore = new Map();
+const LINK_TTL_MS = 24 * 60 * 60 * 1000; // 24 hours
+
+// Base URL detect karo
+const BASE_URL =
+  process.env.RAILWAY_PUBLIC_DOMAIN
+    ? `https://${process.env.RAILWAY_PUBLIC_DOMAIN}`
+    : process.env.BASE_URL || `http://localhost:${PORT}`;
+
 app.get('/', (req, res) => {
   res.send('MayaJaal Bot is running and alive!');
 });
@@ -19,8 +29,37 @@ app.get('/health', (req, res) => {
   res.json({ status: 'ok', uptime: process.uptime() });
 });
 
+// Short link redirect endpoint
+app.get('/v/:id', (req, res) => {
+  const { id } = req.params;
+  const data = linkStore.get(id);
+
+  if (!data) {
+    return res.status(404).send(`
+      <html><body style="font-family:sans-serif;text-align:center;padding:50px;">
+      <h2>🔗 Link not found</h2>
+      <p>This link is invalid or has expired.</p>
+      </body></html>
+    `);
+  }
+
+  if (Date.now() > data.expiresAt) {
+    linkStore.delete(id);
+    return res.status(410).send(`
+      <html><body style="font-family:sans-serif;text-align:center;padding:50px;">
+      <h2>⏰ Link expired</h2>
+      <p>This link was valid for 24 hours only.</p>
+      </body></html>
+    `);
+  }
+
+  // B2 signed URL pe redirect karo
+  res.redirect(data.url);
+});
+
 app.listen(PORT, () => {
   console.log(`Server is listening on port ${PORT}`);
+  console.log(`Base URL: ${BASE_URL}`);
 });
 
 // 2. Config
@@ -64,72 +103,28 @@ function pickFile(msg) {
   return null;
 }
 
-// 6. URL Shortener — Multi-provider fallback
-async function shortenUrl(longUrl) {
-  // Provider 1: TinyURL
-  try {
-    const res = await axios.get('https://tinyurl.com/api-create.php', {
-      params: { url: longUrl },
-      timeout: 8000,
-    });
-    const s = String(res.data).trim();
-    if (s.startsWith('http') && s.length < longUrl.length) {
-      console.log('✅ Shortened via TinyURL:', s);
-      return s;
-    }
-  } catch (e) {
-    console.error('TinyURL failed:', e.message);
-  }
-
-  // Provider 2: is.gd
-  try {
-    const res = await axios.get('https://is.gd/create.php', {
-      params: { format: 'simple', url: longUrl },
-      timeout: 8000,
-    });
-    const s = String(res.data).trim();
-    if (s.startsWith('http') && s.length < longUrl.length) {
-      console.log('✅ Shortened via is.gd:', s);
-      return s;
-    }
-  } catch (e) {
-    console.error('is.gd failed:', e.message);
-  }
-
-  // Provider 3: v.gd
-  try {
-    const res = await axios.get('https://v.gd/create.php', {
-      params: { format: 'simple', url: longUrl },
-      timeout: 8000,
-    });
-    const s = String(res.data).trim();
-    if (s.startsWith('http') && s.length < longUrl.length) {
-      console.log('✅ Shortened via v.gd:', s);
-      return s;
-    }
-  } catch (e) {
-    console.error('v.gd failed:', e.message);
-  }
-
-  // Provider 4: clck.ru
-  try {
-    const res = await axios.get('https://clck.ru/--', {
-      params: { url: longUrl },
-      timeout: 8000,
-    });
-    const s = String(res.data).trim();
-    if (s.startsWith('http') && s.length < longUrl.length) {
-      console.log('✅ Shortened via clck.ru:', s);
-      return s;
-    }
-  } catch (e) {
-    console.error('clck.ru failed:', e.message);
-  }
-
-  // Sab fail — original bhej do
-  console.error('❌ All shorteners failed, using original URL');
-  return longUrl;
+// 6. Custom short link generator
+function createShortLink(signedUrl) {
+  const id = crypto.randomBytes(4).toString('hex'); // 8 chars
+  linkStore.set(id, {
+    url: signedUrl,
+    expiresAt: Date.now() + LINK_TTL_MS,
+  });
+  return `${BASE_URL}/v/${id}`;
 }
+
+// Cleanup expired links (har 10 min)
+setInterval(() => {
+  const now = Date.now();
+  let removed = 0;
+  for (const [id, data] of linkStore.entries()) {
+    if (now > data.expiresAt) {
+      linkStore.delete(id);
+      removed++;
+    }
+  }
+  if (removed > 0) console.log(`🧹 Cleaned ${removed} expired links`);
+}, 10 * 60 * 1000);
 
 // 7. /start
 bot.onText(/\/start/, async (msg) => {
@@ -193,7 +188,8 @@ bot.on('message', async (msg) => {
       { expiresIn: 86400 }
     );
 
-    const shortUrl = await shortenUrl(signedUrl);
+    // Custom short link banao
+    const shortUrl = createShortLink(signedUrl);
 
     if (processingMsg) {
       await bot.deleteMessage(chatId, processingMsg.message_id).catch(() => {});
