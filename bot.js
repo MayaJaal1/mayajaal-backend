@@ -119,6 +119,46 @@ app.get('/tb/:id', async (req, res) => {
   }
 });
 
+// ═══════════════════════════════════════════
+// ✅ NAYA ROUTE 1: ANDROID APP LINKS VERIFICATION
+// ═══════════════════════════════════════════
+app.get('/.well-known/assetlinks.json', (req, res) => {
+  res.set('Content-Type', 'application/json');
+  res.json([{
+    relation: ["delegate_permission/common.handle_all_urls"],
+    target: {
+      namespace: "android_app",
+      package_name: "com.example.mayajaall",
+      sha256_cert_fingerprints: [
+        "YAHAN_SHA256_FINGERPRINT_PASTE_KARO"
+      ]
+    }
+  }]);
+});
+
+// ═══════════════════════════════════════════
+// ✅ NAYA ROUTE 2: APP KE LIYE JSON API (direct video URL)
+// ═══════════════════════════════════════════
+app.get('/api/tb/:id', async (req, res) => {
+  try {
+    const id = req.params.id;
+    const data = await redis.get(`terabox:${id}`);
+
+    if (!data) {
+      return res.status(404).json({ error: 'Not found or expired' });
+    }
+
+    const parsed = typeof data === 'string' ? JSON.parse(data) : data;
+    res.json({
+      video_url: parsed.url,
+      file_name: parsed.name || 'MayaJaal Video'
+    });
+  } catch (err) {
+    console.error('API tb error:', err.message);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
 app.listen(PORT, () => {
   console.log(`✅ Server listening on port ${PORT}`);
   console.log(`🌐 Base URL: ${BASE_URL}`);
@@ -555,8 +595,8 @@ function buildSuccessMessage(user, fileName, sizeMB, shortUrl) {
   parts.push(`⏰ <i>Valid 24 hours</i>`);
 
   return parts.join('\n');
-  }// ═══════════════════════════════════════════
-// 15. MEDIA HANDLER (Sirf 1 change — button add)
+      }// ═══════════════════════════════════════════
+// 15. MEDIA HANDLER
 // ═══════════════════════════════════════════
 bot.on('message', async (msg) => {
   const chatId = msg.chat.id;
@@ -566,7 +606,6 @@ bot.on('message', async (msg) => {
 
   const user = getUser(chatId);
 
-  // ═══ CHANGE: Ab button bhi bhejega ═══
   if (!user.apiToken) {
     const fileCheck = pickFile(msg);
     const isUrl = /^https?:\/\//i.test(text) || text.startsWith('magnet:?');
