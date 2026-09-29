@@ -57,7 +57,7 @@ app.get('/v/:id', (req, res) => {
   res.redirect(data.url);
 });
 
-// ─── Streaming player route (Terabox + Diskwala + others) ───
+// ─── Streaming player route ───
 app.get('/tb/:id', async (req, res) => {
   try {
     const id = req.params.id;
@@ -153,14 +153,20 @@ const s3 = new S3Client({
 });
 
 // ═══════════════════════════════════════════
-// 4. USER SETTINGS
+// 4. USER SETTINGS (Redis-backed persistent)
 // ═══════════════════════════════════════════
 const userSettings = new Map();
 
-function getUser(chatId) {
+async function getUser(chatId) {
   if (!userSettings.has(chatId)) {
+    let savedToken = null;
+    try {
+      savedToken = await redis.get(`token:${chatId}`);
+    } catch (e) {
+      console.error('Redis getUser error:', e.message);
+    }
     userSettings.set(chatId, {
-      apiToken: null,
+      apiToken: savedToken || null,
       header: null,
       footer: null,
       bold: false,
@@ -199,9 +205,7 @@ function pickFile(msg) {
   if (msg.audio) return msg.audio;
   if (Array.isArray(msg.photo) && msg.photo.length) return msg.photo[msg.photo.length - 1];
   return null;
-}
-
-// ═══════════════════════════════════════════
+}// ═══════════════════════════════════════════
 // 7. TERABOX EXTRACTOR (ALL DOMAINS)
 // ═══════════════════════════════════════════
 async function extractTeraboxLink(teraboxUrl) {
@@ -247,13 +251,11 @@ async function extractDiskwalaLink(diskwalaUrl) {
 
     const html = typeof res.data === 'string' ? res.data : JSON.stringify(res.data);
 
-    // B2 URL dhundho
     const b2Match = html.match(/https?:\/\/[^"'\s\\]+\.backblazeb2\.com[^"'\s\\]*/i);
     if (b2Match) {
       return { url: b2Match[0], name: 'Diskwala Video', size: null };
     }
 
-    // General video patterns
     const patterns = [
       /"downloadUrl"\s*:\s*"([^"]+)"/i,
       /"fileUrl"\s*:\s*"([^"]+)"/i,
@@ -290,13 +292,16 @@ setInterval(() => {
     }
   }
   if (removed > 0) console.log(`🧹 Cleaned ${removed} expired links`);
-}, 10 * 60 * 1000);// ═══════════════════════════════════════════
+}, 10 * 60 * 1000);
+
+// ═══════════════════════════════════════════
 // 9. SET BOT COMMANDS
 // ═══════════════════════════════════════════
 async function setupBotCommands() {
   const commands = [
     { command: 'start', description: 'Get started & view all commands' },
     { command: 'api', description: 'Get your Matrix Key & link account' },
+    { command: 'logout', description: 'Disconnect your account' },
     { command: 'add_header', description: 'Add text above your links' },
     { command: 'remove_header', description: 'Remove header text' },
     { command: 'add_footer', description: 'Add text below your links' },
@@ -329,6 +334,7 @@ const WELCOME_TEXT =
   `• <b>Magnet link</b> (magnet:?xt=urn:btih:…)\n\n` +
   `<b>Commands:</b>\n` +
   `/api — Get your Matrix Key & link account\n` +
+  `/logout — Disconnect your account\n` +
   `/add_header TEXT — Add text above your link\n` +
   `/remove_header — Remove header\n` +
   `/add_footer TEXT — Add text below your link\n` +
@@ -344,12 +350,12 @@ bot.onText(/\/start/, (msg) => {
 });
 
 // ═══════════════════════════════════════════
-// 11. /api COMMAND
+// 11. /api COMMAND (with Redis save)
 // ═══════════════════════════════════════════
 bot.onText(/\/api(?:\s+(.+))?/, async (msg, match) => {
   const chatId = msg.chat.id;
   const token = match[1]?.trim();
-  const user = getUser(chatId);
+  const user = await getUser(chatId);
 
   if (!token) {
     const keyboard = {
@@ -362,7 +368,8 @@ bot.onText(/\/api(?:\s+(.+))?/, async (msg, match) => {
       const masked = user.apiToken.slice(0, 6) + '...' + user.apiToken.slice(-4);
       return bot.sendMessage(chatId,
         `✅ <b>Matrix Key already linked:</b>\n<code>${escapeHtml(masked)}</code>\n\n` +
-        `Naya key lene ke liye niche button dabayein 👇`,
+        `Naya key lene ke liye niche button dabayein 👇\n` +
+        `Disconnect karne ke liye: <code>/logout</code>`,
         { parse_mode: 'HTML', reply_markup: keyboard }
       );
     }
@@ -400,9 +407,12 @@ bot.onText(/\/api(?:\s+(.+))?/, async (msg, match) => {
     }
 
     user.apiToken = token;
+    await redis.set(`token:${chatId}`, token, { ex: 60 * 60 * 24 * 365 });
+
     bot.sendMessage(chatId,
       `✅ <b>Matrix Key linked successfully!</b>\n\n` +
-      `Ab aap files upload kar sakte hain. 🚀`,
+      `Ab aap files upload kar sakte hain. 🚀\n\n` +
+      `Disconnect karne ke liye: <code>/logout</code>`,
       { parse_mode: 'HTML' }
     );
 
@@ -416,61 +426,112 @@ bot.onText(/\/api(?:\s+(.+))?/, async (msg, match) => {
 });
 
 // ═══════════════════════════════════════════
-// 12. OTHER COMMANDS
+// 12. /logout COMMAND
 // ═══════════════════════════════════════════
-bot.onText(/\/add_header(?:\s+([\s\S]+))?/, (msg, match) => {
+bot.onText(/\/logout/, async (msg) => {
+  const chatId = msg.chat.id;
+  const user = await getUser(chatId);
+
+  if (!user.apiToken) {
+    return bot.sendMessage(chatId,
+      `❌ <b>Aap logged in nahi ho.</b>\n\nLogin karne ke liye: <code>/api</code>`,
+      { parse_mode: 'HTML' }
+    );
+  }
+
+  user.apiToken = null;
+  try {
+    await redis.del(`token:${chatId}`);
+  } catch (e) {
+    console.error('Redis logout error:', e.message);
+  }
+
+  bot.sendMessage(chatId,
+    `👋 <b>Logged out successfully!</b>\n\n` +
+    `Dobara login karne ke liye: <code>/api</code>`,
+    { parse_mode: 'HTML' }
+  );
+});
+
+// ═══════════════════════════════════════════
+// 13. LOGOUT BUTTON HANDLER
+// ═══════════════════════════════════════════
+bot.on('callback_query', async (query) => {
+  if (query.data === 'logout_user') {
+    const chatId = query.message.chat.id;
+    const user = await getUser(chatId);
+    user.apiToken = null;
+    try { await redis.del(`token:${chatId}`); } catch (e) {}
+    bot.answerCallbackQuery(query.id, { text: '✅ Logged out!' });
+    bot.sendMessage(chatId,
+      `👋 <b>Logged out successfully.</b>\n\nDobara login: <code>/api</code>`,
+      { parse_mode: 'HTML' }
+    );
+  }
+});// ═══════════════════════════════════════════
+// 14. OTHER COMMANDS
+// ═══════════════════════════════════════════
+bot.onText(/\/add_header(?:\s+([\s\S]+))?/, async (msg, match) => {
   const chatId = msg.chat.id;
   const text = match[1]?.trim();
   if (!text) {
     return bot.sendMessage(chatId, `❌ <b>Usage:</b>\n<code>/add_header YOUR TEXT</code>`, { parse_mode: 'HTML' });
   }
-  getUser(chatId).header = text;
+  const u = await getUser(chatId);
+  u.header = text;
   bot.sendMessage(chatId, `✅ <b>Header added:</b>\n${escapeHtml(text)}`, { parse_mode: 'HTML' });
 });
 
-bot.onText(/\/remove_header/, (msg) => {
-  getUser(msg.chat.id).header = null;
+bot.onText(/\/remove_header/, async (msg) => {
+  const u = await getUser(msg.chat.id);
+  u.header = null;
   bot.sendMessage(msg.chat.id, '✅ Header removed.');
 });
 
-bot.onText(/\/add_footer(?:\s+([\s\S]+))?/, (msg, match) => {
+bot.onText(/\/add_footer(?:\s+([\s\S]+))?/, async (msg, match) => {
   const chatId = msg.chat.id;
   const text = match[1]?.trim();
   if (!text) {
     return bot.sendMessage(chatId, `❌ <b>Usage:</b>\n<code>/add_footer YOUR TEXT</code>`, { parse_mode: 'HTML' });
   }
-  getUser(chatId).footer = text;
+  const u = await getUser(chatId);
+  u.footer = text;
   bot.sendMessage(chatId, `✅ <b>Footer added:</b>\n${escapeHtml(text)}`, { parse_mode: 'HTML' });
 });
 
-bot.onText(/\/remove_footer/, (msg) => {
-  getUser(msg.chat.id).footer = null;
+bot.onText(/\/remove_footer/, async (msg) => {
+  const u = await getUser(msg.chat.id);
+  u.footer = null;
   bot.sendMessage(msg.chat.id, '✅ Footer removed.');
 });
 
-bot.onText(/\/enable_text/, (msg) => {
-  getUser(msg.chat.id).enableText = true;
+bot.onText(/\/enable_text/, async (msg) => {
+  const u = await getUser(msg.chat.id);
+  u.enableText = true;
   bot.sendMessage(msg.chat.id, '✅ <b>Surrounding text enabled.</b>', { parse_mode: 'HTML' });
 });
 
-bot.onText(/\/disable_text/, (msg) => {
-  getUser(msg.chat.id).enableText = false;
+bot.onText(/\/disable_text/, async (msg) => {
+  const u = await getUser(msg.chat.id);
+  u.enableText = false;
   bot.sendMessage(msg.chat.id, '✅ <b>Surrounding text disabled.</b>', { parse_mode: 'HTML' });
 });
 
-bot.onText(/\/enable_bold/, (msg) => {
-  getUser(msg.chat.id).bold = true;
+bot.onText(/\/enable_bold/, async (msg) => {
+  const u = await getUser(msg.chat.id);
+  u.bold = true;
   bot.sendMessage(msg.chat.id, '✅ <b>Bold enabled</b>.', { parse_mode: 'HTML' });
 });
 
-bot.onText(/\/disable_bold/, (msg) => {
-  getUser(msg.chat.id).bold = false;
+bot.onText(/\/disable_bold/, async (msg) => {
+  const u = await getUser(msg.chat.id);
+  u.bold = false;
   bot.sendMessage(msg.chat.id, '✅ Bold disabled.');
 });
 
-bot.onText(/\/settings/, (msg) => {
+bot.onText(/\/settings/, async (msg) => {
   const chatId = msg.chat.id;
-  const u = getUser(chatId);
+  const u = await getUser(chatId);
   const text =
     `⚙️ <b>Your MayaJaal Settings</b>\n\n` +
     `🔑 <b>Matrix Key:</b> ${u.apiToken ? '✅ Linked' : '❌ Not linked'}\n` +
@@ -478,11 +539,21 @@ bot.onText(/\/settings/, (msg) => {
     `📝 <b>Footer:</b> ${u.footer ? escapeHtml(u.footer) : '<i>(none)</i>'}\n` +
     `💬 <b>Surrounding text:</b> ${u.enableText ? 'ON' : 'OFF'}\n` +
     `🅱️ <b>Bold:</b> ${u.bold ? 'ON' : 'OFF'}`;
-  bot.sendMessage(chatId, text, { parse_mode: 'HTML' });
+
+  const opts = { parse_mode: 'HTML' };
+  if (u.apiToken) {
+    opts.reply_markup = {
+      inline_keyboard: [[
+        { text: '🚪 Logout', callback_data: 'logout_user' }
+      ]]
+    };
+  }
+
+  bot.sendMessage(chatId, text, opts);
 });
 
 // ═══════════════════════════════════════════
-// 13. BUILD SUCCESS MESSAGE
+// 15. BUILD SUCCESS MESSAGE
 // ═══════════════════════════════════════════
 function buildSuccessMessage(user, fileName, sizeMB, shortUrl) {
   const parts = [];
@@ -511,7 +582,7 @@ function buildSuccessMessage(user, fileName, sizeMB, shortUrl) {
 }
 
 // ═══════════════════════════════════════════
-// 14. MEDIA HANDLER
+// 16. MEDIA HANDLER
 // ═══════════════════════════════════════════
 bot.on('message', async (msg) => {
   const chatId = msg.chat.id;
@@ -519,7 +590,7 @@ bot.on('message', async (msg) => {
 
   if (text.startsWith('/')) return;
 
-  const user = getUser(chatId);
+  const user = await getUser(chatId);
 
   if (!user.apiToken) {
     const fileCheck = pickFile(msg);
@@ -536,7 +607,7 @@ bot.on('message', async (msg) => {
   let statusMsg = null;
 
   try {
-    // ═══ CASE 1: TERABOX LINK (ALL DOMAINS) ═══
+    // ═══ CASE 1: TERABOX LINK ═══
     const isTerabox = /(terabox|terasharefile|1024tera|teraboxapp|teraboxshare|teraboxlink|tibibox|momerybox|mirrorbox|4funbox|dubox|freeterabox|nekopoi)/i.test(text);
 
     if (isTerabox && /^https?:\/\//i.test(text)) {
@@ -689,7 +760,7 @@ bot.on('message', async (msg) => {
       return;
     }
 
-    // ═══ CASE 4: Direct URL / Magnet / Torrent ═══
+    // ═══ CASE 4: Direct URL / Magnet ═══
     const isMagnet = text.startsWith('magnet:?');
     const isTorrentUrl = /\.torrent(\?|$)/i.test(text);
     const isHttpUrl = /^https?:\/\//i.test(text);
@@ -773,7 +844,7 @@ bot.on('message', async (msg) => {
 });
 
 // ═══════════════════════════════════════════
-// 15. ERRORS
+// 17. ERRORS
 // ═══════════════════════════════════════════
 bot.on('polling_error', (error) => console.log('Polling error:', error.code, error.message));
 bot.on('error', (error) => console.log('Bot error:', error.message));
@@ -781,7 +852,7 @@ process.on('unhandledRejection', (r) => console.error('[unhandledRejection]', r)
 process.on('uncaughtException', (e) => console.error('[uncaughtException]', e.message));
 
 // ═══════════════════════════════════════════
-// 16. STARTUP
+// 18. STARTUP
 // ═══════════════════════════════════════════
 (async () => {
   await setupBotCommands();
