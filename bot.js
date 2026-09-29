@@ -15,7 +15,7 @@ const redis = Redis.fromEnv();
 
 const WEB_PAGE_URL = process.env.WEB_PAGE_URL || 'https://matrix-api-seven.vercel.app';
 const BACKEND_URL = process.env.BACKEND_URL || 'https://mayajaal-backend.vercel.app';
-const TERABOX_API = 'https://terabox-worker.robinkumarshakya103.workers.dev/api';
+const TERABOX_API = process.env.TERABOX_API || 'https://terabox.hnn.workers.dev/api';
 
 // ═══════════════════════════════════════════
 // 1. EXPRESS SERVER
@@ -57,7 +57,7 @@ app.get('/v/:id', (req, res) => {
   res.redirect(data.url);
 });
 
-// ─── Terabox player route ───
+// ─── Streaming player route (Terabox + Diskwala + others) ───
 app.get('/tb/:id', async (req, res) => {
   try {
     const id = req.params.id;
@@ -202,7 +202,7 @@ function pickFile(msg) {
 }
 
 // ═══════════════════════════════════════════
-// 7. TERABOX EXTRACTOR
+// 7. TERABOX EXTRACTOR (ALL DOMAINS)
 // ═══════════════════════════════════════════
 async function extractTeraboxLink(teraboxUrl) {
   try {
@@ -231,6 +231,54 @@ async function extractTeraboxLink(teraboxUrl) {
   }
 }
 
+// ═══════════════════════════════════════════
+// 8. DISKWALA EXTRACTOR
+// ═══════════════════════════════════════════
+async function extractDiskwalaLink(diskwalaUrl) {
+  try {
+    const res = await axios.get(diskwalaUrl, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120.0.0.0 Safari/537.36',
+        'Referer': 'https://www.diskwala.com/'
+      },
+      timeout: 30000,
+      maxRedirects: 5
+    });
+
+    const html = typeof res.data === 'string' ? res.data : JSON.stringify(res.data);
+
+    // B2 URL dhundho
+    const b2Match = html.match(/https?:\/\/[^"'\s\\]+\.backblazeb2\.com[^"'\s\\]*/i);
+    if (b2Match) {
+      return { url: b2Match[0], name: 'Diskwala Video', size: null };
+    }
+
+    // General video patterns
+    const patterns = [
+      /"downloadUrl"\s*:\s*"([^"]+)"/i,
+      /"fileUrl"\s*:\s*"([^"]+)"/i,
+      /"videoUrl"\s*:\s*"([^"]+)"/i,
+      /"url"\s*:\s*"(https?:\/\/[^"]+\.mp4[^"]*)"/i,
+      /https?:\/\/[^"'\s]+\.(mp4|m3u8|mkv|webm)[^"'\s]*/i
+    ];
+
+    for (const p of patterns) {
+      const m = html.match(p);
+      if (m) {
+        const u = m[1] || m[0];
+        if (u && u.startsWith('http')) {
+          return { url: u, name: 'Diskwala Video', size: null };
+        }
+      }
+    }
+
+    return null;
+  } catch (err) {
+    console.error('Diskwala extract error:', err.message);
+    return null;
+  }
+}
+
 // Cleanup expired short links
 setInterval(() => {
   const now = Date.now();
@@ -243,7 +291,7 @@ setInterval(() => {
   }
   if (removed > 0) console.log(`🧹 Cleaned ${removed} expired links`);
 }, 10 * 60 * 1000);// ═══════════════════════════════════════════
-// 8. SET BOT COMMANDS
+// 9. SET BOT COMMANDS
 // ═══════════════════════════════════════════
 async function setupBotCommands() {
   const commands = [
@@ -269,16 +317,16 @@ async function setupBotCommands() {
 }
 
 // ═══════════════════════════════════════════
-// 9. WELCOME
+// 10. WELCOME
 // ═══════════════════════════════════════════
 const WELCOME_TEXT =
   `🎬 <b>Welcome to MayaJaal Uploader Bot!</b>\n\n` +
-  `Send me any of the following and I'll upload it and return a shareable link:\n\n` +
+  `Send me any of the following:\n\n` +
   `• <b>Telegram file</b> (video, document, audio)\n` +
   `• <b>Direct file URL</b> (e.g. https://example.com/video.mp4)\n` +
   `• <b>Terabox link</b> (terabox.com / terasharefile.com)\n` +
-  `• <b>Magnet link</b> (magnet:?xt=urn:btih:…)\n` +
-  `• <b>.torrent URL</b>\n\n` +
+  `• <b>Diskwala link</b> (diskwala.com)\n` +
+  `• <b>Magnet link</b> (magnet:?xt=urn:btih:…)\n\n` +
   `<b>Commands:</b>\n` +
   `/api — Get your Matrix Key & link account\n` +
   `/add_header TEXT — Add text above your link\n` +
@@ -296,7 +344,7 @@ bot.onText(/\/start/, (msg) => {
 });
 
 // ═══════════════════════════════════════════
-// 10. /api COMMAND
+// 11. /api COMMAND
 // ═══════════════════════════════════════════
 bot.onText(/\/api(?:\s+(.+))?/, async (msg, match) => {
   const chatId = msg.chat.id;
@@ -368,7 +416,7 @@ bot.onText(/\/api(?:\s+(.+))?/, async (msg, match) => {
 });
 
 // ═══════════════════════════════════════════
-// 11. OTHER COMMANDS
+// 12. OTHER COMMANDS
 // ═══════════════════════════════════════════
 bot.onText(/\/add_header(?:\s+([\s\S]+))?/, (msg, match) => {
   const chatId = msg.chat.id;
@@ -434,7 +482,7 @@ bot.onText(/\/settings/, (msg) => {
 });
 
 // ═══════════════════════════════════════════
-// 12. BUILD SUCCESS MESSAGE
+// 13. BUILD SUCCESS MESSAGE
 // ═══════════════════════════════════════════
 function buildSuccessMessage(user, fileName, sizeMB, shortUrl) {
   const parts = [];
@@ -463,7 +511,7 @@ function buildSuccessMessage(user, fileName, sizeMB, shortUrl) {
 }
 
 // ═══════════════════════════════════════════
-// 13. MEDIA HANDLER
+// 14. MEDIA HANDLER
 // ═══════════════════════════════════════════
 bot.on('message', async (msg) => {
   const chatId = msg.chat.id;
@@ -488,8 +536,8 @@ bot.on('message', async (msg) => {
   let statusMsg = null;
 
   try {
-    // ─── CASE 1: TERABOX LINK ───
-    const isTerabox = /terabox\.com|terasharefile\.com|1024terabox\.com|teraboxapp\.com/i.test(text);
+    // ═══ CASE 1: TERABOX LINK (ALL DOMAINS) ═══
+    const isTerabox = /(terabox|terasharefile|1024tera|teraboxapp|teraboxshare|teraboxlink|tibibox|momerybox|mirrorbox|4funbox|dubox|freeterabox|nekopoi)/i.test(text);
 
     if (isTerabox && /^https?:\/\//i.test(text)) {
       statusMsg = await bot.sendMessage(chatId,
@@ -531,7 +579,50 @@ bot.on('message', async (msg) => {
       return;
     }
 
-    // ─── CASE 2: Telegram file ───
+    // ═══ CASE 2: DISKWALA LINK ═══
+    const isDiskwala = /diskwala\.com/i.test(text);
+
+    if (isDiskwala && /^https?:\/\//i.test(text)) {
+      statusMsg = await bot.sendMessage(chatId,
+        `🔄 <i>Extracting Diskwala link...</i>`,
+        { parse_mode: 'HTML' }
+      );
+
+      const extracted = await extractDiskwalaLink(text);
+
+      if (!extracted || !extracted.url) {
+        await bot.deleteMessage(chatId, statusMsg.message_id).catch(() => {});
+        return bot.sendMessage(chatId,
+          `❌ <b>Diskwala link extract nahi ho paya.</b>\n\n` +
+          `Possible reasons:\n` +
+          `• Link private hai\n` +
+          `• Link expire ho gaya\n` +
+          `• Page structure change ho gaya\n\n` +
+          `Kripya dusra link try karein.`,
+          { parse_mode: 'HTML' }
+        );
+      }
+
+      const shortId = crypto.randomBytes(4).toString('hex');
+      await redis.set(
+        `terabox:${shortId}`,
+        JSON.stringify({ url: extracted.url, name: extracted.name }),
+        { ex: 86400 }
+      );
+
+      const myLink = `${BASE_URL}/tb/${shortId}`;
+
+      await bot.deleteMessage(chatId, statusMsg.message_id).catch(() => {});
+      statusMsg = null;
+
+      await bot.sendMessage(chatId,
+        buildSuccessMessage(user, extracted.name, null, myLink),
+        { parse_mode: 'HTML', disable_web_page_preview: true }
+      );
+      return;
+    }
+
+    // ═══ CASE 3: Telegram file ═══
     const file = pickFile(msg);
 
     if (file) {
@@ -598,7 +689,7 @@ bot.on('message', async (msg) => {
       return;
     }
 
-    // ─── CASE 3: URL / Magnet / Torrent ───
+    // ═══ CASE 4: Direct URL / Magnet / Torrent ═══
     const isMagnet = text.startsWith('magnet:?');
     const isTorrentUrl = /\.torrent(\?|$)/i.test(text);
     const isHttpUrl = /^https?:\/\//i.test(text);
@@ -682,7 +773,7 @@ bot.on('message', async (msg) => {
 });
 
 // ═══════════════════════════════════════════
-// 14. ERRORS
+// 15. ERRORS
 // ═══════════════════════════════════════════
 bot.on('polling_error', (error) => console.log('Polling error:', error.code, error.message));
 bot.on('error', (error) => console.log('Bot error:', error.message));
@@ -690,7 +781,7 @@ process.on('unhandledRejection', (r) => console.error('[unhandledRejection]', r)
 process.on('uncaughtException', (e) => console.error('[uncaughtException]', e.message));
 
 // ═══════════════════════════════════════════
-// 15. STARTUP
+// 16. STARTUP
 // ═══════════════════════════════════════════
 (async () => {
   await setupBotCommands();
