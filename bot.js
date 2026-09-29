@@ -152,7 +152,7 @@ const s3 = new S3Client({
 });
 
 // ═══════════════════════════════════════════
-// 4. USER SETTINGS (waisa hi, koi change nahi)
+// 4. USER SETTINGS
 // ═══════════════════════════════════════════
 const userSettings = new Map();
 
@@ -201,7 +201,7 @@ function pickFile(msg) {
 }
 
 // ═══════════════════════════════════════════
-// 7. TERABOX EXTRACTOR (ALL DOMAINS)
+// 7. TERABOX EXTRACTOR
 // ═══════════════════════════════════════════
 async function extractTeraboxLink(teraboxUrl) {
   try {
@@ -288,7 +288,7 @@ setInterval(() => {
   }
   if (removed > 0) console.log(`🧹 Cleaned ${removed} expired links`);
 }, 10 * 60 * 1000);// ═══════════════════════════════════════════
-// 9. SET BOT COMMANDS (CHANGE: /logout add kiya)
+// 9. SET BOT COMMANDS
 // ═══════════════════════════════════════════
 async function setupBotCommands() {
   const commands = [
@@ -315,7 +315,7 @@ async function setupBotCommands() {
 }
 
 // ═══════════════════════════════════════════
-// 10. WELCOME (CHANGE: /logout add kiya)
+// 10. WELCOME
 // ═══════════════════════════════════════════
 const WELCOME_TEXT =
   `🎬 <b>Welcome to MayaJaal Uploader Bot!</b>\n\n` +
@@ -343,7 +343,7 @@ bot.onText(/\/start/, (msg) => {
 });
 
 // ═══════════════════════════════════════════
-// 11. /api COMMAND (waisa hi, koi change nahi)
+// 11. /api COMMAND
 // ═══════════════════════════════════════════
 bot.onText(/\/api(?:\s+(.+))?/, async (msg, match) => {
   const chatId = msg.chat.id;
@@ -417,7 +417,7 @@ bot.onText(/\/api(?:\s+(.+))?/, async (msg, match) => {
 });
 
 // ═══════════════════════════════════════════
-// 12. OTHER COMMANDS (CHANGE: /logout command add ki)
+// 12. OTHER COMMANDS
 // ═══════════════════════════════════════════
 bot.onText(/\/add_header(?:\s+([\s\S]+))?/, (msg, match) => {
   const chatId = msg.chat.id;
@@ -469,7 +469,7 @@ bot.onText(/\/disable_bold/, (msg) => {
   bot.sendMessage(msg.chat.id, '✅ Bold disabled.');
 });
 
-// ═══ CHANGE: /logout command (NAYA) ═══
+// ═══ /logout command ═══
 bot.onText(/\/logout/, (msg) => {
   const chatId = msg.chat.id;
   const user = getUser(chatId);
@@ -489,7 +489,7 @@ bot.onText(/\/logout/, (msg) => {
 });
 
 // ═══════════════════════════════════════════
-// 13. /settings COMMAND (CHANGE: logout button add kiya)
+// 13. /settings COMMAND
 // ═══════════════════════════════════════════
 bot.onText(/\/settings/, (msg) => {
   const chatId = msg.chat.id;
@@ -514,7 +514,7 @@ bot.onText(/\/settings/, (msg) => {
   bot.sendMessage(chatId, text, opts);
 });
 
-// ═══ CHANGE: Logout button handler (NAYA) ═══
+// ═══ Logout button handler ═══
 bot.on('callback_query', (query) => {
   if (query.data === 'logout_user') {
     const chatId = query.message.chat.id;
@@ -529,7 +529,7 @@ bot.on('callback_query', (query) => {
 });
 
 // ═══════════════════════════════════════════
-// 14. BUILD SUCCESS MESSAGE (waisa hi)
+// 14. BUILD SUCCESS MESSAGE
 // ═══════════════════════════════════════════
 function buildSuccessMessage(user, fileName, sizeMB, shortUrl) {
   const parts = [];
@@ -555,8 +555,8 @@ function buildSuccessMessage(user, fileName, sizeMB, shortUrl) {
   parts.push(`⏰ <i>Valid 24 hours</i>`);
 
   return parts.join('\n');
-      }// ═══════════════════════════════════════════
-// 15. MEDIA HANDLER (waisa hi, koi change nahi)
+  }// ═══════════════════════════════════════════
+// 15. MEDIA HANDLER (Sirf 1 change — button add)
 // ═══════════════════════════════════════════
 bot.on('message', async (msg) => {
   const chatId = msg.chat.id;
@@ -566,13 +566,20 @@ bot.on('message', async (msg) => {
 
   const user = getUser(chatId);
 
+  // ═══ CHANGE: Ab button bhi bhejega ═══
   if (!user.apiToken) {
     const fileCheck = pickFile(msg);
     const isUrl = /^https?:\/\//i.test(text) || text.startsWith('magnet:?');
     if (fileCheck || isUrl) {
+      const keyboard = {
+        inline_keyboard: [[
+          { text: '🔑 Get Matrix Key', url: `${WEB_PAGE_URL}?tg=${chatId}` }
+        ]]
+      };
       return bot.sendMessage(chatId,
-        `❌ <b>Pehle apna Matrix Key link karo:</b>\n\n<code>/api</code> bhejein`,
-        { parse_mode: 'HTML' }
+        `❌ <b>Pehle apna Matrix Key link karo!</b>\n\n` +
+        `Niche button se Matrix Key lein, phir <code>/api YOUR_KEY</code> bhejein.`,
+        { parse_mode: 'HTML', reply_markup: keyboard }
       );
     }
     return;
@@ -734,7 +741,7 @@ bot.on('message', async (msg) => {
       return;
     }
 
-    // ═══ CASE 4: Direct URL / Magnet / Torrent ═══
+    // ═══ CASE 4: Direct URL / Magnet ═══
     const isMagnet = text.startsWith('magnet:?');
     const isTorrentUrl = /\.torrent(\?|$)/i.test(text);
     const isHttpUrl = /^https?:\/\//i.test(text);
