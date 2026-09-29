@@ -130,7 +130,7 @@ app.get('/.well-known/assetlinks.json', (req, res) => {
       namespace: "android_app",
       package_name: "com.example.mayajaall",
       sha256_cert_fingerprints: [
-        "YAHAN_SHA256_FINGERPRINT_PASTE_KARO"
+        "39:DA:41:B9:9B:56:6A:0A:A8:99:14:21:8B:EE:87:E7:3E:CD:8D:46:84:82:0B:70:D6:42:32:ED:FB:23:10:CA"
       ]
     }
   }]);
