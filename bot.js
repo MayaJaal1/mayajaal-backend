@@ -130,7 +130,7 @@ app.get('/.well-known/assetlinks.json', (req, res) => {
       namespace: "android_app",
       package_name: "com.example.mayajaall",
       sha256_cert_fingerprints: [
-        "CA:9D:BE:41:54:7E:AF:C8:F5:69:15:2D:0F:82:BC:DD:5C:3D:A2:49:0A:BF:78:31:ED:66:DE:5A:F4:AD:C3:1C"
+        "ED:38:5F:D6:CE:D6:87:88:E1:5B:8F:3D:F4:D0:96:7E:3F:BC:A0:C5:A7:6A:27:B2:FC:7D:1A:03:BF:4C:11:54"
       ]
     }
   }]);
