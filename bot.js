@@ -120,7 +120,7 @@ app.get('/tb/:id', async (req, res) => {
 });
 
 // ═══════════════════════════════════════════
-// ✅ NAYA ROUTE 1: ANDROID APP LINKS VERIFICATION
+// ANDROID APP LINKS VERIFICATION
 // ═══════════════════════════════════════════
 app.get('/.well-known/assetlinks.json', (req, res) => {
   res.set('Content-Type', 'application/json');
@@ -137,7 +137,7 @@ app.get('/.well-known/assetlinks.json', (req, res) => {
 });
 
 // ═══════════════════════════════════════════
-// ✅ NAYA ROUTE 2: APP KE LIYE JSON API (direct video URL)
+// APP KE LIYE JSON API (direct video URL)
 // ═══════════════════════════════════════════
 app.get('/api/tb/:id', async (req, res) => {
   try {
@@ -595,7 +595,7 @@ function buildSuccessMessage(user, fileName, sizeMB, shortUrl) {
   parts.push(`⏰ <i>Valid 24 hours</i>`);
 
   return parts.join('\n');
-      }// ═══════════════════════════════════════════
+                             }// ═══════════════════════════════════════════
 // 15. MEDIA HANDLER
 // ═══════════════════════════════════════════
 bot.on('message', async (msg) => {
