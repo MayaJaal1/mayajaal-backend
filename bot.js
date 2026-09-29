@@ -57,7 +57,6 @@ app.get('/v/:id', (req, res) => {
   res.redirect(data.url);
 });
 
-// ─── Streaming player route ───
 app.get('/tb/:id', async (req, res) => {
   try {
     const id = req.params.id;
@@ -153,20 +152,14 @@ const s3 = new S3Client({
 });
 
 // ═══════════════════════════════════════════
-// 4. USER SETTINGS (Redis-backed persistent)
+// 4. USER SETTINGS (waisa hi, koi change nahi)
 // ═══════════════════════════════════════════
 const userSettings = new Map();
 
-async function getUser(chatId) {
+function getUser(chatId) {
   if (!userSettings.has(chatId)) {
-    let savedToken = null;
-    try {
-      savedToken = await redis.get(`token:${chatId}`);
-    } catch (e) {
-      console.error('Redis getUser error:', e.message);
-    }
     userSettings.set(chatId, {
-      apiToken: savedToken || null,
+      apiToken: null,
       header: null,
       footer: null,
       bold: false,
@@ -205,7 +198,9 @@ function pickFile(msg) {
   if (msg.audio) return msg.audio;
   if (Array.isArray(msg.photo) && msg.photo.length) return msg.photo[msg.photo.length - 1];
   return null;
-}// ═══════════════════════════════════════════
+}
+
+// ═══════════════════════════════════════════
 // 7. TERABOX EXTRACTOR (ALL DOMAINS)
 // ═══════════════════════════════════════════
 async function extractTeraboxLink(teraboxUrl) {
@@ -292,10 +287,8 @@ setInterval(() => {
     }
   }
   if (removed > 0) console.log(`🧹 Cleaned ${removed} expired links`);
-}, 10 * 60 * 1000);
-
-// ═══════════════════════════════════════════
-// 9. SET BOT COMMANDS
+}, 10 * 60 * 1000);// ═══════════════════════════════════════════
+// 9. SET BOT COMMANDS (CHANGE: /logout add kiya)
 // ═══════════════════════════════════════════
 async function setupBotCommands() {
   const commands = [
@@ -322,7 +315,7 @@ async function setupBotCommands() {
 }
 
 // ═══════════════════════════════════════════
-// 10. WELCOME
+// 10. WELCOME (CHANGE: /logout add kiya)
 // ═══════════════════════════════════════════
 const WELCOME_TEXT =
   `🎬 <b>Welcome to MayaJaal Uploader Bot!</b>\n\n` +
@@ -350,12 +343,12 @@ bot.onText(/\/start/, (msg) => {
 });
 
 // ═══════════════════════════════════════════
-// 11. /api COMMAND (with Redis save)
+// 11. /api COMMAND (waisa hi, koi change nahi)
 // ═══════════════════════════════════════════
 bot.onText(/\/api(?:\s+(.+))?/, async (msg, match) => {
   const chatId = msg.chat.id;
   const token = match[1]?.trim();
-  const user = await getUser(chatId);
+  const user = getUser(chatId);
 
   if (!token) {
     const keyboard = {
@@ -407,8 +400,6 @@ bot.onText(/\/api(?:\s+(.+))?/, async (msg, match) => {
     }
 
     user.apiToken = token;
-    await redis.set(`token:${chatId}`, token, { ex: 60 * 60 * 24 * 365 });
-
     bot.sendMessage(chatId,
       `✅ <b>Matrix Key linked successfully!</b>\n\n` +
       `Ab aap files upload kar sakte hain. 🚀\n\n` +
@@ -426,112 +417,83 @@ bot.onText(/\/api(?:\s+(.+))?/, async (msg, match) => {
 });
 
 // ═══════════════════════════════════════════
-// 12. /logout COMMAND
+// 12. OTHER COMMANDS (CHANGE: /logout command add ki)
 // ═══════════════════════════════════════════
-bot.onText(/\/logout/, async (msg) => {
-  const chatId = msg.chat.id;
-  const user = await getUser(chatId);
-
-  if (!user.apiToken) {
-    return bot.sendMessage(chatId,
-      `❌ <b>Aap logged in nahi ho.</b>\n\nLogin karne ke liye: <code>/api</code>`,
-      { parse_mode: 'HTML' }
-    );
-  }
-
-  user.apiToken = null;
-  try {
-    await redis.del(`token:${chatId}`);
-  } catch (e) {
-    console.error('Redis logout error:', e.message);
-  }
-
-  bot.sendMessage(chatId,
-    `👋 <b>Logged out successfully!</b>\n\n` +
-    `Dobara login karne ke liye: <code>/api</code>`,
-    { parse_mode: 'HTML' }
-  );
-});
-
-// ═══════════════════════════════════════════
-// 13. LOGOUT BUTTON HANDLER
-// ═══════════════════════════════════════════
-bot.on('callback_query', async (query) => {
-  if (query.data === 'logout_user') {
-    const chatId = query.message.chat.id;
-    const user = await getUser(chatId);
-    user.apiToken = null;
-    try { await redis.del(`token:${chatId}`); } catch (e) {}
-    bot.answerCallbackQuery(query.id, { text: '✅ Logged out!' });
-    bot.sendMessage(chatId,
-      `👋 <b>Logged out successfully.</b>\n\nDobara login: <code>/api</code>`,
-      { parse_mode: 'HTML' }
-    );
-  }
-});// ═══════════════════════════════════════════
-// 14. OTHER COMMANDS
-// ═══════════════════════════════════════════
-bot.onText(/\/add_header(?:\s+([\s\S]+))?/, async (msg, match) => {
+bot.onText(/\/add_header(?:\s+([\s\S]+))?/, (msg, match) => {
   const chatId = msg.chat.id;
   const text = match[1]?.trim();
   if (!text) {
     return bot.sendMessage(chatId, `❌ <b>Usage:</b>\n<code>/add_header YOUR TEXT</code>`, { parse_mode: 'HTML' });
   }
-  const u = await getUser(chatId);
-  u.header = text;
+  getUser(chatId).header = text;
   bot.sendMessage(chatId, `✅ <b>Header added:</b>\n${escapeHtml(text)}`, { parse_mode: 'HTML' });
 });
 
-bot.onText(/\/remove_header/, async (msg) => {
-  const u = await getUser(msg.chat.id);
-  u.header = null;
+bot.onText(/\/remove_header/, (msg) => {
+  getUser(msg.chat.id).header = null;
   bot.sendMessage(msg.chat.id, '✅ Header removed.');
 });
 
-bot.onText(/\/add_footer(?:\s+([\s\S]+))?/, async (msg, match) => {
+bot.onText(/\/add_footer(?:\s+([\s\S]+))?/, (msg, match) => {
   const chatId = msg.chat.id;
   const text = match[1]?.trim();
   if (!text) {
     return bot.sendMessage(chatId, `❌ <b>Usage:</b>\n<code>/add_footer YOUR TEXT</code>`, { parse_mode: 'HTML' });
   }
-  const u = await getUser(chatId);
-  u.footer = text;
+  getUser(chatId).footer = text;
   bot.sendMessage(chatId, `✅ <b>Footer added:</b>\n${escapeHtml(text)}`, { parse_mode: 'HTML' });
 });
 
-bot.onText(/\/remove_footer/, async (msg) => {
-  const u = await getUser(msg.chat.id);
-  u.footer = null;
+bot.onText(/\/remove_footer/, (msg) => {
+  getUser(msg.chat.id).footer = null;
   bot.sendMessage(msg.chat.id, '✅ Footer removed.');
 });
 
-bot.onText(/\/enable_text/, async (msg) => {
-  const u = await getUser(msg.chat.id);
-  u.enableText = true;
+bot.onText(/\/enable_text/, (msg) => {
+  getUser(msg.chat.id).enableText = true;
   bot.sendMessage(msg.chat.id, '✅ <b>Surrounding text enabled.</b>', { parse_mode: 'HTML' });
 });
 
-bot.onText(/\/disable_text/, async (msg) => {
-  const u = await getUser(msg.chat.id);
-  u.enableText = false;
+bot.onText(/\/disable_text/, (msg) => {
+  getUser(msg.chat.id).enableText = false;
   bot.sendMessage(msg.chat.id, '✅ <b>Surrounding text disabled.</b>', { parse_mode: 'HTML' });
 });
 
-bot.onText(/\/enable_bold/, async (msg) => {
-  const u = await getUser(msg.chat.id);
-  u.bold = true;
+bot.onText(/\/enable_bold/, (msg) => {
+  getUser(msg.chat.id).bold = true;
   bot.sendMessage(msg.chat.id, '✅ <b>Bold enabled</b>.', { parse_mode: 'HTML' });
 });
 
-bot.onText(/\/disable_bold/, async (msg) => {
-  const u = await getUser(msg.chat.id);
-  u.bold = false;
+bot.onText(/\/disable_bold/, (msg) => {
+  getUser(msg.chat.id).bold = false;
   bot.sendMessage(msg.chat.id, '✅ Bold disabled.');
 });
 
-bot.onText(/\/settings/, async (msg) => {
+// ═══ CHANGE: /logout command (NAYA) ═══
+bot.onText(/\/logout/, (msg) => {
   const chatId = msg.chat.id;
-  const u = await getUser(chatId);
+  const user = getUser(chatId);
+
+  if (!user.apiToken) {
+    return bot.sendMessage(chatId,
+      `❌ <b>Aap logged in nahi ho.</b>\n\nLogin: <code>/api</code>`,
+      { parse_mode: 'HTML' }
+    );
+  }
+
+  user.apiToken = null;
+  bot.sendMessage(chatId,
+    `👋 <b>Logged out successfully!</b>\n\nDobara login: <code>/api</code>`,
+    { parse_mode: 'HTML' }
+  );
+});
+
+// ═══════════════════════════════════════════
+// 13. /settings COMMAND (CHANGE: logout button add kiya)
+// ═══════════════════════════════════════════
+bot.onText(/\/settings/, (msg) => {
+  const chatId = msg.chat.id;
+  const u = getUser(chatId);
   const text =
     `⚙️ <b>Your MayaJaal Settings</b>\n\n` +
     `🔑 <b>Matrix Key:</b> ${u.apiToken ? '✅ Linked' : '❌ Not linked'}\n` +
@@ -552,8 +514,22 @@ bot.onText(/\/settings/, async (msg) => {
   bot.sendMessage(chatId, text, opts);
 });
 
+// ═══ CHANGE: Logout button handler (NAYA) ═══
+bot.on('callback_query', (query) => {
+  if (query.data === 'logout_user') {
+    const chatId = query.message.chat.id;
+    const user = getUser(chatId);
+    user.apiToken = null;
+    bot.answerCallbackQuery(query.id, { text: '✅ Logged out!' });
+    bot.sendMessage(chatId,
+      `👋 <b>Logged out successfully.</b>\n\nDobara login: <code>/api</code>`,
+      { parse_mode: 'HTML' }
+    );
+  }
+});
+
 // ═══════════════════════════════════════════
-// 15. BUILD SUCCESS MESSAGE
+// 14. BUILD SUCCESS MESSAGE (waisa hi)
 // ═══════════════════════════════════════════
 function buildSuccessMessage(user, fileName, sizeMB, shortUrl) {
   const parts = [];
@@ -579,10 +555,8 @@ function buildSuccessMessage(user, fileName, sizeMB, shortUrl) {
   parts.push(`⏰ <i>Valid 24 hours</i>`);
 
   return parts.join('\n');
-}
-
-// ═══════════════════════════════════════════
-// 16. MEDIA HANDLER
+      }// ═══════════════════════════════════════════
+// 15. MEDIA HANDLER (waisa hi, koi change nahi)
 // ═══════════════════════════════════════════
 bot.on('message', async (msg) => {
   const chatId = msg.chat.id;
@@ -590,7 +564,7 @@ bot.on('message', async (msg) => {
 
   if (text.startsWith('/')) return;
 
-  const user = await getUser(chatId);
+  const user = getUser(chatId);
 
   if (!user.apiToken) {
     const fileCheck = pickFile(msg);
@@ -760,7 +734,7 @@ bot.on('message', async (msg) => {
       return;
     }
 
-    // ═══ CASE 4: Direct URL / Magnet ═══
+    // ═══ CASE 4: Direct URL / Magnet / Torrent ═══
     const isMagnet = text.startsWith('magnet:?');
     const isTorrentUrl = /\.torrent(\?|$)/i.test(text);
     const isHttpUrl = /^https?:\/\//i.test(text);
@@ -844,7 +818,7 @@ bot.on('message', async (msg) => {
 });
 
 // ═══════════════════════════════════════════
-// 17. ERRORS
+// 16. ERRORS
 // ═══════════════════════════════════════════
 bot.on('polling_error', (error) => console.log('Polling error:', error.code, error.message));
 bot.on('error', (error) => console.log('Bot error:', error.message));
@@ -852,7 +826,7 @@ process.on('unhandledRejection', (r) => console.error('[unhandledRejection]', r)
 process.on('uncaughtException', (e) => console.error('[uncaughtException]', e.message));
 
 // ═══════════════════════════════════════════
-// 18. STARTUP
+// 17. STARTUP
 // ═══════════════════════════════════════════
 (async () => {
   await setupBotCommands();
