@@ -7,7 +7,7 @@ const { Redis } = require('@upstash/redis');
 const app = express();
 app.use(express.json());
 
-// ✅ CORS enable (page different domain se request karega)
+// CORS enable
 app.use((req, res, next) => {
   res.header('Access-Control-Allow-Origin', '*');
   res.header('Access-Control-Allow-Headers', 'Content-Type');
@@ -33,11 +33,11 @@ app.get('/', (req, res) => {
 });
 
 // ═══════════════════════════════════════════
-// APP VERSION CHECK API (Version 3 Test Trigger)
+// APP VERSION CHECK API (Supports /api/check-update AND /check-update)
 // ═══════════════════════════════════════════
-app.get('/api/check-update', (req, res) => {
+app.get(['/api/check-update', '/check-update'], (req, res) => {
   res.json({
-    latestVersionCode: 3,               // <-- 3 set kiya taaki v1.1.0 par popup trigger ho
+    latestVersionCode: 3,
     latestVersionName: "v1.2.0",
     updateUrl: "https://mayajaal.online/download.html",
     forceUpdate: false,
@@ -46,7 +46,7 @@ app.get('/api/check-update', (req, res) => {
 });
 
 // ═══════════════════════════════════════════
-// DOWNLOAD LANDING PAGE ROUTE (/download & /download.html)
+// DOWNLOAD LANDING PAGE ROUTE
 // ═══════════════════════════════════════════
 app.get(['/download', '/download.html'], (req, res) => {
   const downloadPath = path.join(__dirname, 'download.html');
@@ -57,19 +57,16 @@ app.get(['/download', '/download.html'], (req, res) => {
 });
 
 // ═══════════════════════════════════════════
-// SAVE KEY (called from Vercel page)
+// SAVE KEY
 // ═══════════════════════════════════════════
 app.post('/save-key', async (req, res) => {
   try {
     const { telegram_id, key } = req.body;
-
     if (!telegram_id || !key) {
       return res.status(400).json({ error: 'telegram_id and key required' });
     }
-
     await redis.set(`key:${key}`, String(telegram_id), { ex: 60 * 60 * 24 * 30 });
     await redis.set(`user:${telegram_id}`, key, { ex: 60 * 60 * 24 * 30 });
-
     res.json({ success: true, key, telegram_id });
   } catch (err) {
     console.error('save-key error:', err.message);
@@ -132,8 +129,7 @@ async function serveTeraBoxLandingPage(req, res, id) {
 }
 
 // ═══════════════════════════════════════════
-// TERABOX / VIDEO PLAYER ROUTES (/v/:id & /tb/:id)
-// Direct browser play locked -> Serves player.html
+// TERABOX / VIDEO PLAYER ROUTES
 // ═══════════════════════════════════════════
 app.get('/v/:id', (req, res) => {
   serveTeraBoxLandingPage(req, res, req.params.id);
@@ -144,7 +140,7 @@ app.get('/tb/:id', (req, res) => {
 });
 
 // ═══════════════════════════════════════════
-// RAW VIDEO DATA ENDPOINT (App calls this to get direct video URL)
+// RAW VIDEO DATA ENDPOINT
 // ═══════════════════════════════════════════
 app.get('/api/raw/:id', async (req, res) => {
   try {
@@ -208,3 +204,4 @@ app.get('/maya/:msgId', async (req, res) => {
 });
 
 module.exports = app;
+        
