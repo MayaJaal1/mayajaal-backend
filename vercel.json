@@ -20,6 +20,10 @@
       "dest": "/public/.well-known/assetlinks.json"
     },
     {
+      "src": "/app-release.apk",
+      "dest": "https://github.com/MayaJaal1/mayajaal-backend/releases/download/v1.0.0/app-release.apk"
+    },
+    {
       "src": "/download",
       "dest": "/download.html"
     },
