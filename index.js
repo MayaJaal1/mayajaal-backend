@@ -33,9 +33,9 @@ app.get('/', (req, res) => {
 });
 
 // ═══════════════════════════════════════════
-// DOWNLOAD LANDING PAGE ROUTE (/download)
+// DOWNLOAD LANDING PAGE ROUTE (/download & /download.html)
 // ═══════════════════════════════════════════
-app.get('/download', (req, res) => {
+app.get(['/download', '/download.html'], (req, res) => {
   const downloadPath = path.join(__dirname, 'download.html');
   if (fs.existsSync(downloadPath)) {
     return res.sendFile(downloadPath);
