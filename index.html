@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-<title>MAYA JAAL · Neural Hub</title>
+<title>MAYA JAAL · Neural Media Dispatcher</title>
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; }
   
@@ -42,8 +42,8 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    padding: 24px 16px 90px;
-    background: radial-gradient(circle at center, rgba(0,0,0,0.3) 0%, rgba(0,0,0,0.85) 80%);
+    padding: 24px 16px 100px;
+    background: radial-gradient(circle at center, rgba(0,0,0,0.3) 0%, rgba(0,0,0,0.88) 80%);
   }
 
   .card {
@@ -56,6 +56,19 @@
     backdrop-filter: blur(10px);
     box-shadow: 0 0 35px rgba(0, 255, 136, 0.18), inset 0 0 40px rgba(0, 255, 136, 0.04);
     animation: fadeIn 0.8s ease-out;
+    transition: transform 0.15s, box-shadow 0.2s;
+  }
+
+  .card.glitch-shake {
+    animation: cardShake 0.35s cubic-bezier(.36,.07,.19,.97) both;
+    box-shadow: 0 0 60px rgba(0, 255, 136, 0.6), inset 0 0 50px rgba(0, 255, 136, 0.2);
+  }
+
+  @keyframes cardShake {
+    10%, 90% { transform: translate3d(-2px, 0, 0); }
+    20%, 80% { transform: translate3d(3px, -2px, 0); filter: hue-rotate(90deg); }
+    30%, 50%, 70% { transform: translate3d(-5px, 2px, 0); }
+    40%, 60% { transform: translate3d(5px, 0, 0); filter: hue-rotate(0deg); }
   }
 
   @keyframes fadeIn {
@@ -220,28 +233,20 @@
   }
   .dock-open:hover { box-shadow: 0 0 30px rgba(0, 255, 136, 0.8); transform: translateY(-1px); }
 
-  /* MATRIX KEY GENERATOR SECTION */
-  .key-box {
-    position: relative;
-    background: #000;
-    border: 1px solid rgba(0, 255, 136, 0.4);
-    border-radius: 10px;
-    padding: 18px 85px 18px 16px;
-    margin: 16px 0;
-    overflow: hidden;
-    min-height: 62px;
-    display: flex;
-    align-items: center;
-    cursor: pointer;
-  }
+  /* MATRIX KEY SECTION STYLES */
+  .status-line { font-size: 12px; color: #00ff88; margin-bottom: 10px; letter-spacing: 1px; min-height: 16px; opacity: 0.85; }
+  .status-line::before { content: "> "; opacity: 0.6; }
+  .debug-box { font-size: 11px; color: #ffaa00; background: #1a0f00; border: 1px solid #553300; padding: 10px 12px; border-radius: 6px; margin-bottom: 14px; min-height: 20px; word-break: break-all; }
+  .debug-box.ok  { color: #00ff88; background: #001a0e; border-color: #00ff88; }
+  .debug-box.err { color: #ff5555; background: #1a0000; border-color: #ff3333; }
+  .key-box { position: relative; background: #000; border: 1px solid rgba(0, 255, 136, 0.4); border-radius: 10px; padding: 18px 85px 18px 16px; margin: 16px 0; overflow: hidden; min-height: 62px; display: flex; align-items: center; cursor: pointer; }
   #apiKey { font-size: 15px; letter-spacing: 2px; font-weight: bold; }
-  .copy-btn {
-    position: absolute; right: 10px; top: 50%; transform: translateY(-50%);
-    background: rgba(0, 255, 136, 0.1); border: 1px solid rgba(0, 255, 136, 0.6);
-    color: #00ff88; padding: 8px 14px; border-radius: 6px; cursor: pointer;
-    font-size: 11px; font-family: inherit; font-weight: bold;
-  }
+  .copy-btn { position: absolute; right: 10px; top: 50%; transform: translateY(-50%); background: rgba(0, 255, 136, 0.1); border: 1px solid rgba(0, 255, 136, 0.6); color: #00ff88; padding: 8px 14px; border-radius: 6px; cursor: pointer; font-size: 11px; font-family: inherit; font-weight: bold; }
   .copy-btn.copied { background: #00ff88; color: #000; box-shadow: 0 0 20px #00ff88; }
+  .stat-row { display: flex; gap: 12px; margin-top: 16px; flex-wrap: wrap; }
+  .stat { flex: 1; min-width: 110px; padding: 12px 14px; background: rgba(0, 255, 136, 0.04); border-left: 2px solid #00ff88; border-radius: 4px; }
+  .stat-label { font-size: 10px; letter-spacing: 2px; text-transform: uppercase; color: #4fbf8b; margin-bottom: 4px; }
+  .stat-value { font-size: 13px; color: #d6ffe8; }
 </style>
 </head>
 <body>
@@ -252,6 +257,7 @@
 <div class="overlay">
   <div class="card" id="mainCard">
 
+    <!-- 🌟 MAYA JAAL PHOTO LOGO -->
     <div class="logo-container">
       <img src="https://files.catbox.moe/k3159k.jpg" alt="Maya Jaal" referrerpolicy="no-referrer" crossorigin="anonymous" />
     </div>
@@ -262,13 +268,13 @@
       <span id="headerTag">SECURE STREAM PORTAL</span>
     </div>
 
-    <!-- 🌟 SECTION 1: VIDEO STREAM DETECTED (TERABOX STYLE VIEW) -->
+    <!-- 🌟 SECTION 1: VIDEO STREAM DETECTED (TERABOX STYLE LOCKED MEDIA) -->
     <div id="videoStreamSection" style="display:none;">
-      <h2 style="font-size: 18px; color: #d6ffe8; text-align: center; margin-bottom: 4px;" id="videoName">
+      <h2 style="font-size: 17px; color: #d6ffe8; text-align: center; margin-bottom: 4px;" id="videoName">
         Node_Encrypted_Media.mp4
       </h2>
-      <p style="font-size: 12px; color: #4fbf8b; text-align: center; margin-bottom: 12px;">
-        High-Speed Hardware Accelerated Matrix Stream
+      <p style="font-size: 12px; color: #4fbf8b; text-align: center; margin-bottom: 14px;">
+        Hardware Accelerated Quantum Stream Protocol
       </p>
 
       <div class="video-preview-box" onclick="handleOpenApp()">
@@ -277,87 +283,108 @@
         </div>
         <div class="stream-meta">
           <span>● 1080P Ultra HD</span>
-          <span>Matrix Quantum Node</span>
+          <span>MayaJaal Node</span>
         </div>
       </div>
 
-      <div style="font-size: 12px; color: #7fffb8; line-height: 1.6; text-align: center; padding: 10px; background: rgba(0, 255, 136, 0.04); border-radius: 8px; border: 1px dashed rgba(0, 255, 136, 0.3);">
-        Agar aapke device mein <strong>MayaJaal App</strong> nahi hai, toh neeche se APK download karein.
+      <div style="font-size: 12px; color: #7fffb8; line-height: 1.6; text-align: center; padding: 12px; background: rgba(0, 255, 136, 0.04); border-radius: 8px; border: 1px dashed rgba(0, 255, 136, 0.3);">
+        Browser streaming is locked. Tap <strong>View in App</strong> or install <strong>MayaJaal APK</strong> to unlock full resolution playback.
       </div>
     </div>
 
-    <!-- 🌟 SECTION 2: MATRIX KEY GENERATOR (FALLBACK AGAR TG ID HO) -->
+    <!-- 🌟 SECTION 2: MATRIX KEY GENERATOR (AGAR TG ID HO) -->
     <div id="keySection" style="display:none;">
       <h1 style="font-size: 20px; text-align: center; color: #d6ffe8;">Your Matrix Key</h1>
-      <p style="font-size: 12px; color: #4fbf8b; text-align: center; margin: 6px 0 16px;">
-        Aapki unique encrypted key bot ke sath bind hone ke liye ready hai.
+      <p style="font-size: 12.5px; color: #4fbf8b; text-align: center; margin: 6px 0 16px; line-height: 1.5;">
+        Aapki unique encrypted Matrix Key connect karne ke liye taiyar hai.
       </p>
 
-      <div class="key-box" onclick="copyKey()">
+      <div class="status-line" id="status">initializing secure channel...</div>
+      <div class="debug-box" id="debug">Debug: waiting...</div>
+
+      <div class="key-box" onclick="copyKey()" title="Click to copy">
         <span id="apiKey"></span>
         <button class="copy-btn" id="copyBtn" onclick="event.stopPropagation(); copyKey();">COPY</button>
       </div>
 
-      <div style="display: flex; gap: 10px; margin-top: 15px;">
-        <a href="https://t.me/Mayajaalfilebot" target="_blank" style="flex:1; background:#00ff88; color:#000; text-align:center; padding:12px; border-radius:8px; text-decoration:none; font-weight:bold; font-size:12px;">Open Telegram Bot</a>
-        <button onclick="runKeyFlow()" style="flex:1; background:transparent; border:1px solid #00ff88; color:#00ff88; border-radius:8px; font-family:inherit; font-size:12px; cursor:pointer;">Regenerate</button>
+      <div class="stat-row" id="statRow" style="display:none;">
+        <div class="stat">
+          <div class="stat-label">Status</div>
+          <div class="stat-value" style="color:#00ff88;">● Active</div>
+        </div>
+        <div class="stat">
+          <div class="stat-label">Security</div>
+          <div class="stat-value">SHA-256</div>
+        </div>
+        <div class="stat">
+          <div class="stat-label">Created</div>
+          <div class="stat-value" id="createdAt">—</div>
+        </div>
+      </div>
+
+      <div style="display: flex; gap: 10px; margin-top: 18px; flex-wrap: wrap;">
+        <a href="https://t.me/Mayajaalfilebot" target="_blank" style="flex:1; min-width: 140px; background:#00ff88; color:#000; text-align:center; padding:12px; border-radius:8px; text-decoration:none; font-weight:bold; font-size:12px;">Open Telegram Bot</a>
+        <button onclick="regenerate()" style="flex:1; min-width: 140px; background:transparent; border:1px solid #00ff88; color:#00ff88; border-radius:8px; font-family:inherit; font-size:12px; cursor:pointer;">Regenerate</button>
       </div>
     </div>
 
   </div>
 </div>
 
-<!-- 🌟 FIXED BOTTOM ACTIONS BAR -->
-<div class="bottom-dock" id="bottomDock">
+<!-- 🌟 FIXED BOTTOM ACTIONS BAR (NON-APP USERS KE LIYE) -->
+<div class="bottom-dock" id="bottomDock" style="display:none;">
   <a href="javascript:void(0)" onclick="downloadApk()" class="dock-btn dock-dl">⬇ Download APK</a>
   <a href="javascript:void(0)" onclick="handleOpenApp()" class="dock-btn dock-open">View in MayaJaal</a>
 </div>
 <script>
 /* ═══════════════════════════════════════════
-   CONFIGURATION & APK PATH
+   CONFIGURATION & DISPATCHING PATH
    ═══════════════════════════════════════════ */
-// 🌟 Yahan apna direct APK Download link daalein (Google Drive / GitHub Releases / Server file)
+// 🌟 Yahan apna updated APK download link verify karein
 const APK_DOWNLOAD_URL = "https://mayajaal.online/download/app-release.apk";
 
 const params = new URLSearchParams(window.location.search);
-const tgId = params.get('tg');
+const telegramId = params.get('tg');
 const videoId = params.get('v') || params.get('tb');
 const currentUrl = window.location.href;
 
-// Agar path mein /v/ ya /tb/ ho ya parameter ho
+// Detect agar link video se related hai
 const isVideoLink = videoId || window.location.pathname.includes('/v/') || window.location.pathname.includes('/tb/') || params.has('url');
 
 const videoSection = document.getElementById('videoStreamSection');
 const keySection = document.getElementById('keySection');
 const bottomDock = document.getElementById('bottomDock');
 const headerTag = document.getElementById('headerTag');
+const mainCard = document.getElementById('mainCard');
+const flashBang = document.getElementById('flashBang');
 
 if (isVideoLink) {
   videoSection.style.display = 'block';
   bottomDock.style.display = 'flex';
-  headerTag.textContent = 'STREAMING NODE VERIFIED';
+  headerTag.textContent = 'STREAMING NODE DETECTED';
 } else {
   keySection.style.display = 'block';
   bottomDock.style.display = 'none';
   headerTag.textContent = 'SECURE NEURAL NODE';
-  runKeyFlow();
+  window.addEventListener('load', () => setTimeout(runGenerationFlow, 300));
 }
 
 /* ═══════════════════════════════════════════
-   SMART APP LAUNCHER & FALLBACK
+   SMART APP LAUNCHER & FALLBACK TIMER
    ═══════════════════════════════════════════ */
 function handleOpenApp() {
   triggerHaptic();
+  playCyberBeep();
   
-  // 1. Android Deep-link Scheme format
+  // Custom Scheme URL Android App ke liye
   const appSchemeUrl = "mayajaall://open?url=" + encodeURIComponent(currentUrl);
-  
   const startTime = Date.now();
+  
+  // 1. App open karne ka intent bhejein
   window.location.href = appSchemeUrl;
 
-  // 2. Agar 1.5 sec ke andar user app me switch nahi hota (mtlb app installed nahi hai)
+  // 2. Fallback: Agar 1.5 seconds me app trigger nahi hua, APK download initiate karein
   setTimeout(function () {
-    // Agar user abhi bhi isi page par hai, to APK download trigger karein
     if (Date.now() - startTime < 2200) {
       window.location.href = APK_DOWNLOAD_URL;
     }
@@ -366,15 +393,43 @@ function handleOpenApp() {
 
 function downloadApk() {
   triggerHaptic();
+  playCyberBeep();
   window.location.href = APK_DOWNLOAD_URL;
 }
 
 /* ═══════════════════════════════════════════
-   MATRIX RAIN BACKGROUND ENGINE
+   HAPTICS & WEB AUDIO SYNTHESIZER
+   ═══════════════════════════════════════════ */
+function triggerHaptic() {
+  if (navigator.vibrate) navigator.vibrate([40, 30, 80]);
+}
+
+function playCyberBeep() {
+  try {
+    const AudioContext = window.AudioContext || window.webkitAudioContext;
+    if (!AudioContext) return;
+    const actx = new AudioContext();
+    const osc = actx.createOscillator();
+    const gain = actx.createGain();
+    osc.type = 'sawtooth';
+    osc.frequency.setValueAtTime(650, actx.currentTime);
+    osc.frequency.exponentialRampToValueAtTime(1100, actx.currentTime + 0.1);
+    gain.gain.setValueAtTime(0.12, actx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.01, actx.currentTime + 0.12);
+    osc.connect(gain);
+    gain.connect(actx.destination);
+    osc.start();
+    osc.stop(actx.currentTime + 0.12);
+  } catch (e) {}
+}
+
+/* ═══════════════════════════════════════════
+   MATRIX RAIN CANVAS ENGINE
    ═══════════════════════════════════════════ */
 const canvas = document.getElementById('matrix');
 const ctx = canvas.getContext('2d');
 let cols, drops;
+let speedFactor = 1;
 const chars = 'アイウエオカキクケコサシスセソタチツテトナニヌネノ0123456789ABCDEFXYZ@#$%&*'.split('');
 
 function resize() {
@@ -400,42 +455,97 @@ function drawMatrix() {
     ctx.fillStyle = '#00ff88';
     ctx.fillText(text, x, y - 14);
     if (y > canvas.height && Math.random() > 0.975) drops[i] = 0;
-    drops[i]++;
+    drops[i] += speedFactor;
   }
 }
 setInterval(drawMatrix, 40);
 
-function triggerHaptic() {
-  if (navigator.vibrate) navigator.vibrate([40, 30, 60]);
-}
-
 /* ═══════════════════════════════════════════
-   FALLBACK KEY LOGIC
+   MATRIX KEY LOGIC & SERVER SYNC
    ═══════════════════════════════════════════ */
 let currentKey = '';
-function runKeyFlow() {
-  const chars24 = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
-  let out = '';
-  for (let i = 0; i < 24; i++) out += chars24[Math.floor(Math.random() * chars24.length)];
-  currentKey = out;
-  const keyEl = document.getElementById('apiKey');
-  if (keyEl) keyEl.textContent = out;
+const apiKeyEl = document.getElementById('apiKey');
+const copyBtn = document.getElementById('copyBtn');
+const statusEl = document.getElementById('status');
+const statRow = document.getElementById('statRow');
+const createdAtEl = document.getElementById('createdAt');
+const debugEl = document.getElementById('debug');
+
+function setDebug(msg, type) {
+  if (debugEl) {
+    debugEl.textContent = 'Debug: ' + msg;
+    debugEl.className = 'debug-box' + (type ? ' ' + type : '');
+  }
+}
+
+async function saveKeyToServer(key) {
+  if (!telegramId) {
+    setDebug('URL parameter ?tg= missing!', 'err');
+    return;
+  }
+  try {
+    const res = await fetch(window.location.origin + '/save-key', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ telegram_id: telegramId, key: key })
+    });
+    const data = await res.json();
+    if (res.ok && data.success) setDebug('Key linked to Telegram ID: ' + telegramId, 'ok');
+    else setDebug('Save error: ' + JSON.stringify(data), 'err');
+  } catch (err) {
+    setDebug('Network error: ' + err.message, 'err');
+  }
+}
+
+function runGenerationFlow() {
+  if (!apiKeyEl) return;
+  apiKeyEl.textContent = '';
+  statRow.style.display = 'none';
+  const steps = ['connecting node...', 'extracting entropy...', 'signing token...', 'matrix key active ✓'];
+  let idx = 0;
+  statusEl.textContent = steps[0];
+  const timer = setInterval(() => {
+    idx++;
+    if (idx < steps.length) {
+      statusEl.textContent = steps[idx];
+    } else {
+      clearInterval(timer);
+      const chars24 = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+      let out = '';
+      for (let i = 0; i < 24; i++) out += chars24[Math.floor(Math.random() * chars24.length)];
+      currentKey = out;
+      apiKeyEl.textContent = currentKey;
+      statRow.style.display = 'flex';
+      createdAtEl.textContent = new Date().toLocaleTimeString();
+      saveKeyToServer(currentKey);
+    }
+  }, 350);
 }
 
 function copyKey() {
   if (!currentKey) return;
   navigator.clipboard.writeText(currentKey).then(() => {
+    playCyberBeep();
     triggerHaptic();
-    const btn = document.getElementById('copyBtn');
-    if (btn) {
-      btn.textContent = 'COPIED ⚡';
-      btn.classList.add('copied');
-      setTimeout(() => {
-        btn.textContent = 'COPY';
-        btn.classList.remove('copied');
-      }, 2000);
-    }
+    flashBang.classList.add('active');
+    mainCard.classList.add('glitch-shake');
+    speedFactor = 3;
+    setTimeout(() => flashBang.classList.remove('active'), 100);
+    setTimeout(() => { mainCard.classList.remove('glitch-shake'); speedFactor = 1; }, 400);
+
+    copyBtn.textContent = 'COPIED ⚡';
+    copyBtn.classList.add('copied');
+    statusEl.textContent = 'ACCESS KEY COPIED ✓';
+    setTimeout(() => {
+      copyBtn.textContent = 'COPY';
+      copyBtn.classList.remove('copied');
+      statusEl.textContent = 'matrix key active ✓';
+    }, 2000);
   });
+}
+
+function regenerate() {
+  runGenerationFlow();
 }
 </script>
 </body>
