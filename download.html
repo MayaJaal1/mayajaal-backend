@@ -5,7 +5,16 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"/>
 <title>Download MayaJaal App · Official APK</title>
 <style>
-  * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Courier New', monospace; }
+  * { 
+    margin: 0; 
+    padding: 0; 
+    box-sizing: border-box; 
+    font-family: 'Courier New', monospace; 
+    -webkit-tap-highlight-color: transparent;
+    -webkit-touch-callout: none;
+    -webkit-user-select: none;
+    user-select: none;
+  }
   
   body {
     background-color: #000;
@@ -138,13 +147,13 @@
     <div class="tagline">OFFICIAL ANDROID APPLICATION</div>
 
     <div class="meta-badges">
-      <div class="badge">v1.0.0</div>
+      <div class="badge">v1.1.0</div>
       <div class="badge">Size: ~26 MB</div>
       <div class="badge">Android 7.0+</div>
     </div>
 
-    <!-- Direct GitHub release download link -->
-    <a href="https://github.com/MayaJaal1/mayajaal-backend/releases/download/v1.0.0/app-release.apk" class="download-btn" id="dlBtn" download>
+    <!-- Permanent Auto-Latest GitHub Direct Link -->
+    <a href="https://github.com/MayaJaal1/mayajaall/releases/latest/download/app-release.apk" class="download-btn" id="dlBtn">
       ⬇ DOWNLOAD APK DIRECT
     </a>
 
@@ -155,7 +164,8 @@
       <div><span>✔</span> Background Offline Download Support</div>
     </div>
   </div>
-    <script>
+
+  <script>
     // Matrix Rain Animation
     const canvas = document.getElementById('matrixBg');
     const ctx = canvas.getContext('2d');
