@@ -33,15 +33,15 @@ app.get('/', (req, res) => {
 });
 
 // ═══════════════════════════════════════════
-// APP VERSION CHECK API (Auto Update Checker)
+// APP VERSION CHECK API (Version 3 Test Trigger)
 // ═══════════════════════════════════════════
 app.get('/api/check-update', (req, res) => {
   res.json({
-    latestVersionCode: 2,               // Updated to trigger popup for version 1 users
-    latestVersionName: "v1.1.0",
+    latestVersionCode: 3,               // <-- 3 set kiya taaki v1.1.0 par popup trigger ho
+    latestVersionName: "v1.2.0",
     updateUrl: "https://mayajaal.online/download.html",
-    forceUpdate: false,                 // true tab karein jab purana version band karna ho
-    changelog: "Bug fixes & high-speed playback improvements."
+    forceUpdate: false,
+    changelog: "⚡ Fast player and auto-update test success!"
   });
 });
 
