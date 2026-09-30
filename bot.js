@@ -27,6 +27,9 @@ const PORT = process.env.PORT || 3000;
 
 app.use(express.json());
 
+// 🌟 STATIC FILES SERVING (Logo aur assets ke liye)
+app.use(express.static(__dirname));
+
 const linkStore = new Map();
 const LINK_TTL_MS = 24 * 60 * 60 * 1000;
 
@@ -36,6 +39,11 @@ const BASE_URL = process.env.CUSTOM_DOMAIN
 
 app.get('/', (req, res) => res.send('MayaJaal Bot is running!'));
 app.get('/health', (req, res) => res.json({ status: 'ok', uptime: process.uptime() }));
+
+// 🌟 DIRECT LOGO ROUTE (Agar browser direct maange)
+app.get('/logo.jpg', (req, res) => {
+  res.sendFile(path.join(__dirname, 'logo.jpg'));
+});
 
 // 🌟 MATRIX KEY FRONTEND PAGE ROUTE
 app.get('/key', (req, res) => {
@@ -158,7 +166,7 @@ app.get('/tb/:id', async (req, res) => {
     `);
   }
 });
-// ═══════════════════════════════════════════
+              // ═══════════════════════════════════════════
 // ANDROID APP LINKS VERIFICATION
 // ═══════════════════════════════════════════
 app.get('/.well-known/assetlinks.json', (req, res) => {
@@ -496,7 +504,7 @@ bot.onText(/\/api(?:\s+(.+))?/, async (msg, match) => {
     );
   }
 });
-// ═══════════════════════════════════════════
+    // ═══════════════════════════════════════════
 // 12. OTHER COMMANDS
 // ═══════════════════════════════════════════
 bot.onText(/\/add_header(?:\s+([\s\S]+))?/, (msg, match) => {
@@ -864,7 +872,7 @@ bot.on('message', async (msg) => {
     const sizeMB = (buffer.byteLength / 1024 / 1024).toFixed(2);
 
     await bot.editMessageText(
-      `⬆️ <i>Uploading to MayaJaal cloud (${sizeMB} MB)...</i>`,
+      `⬆️️ <i>Uploading to MayaJaal cloud (${sizeMB} MB)...</i>`,
       { chat_id: chatId, message_id: statusMsg.message_id, parse_mode: 'HTML' }
     );
 
@@ -920,4 +928,4 @@ process.on('uncaughtException', (e) => console.error('[uncaughtException]', e.me
   await setupBotCommands();
   console.log('🚀 MayaJaal Remote URL Uploader Bot chal pada hai...');
 })();
-      
+  
