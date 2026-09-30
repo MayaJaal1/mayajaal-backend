@@ -38,7 +38,7 @@ const BASE_URL = process.env.CUSTOM_DOMAIN
 app.get('/', (req, res) => res.send('MayaJaal Bot is running!'));
 app.get('/health', (req, res) => res.json({ status: 'ok', uptime: process.uptime() }));
 
-// 🌟 APP UPDATE VERSION CHECK ROUTE (FIXED)
+// 🌟 APP UPDATE VERSION CHECK ROUTE (NO MORE 404 OR CANNOT GET)
 app.get(['/version.json', '/check-update', '/api/check-update'], (req, res) => {
   res.setHeader('Content-Type', 'application/json');
   res.json({
@@ -97,7 +97,65 @@ app.get('/verify-key/:key', async (req, res) => {
   }
 });
 
-// 🌟 HELPER TO SERVE TERABOX STYLE PLAYER.HTML
+// 🌟 1. VIDEO METADATA API (Preview Screen: Title + Uploader Name Fetcher)
+app.get('/api/stream-info/:id', async (req, res) => {
+  try {
+    const id = req.params.id;
+    let data = linkStore.get(id);
+    if (!data) data = await redis.get(`video:${id}`);
+    if (!data) data = await redis.get(`terabox:${id}`);
+    
+    if (!data) return res.status(404).json({ success: false, message: 'Stream not found' });
+    
+    const parsed = typeof data === 'string' ? JSON.parse(data) : data;
+    res.json({
+      success: true,
+      url: parsed.url,
+      title: parsed.name || 'MayaJaal Stream Video',
+      uploader: parsed.uploader || 'Matrix Ghost Node',
+      id: id
+    });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// 🌟 2. CLOUD WATCH HISTORY SAVE API
+app.post('/api/history/save', async (req, res) => {
+  try {
+    const { telegram_id, video } = req.body;
+    if (!telegram_id || !video) return res.status(400).json({ success: false });
+    
+    const key = `user_history:${telegram_id}`;
+    let history = await redis.get(key);
+    history = history ? (typeof history === 'string' ? JSON.parse(history) : history) : [];
+    
+    history = history.filter(item => item.url !== video.url);
+    history.unshift({ ...video, watchedAt: Date.now() });
+    
+    if (history.length > 50) history.pop();
+    
+    await redis.set(key, JSON.stringify(history));
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// 🌟 3. CLOUD WATCH HISTORY RESTORE API
+app.get('/api/history/:telegram_id', async (req, res) => {
+  try {
+    const key = `user_history:${req.params.telegram_id}`;
+    let history = await redis.get(key);
+    res.json({
+      success: true,
+      history: history ? (typeof history === 'string' ? JSON.parse(history) : history) : []
+    });
+  } catch (err) {
+    res.status(500).json({ success: false, history: [] });
+  }
+});
+
 function servePlayerPage(req, res) {
   const playerFile = path.join(__dirname, 'player.html');
   if (fs.existsSync(playerFile)) {
@@ -112,20 +170,9 @@ function servePlayerPage(req, res) {
   `);
 }
 
-// ═══════════════════════════════════════════
-// 🌟 FIXED ROUTES (/v/:id & /tb/:id)
-// ═══════════════════════════════════════════
-app.get('/v/:id', (req, res) => {
-  servePlayerPage(req, res);
-});
+app.get('/v/:id', (req, res) => servePlayerPage(req, res));
+app.get('/tb/:id', (req, res) => servePlayerPage(req, res));
 
-app.get('/tb/:id', (req, res) => {
-  servePlayerPage(req, res);
-});
-
-// ═══════════════════════════════════════════
-// ANDROID APP VERIFICATION
-// ═══════════════════════════════════════════
 app.get('/.well-known/assetlinks.json', (req, res) => {
   res.set('Content-Type', 'application/json');
   res.json([{
@@ -140,9 +187,6 @@ app.get('/.well-known/assetlinks.json', (req, res) => {
   }]);
 });
 
-// ═══════════════════════════════════════════
-// NATIVE APP DIRECT VIDEO LINK RESOLVER
-// ═══════════════════════════════════════════
 app.get('/api/v/:id', async (req, res) => {
   const id = req.params.id;
   const memoryData = linkStore.get(id);
@@ -184,7 +228,7 @@ app.listen(PORT, () => {
   console.log(`✅ Server listening on port ${PORT}`);
   console.log(`🌐 Base URL: ${BASE_URL}`);
 });
-// ═══════════════════════════════════════════
+        // ═══════════════════════════════════════════
 // 2. CONFIG & PERMANENT REDIS USER STATE
 // ═══════════════════════════════════════════
 const TOKEN = process.env.BOT_TOKEN;
@@ -237,24 +281,22 @@ async function saveUser(chatId, settings) {
 
 const bot = new TelegramBot(TOKEN, { polling: true });
 
-// ═══════════════════════════════════════════
-// 6. HELPERS
-// ═══════════════════════════════════════════
 function escapeHtml(str = '') {
   return String(str).replace(/[&<>"']/g, (c) => (
     { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]
   ));
 }
 
-function createShortLink(signedUrl, fileName) {
+function createShortLink(signedUrl, fileName, uploaderName) {
   const id = crypto.randomBytes(4).toString('hex');
-  linkStore.set(id, {
+  const payload = {
     url: signedUrl,
     name: fileName,
+    uploader: uploaderName || 'Matrix Node',
     expiresAt: Date.now() + LINK_TTL_MS,
-  });
-  
-  redis.set(`video:${id}`, JSON.stringify({ url: signedUrl, name: fileName }), { ex: 86400 }).catch(() => {});
+  };
+  linkStore.set(id, payload);
+  redis.set(`video:${id}`, JSON.stringify(payload), { ex: 86400 }).catch(() => {});
   return `${BASE_URL}/v/${id}`;
 }
 
@@ -266,9 +308,6 @@ function pickFile(msg) {
   return null;
 }
 
-// ═══════════════════════════════════════════
-// 7. TERABOX EXTRACTOR
-// ═══════════════════════════════════════════
 async function extractTeraboxLink(teraboxUrl) {
   try {
     const res = await axios.get(TERABOX_API, {
@@ -296,9 +335,6 @@ async function extractTeraboxLink(teraboxUrl) {
   }
 }
 
-// ═══════════════════════════════════════════
-// 8. DISKWALA EXTRACTOR
-// ═══════════════════════════════════════════
 async function extractDiskwalaLink(diskwalaUrl) {
   try {
     const res = await axios.get(diskwalaUrl, {
@@ -311,7 +347,6 @@ async function extractDiskwalaLink(diskwalaUrl) {
     });
 
     const html = typeof res.data === 'string' ? res.data : JSON.stringify(res.data);
-
     const b2Match = html.match(/https?:\/\/[^"'\s\\]+\.backblazeb2\.com[^"'\s\\]*/i);
     if (b2Match) {
       return { url: b2Match[0], name: 'Diskwala Video', size: null };
@@ -334,7 +369,6 @@ async function extractDiskwalaLink(diskwalaUrl) {
         }
       }
     }
-
     return null;
   } catch (err) {
     console.error('Diskwala extract error:', err.message);
@@ -570,7 +604,7 @@ bot.onText(/\/settings/, async (msg) => {
     `📝 <b>Header:</b> ${u.header ? escapeHtml(u.header) : '<i>(none)</i>'}\n` +
     `📝 <b>Footer:</b> ${u.footer ? escapeHtml(u.footer) : '<i>(none)</i>'}\n` +
     `💬 <b>Surrounding text:</b> ${u.enableText ? 'ON' : 'OFF'}\n` +
-    `🅱️️ <b>Bold:</b> ${u.bold ? 'ON' : 'OFF'}`;
+    `🅱️ <b>Bold:</b> ${u.bold ? 'ON' : 'OFF'}`;
 
   const opts = { parse_mode: 'HTML' };
   if (u.apiToken) {
@@ -591,7 +625,7 @@ bot.on('callback_query', async (query) => {
     bot.sendMessage(chatId, `👋 <b>Logged out successfully.</b>\n\nDobara login: <code>/api</code>`, { parse_mode: 'HTML' });
   }
 });
-  function buildSuccessMessage(user, fileName, sizeMB, shortUrl) {
+function buildSuccessMessage(user, fileName, sizeMB, shortUrl) {
   const parts = [];
   if (user.enableText && user.header) {
     parts.push(user.bold ? `<b>${escapeHtml(user.header)}</b>` : escapeHtml(user.header));
@@ -618,6 +652,8 @@ bot.on('message', async (msg) => {
   if (text.startsWith('/')) return;
 
   const user = await getUser(chatId);
+  const uploaderName = msg.from?.username ? `@${msg.from.username}` : (msg.from?.first_name || 'Matrix User');
+
   if (!user.apiToken) {
     const fileCheck = pickFile(msg);
     const isUrl = /^https?:\/\//i.test(text) || text.startsWith('magnet:?');
@@ -648,9 +684,13 @@ bot.on('message', async (msg) => {
       }
 
       const shortId = crypto.randomBytes(4).toString('hex');
-      await redis.set(`terabox:${shortId}`, JSON.stringify({ url: extracted.url, name: extracted.name }), { ex: 86400 });
-      const myLink = `${BASE_URL}/tb/${shortId}`;
+      await redis.set(`terabox:${shortId}`, JSON.stringify({
+        url: extracted.url,
+        name: extracted.name,
+        uploader: uploaderName
+      }), { ex: 86400 });
 
+      const myLink = `${BASE_URL}/tb/${shortId}`;
       await bot.deleteMessage(chatId, statusMsg.message_id).catch(() => {});
       statusMsg = null;
       await bot.sendMessage(chatId, buildSuccessMessage(user, extracted.name, null, myLink), { parse_mode: 'HTML', disable_web_page_preview: true });
@@ -668,9 +708,13 @@ bot.on('message', async (msg) => {
       }
 
       const shortId = crypto.randomBytes(4).toString('hex');
-      await redis.set(`terabox:${shortId}`, JSON.stringify({ url: extracted.url, name: extracted.name }), { ex: 86400 });
-      const myLink = `${BASE_URL}/tb/${shortId}`;
+      await redis.set(`terabox:${shortId}`, JSON.stringify({
+        url: extracted.url,
+        name: extracted.name,
+        uploader: uploaderName
+      }), { ex: 86400 });
 
+      const myLink = `${BASE_URL}/tb/${shortId}`;
       await bot.deleteMessage(chatId, statusMsg.message_id).catch(() => {});
       statusMsg = null;
       await bot.sendMessage(chatId, buildSuccessMessage(user, extracted.name, null, myLink), { parse_mode: 'HTML', disable_web_page_preview: true });
@@ -706,7 +750,7 @@ bot.on('message', async (msg) => {
       }));
 
       const signedUrl = await getSignedUrl(s3, new GetObjectCommand({ Bucket: B2_BUCKET, Key: uniqueKey }), { expiresIn: 86400 });
-      const shortUrl = createShortLink(signedUrl, fileName);
+      const shortUrl = createShortLink(signedUrl, fileName, uploaderName);
 
       await bot.deleteMessage(chatId, statusMsg.message_id).catch(() => {});
       statusMsg = null;
@@ -756,7 +800,7 @@ bot.on('message', async (msg) => {
     }));
 
     const signedUrl = await getSignedUrl(s3, new GetObjectCommand({ Bucket: B2_BUCKET, Key: uniqueKey }), { expiresIn: 86400 });
-    const shortUrl = createShortLink(signedUrl, fileName);
+    const shortUrl = createShortLink(signedUrl, fileName, uploaderName);
 
     await bot.deleteMessage(chatId, statusMsg.message_id).catch(() => {});
     statusMsg = null;
@@ -778,4 +822,3 @@ process.on('uncaughtException', (e) => console.error('[uncaughtException]', e.me
   await setupBotCommands();
   console.log('🚀 MayaJaal Remote URL Uploader Bot chal pada hai...');
 })();
-                                        
