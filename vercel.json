@@ -1,51 +1,37 @@
 {
   "version": 2,
-  "builds": [
+  "rewrites": [
     {
-      "src": "index.js",
-      "use": "@vercel/node"
+      "source": "/.well-known/assetlinks.json",
+      "destination": "/public/.well-known/assetlinks.json"
     },
     {
-      "src": "*.html",
-      "use": "@vercel/static"
+      "source": "/app-release.apk",
+      "destination": "https://github.com/MayaJaal1/mayajaall/releases/latest/download/app-release.apk"
     },
     {
-      "src": "public/**",
-      "use": "@vercel/static"
-    }
-  ],
-  "routes": [
-    {
-      "src": "/.well-known/assetlinks.json",
-      "dest": "/public/.well-known/assetlinks.json"
+      "source": "/download",
+      "destination": "/download.html"
     },
     {
-      "src": "/app-release.apk",
-      "dest": "https://github.com/MayaJaal1/mayajaall/releases/latest/download/app-release.apk"
+      "source": "/download.html",
+      "destination": "/download.html"
     },
     {
-      "src": "/download",
-      "dest": "/download.html"
+      "source": "/v/:id*",
+      "destination": "/player.html"
     },
     {
-      "src": "/v/(.*)",
-      "dest": "/player.html"
+      "source": "/tb/:id*",
+      "destination": "/player.html"
     },
     {
-      "src": "/tb/(.*)",
-      "dest": "/player.html"
+      "source": "/key",
+      "destination": "/index.html"
     },
     {
-      "src": "/key",
-      "dest": "/index.html"
-    },
-    {
-      "src": "/api/(.*)",
-      "dest": "/index.js"
-    },
-    {
-      "src": "/(.*)",
-      "dest": "/index.js"
+      "source": "/(.*)",
+      "destination": "/index.js"
     }
   ]
 }
