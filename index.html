@@ -96,6 +96,7 @@
     animation: logoPulse 3s infinite alternate ease-in-out;
     border: 2px solid rgba(0, 255, 136, 0.6);
     display: inline-block;
+    background: #001a0e;
   }
 
   @keyframes logoPulse {
@@ -390,9 +391,14 @@
 <div class="overlay">
   <div class="card" id="mainCard">
 
-    <!-- 🌟 DIRECT GITHUB CDN LOGO LINK (100% load guarantee) -->
+    <!-- 🌟 HIGH-SPEED CDN LOGO + AUTO FALLBACK -->
     <div class="logo-container">
-      <img src="https://raw.githubusercontent.com/MayaJaal1/mayajaal-backend/main/logo.jpg" alt="Maya Jaal Logo" />
+      <img 
+        id="botLogo"
+        src="https://cdn.jsdelivr.net/gh/MayaJaal1/mayajaal-backend@main/logo.jpg" 
+        alt="Maya Jaal Logo"
+        onerror="this.onerror=null; this.src='https://raw.githubusercontent.com/MayaJaal1/mayajaal-backend/main/logo.jpg';"
+      />
     </div>
 
     <div class="matrix-title">MAYA JAAL</div>
