@@ -1,5 +1,7 @@
 const express = require('express');
 const axios = require('axios');
+const path = require('path');
+const fs = require('fs');
 const { Redis } = require('@upstash/redis');
 
 const app = express();
@@ -23,6 +25,10 @@ if (!TOKEN) {
 const redis = Redis.fromEnv();
 
 app.get('/', (req, res) => {
+  const indexPath = path.join(__dirname, 'index.html');
+  if (fs.existsSync(indexPath)) {
+    return res.sendFile(indexPath);
+  }
   res.send('MayaJaal Backend Streaming Server is Active!');
 });
 
@@ -88,6 +94,52 @@ app.post('/save', async (req, res) => {
   }
 });
 
+// Helper function to serve TeraBox style player.html
+async function serveTeraBoxLandingPage(req, res, id) {
+  try {
+    const playerPath = path.join(__dirname, 'player.html');
+    if (fs.existsSync(playerPath)) {
+      return res.sendFile(playerPath);
+    }
+    res.status(404).send('player.html not found on server');
+  } catch (err) {
+    console.error('Landing page error:', err);
+    res.status(500).send('Error loading page');
+  }
+}
+
+// ═══════════════════════════════════════════
+// TERABOX / VIDEO PLAYER ROUTES (/v/:id & /tb/:id)
+// Direct browser play locked -> Serves player.html
+// ═══════════════════════════════════════════
+app.get('/v/:id', (req, res) => {
+  serveTeraBoxLandingPage(req, res, req.params.id);
+});
+
+app.get('/tb/:id', (req, res) => {
+  serveTeraBoxLandingPage(req, res, req.params.id);
+});
+
+// ═══════════════════════════════════════════
+// RAW VIDEO DATA ENDPOINT (App calls this to get direct video URL)
+// ═══════════════════════════════════════════
+app.get('/api/raw/:id', async (req, res) => {
+  try {
+    const id = req.params.id;
+    let data = await redis.get(`terabox:${id}`);
+    if (!data) {
+      data = await redis.get(`file:${id}`);
+    }
+    if (!data) {
+      return res.status(404).json({ error: 'Video not found' });
+    }
+    const parsed = typeof data === 'string' ? JSON.parse(data) : data;
+    res.json({ success: true, url: parsed.url || parsed });
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to fetch raw stream' });
+  }
+});
+
 // ═══════════════════════════════════════════
 // MAYA STREAM ROUTE (Telegram files)
 // ═══════════════════════════════════════════
@@ -128,118 +180,6 @@ app.get('/maya/:msgId', async (req, res) => {
       <html><head><meta charset="UTF-8"><title>MayaJaal</title>
       <style>body{background:#000;color:#fff;font-family:sans-serif;text-align:center;padding:50px}h2{color:#9c27b0}</style></head>
       <body><h2>MayaJaal</h2><p>Error loading the media.</p></body></html>
-    `);
-  }
-});
-
-// ═══════════════════════════════════════════
-// TERABOX PLAYER ROUTE (NEW)
-// ═══════════════════════════════════════════
-app.get('/tb/:id', async (req, res) => {
-  try {
-    const id = req.params.id;
-    const data = await redis.get(`terabox:${id}`);
-
-    if (!data) {
-      return res.status(404).send(`
-        <!DOCTYPE html>
-        <html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>MayaJaal</title>
-        <style>body{background:#000;color:#fff;font-family:sans-serif;text-align:center;padding:50px}h2{color:#00ff88}</style></head>
-        <body><h2>MayaJaal</h2><p>File not found or expired.</p></body></html>
-      `);
-    }
-
-    const parsed = typeof data === 'string' ? JSON.parse(data) : data;
-    const videoUrl = parsed.url;
-    const fileName = parsed.name || 'MayaJaal Video';
-
-    res.send(`
-      <!DOCTYPE html>
-      <html>
-      <head>
-        <meta charset="UTF-8">
-        <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>${fileName} · MayaJaal</title>
-        <style>
-          html, body {
-            margin: 0; padding: 0;
-            width: 100%; height: 100%;
-            background: #000;
-            overflow: hidden;
-            font-family: 'Courier New', monospace;
-          }
-          #player-wrap {
-            position: relative;
-            width: 100%; height: 100%;
-            display: flex; align-items: center; justify-content: center;
-            background: #000;
-          }
-          video {
-            width: 100%; height: 100%;
-            object-fit: contain;
-            background: #000;
-          }
-          .brand-tag {
-            position: fixed;
-            top: 10px; left: 50%;
-            transform: translateX(-50%);
-            color: #00ff88;
-            font-size: 11px;
-            letter-spacing: 3px;
-            text-transform: uppercase;
-            text-shadow: 0 0 8px #00ff88;
-            opacity: 0.7;
-            z-index: 100;
-            pointer-events: none;
-          }
-          .loading {
-            color: #00ff88;
-            font-size: 14px;
-            letter-spacing: 2px;
-            position: absolute;
-            z-index: 5;
-          }
-        </style>
-      </head>
-      <body>
-        <div class="brand-tag">● MAYA JAAL PLAYER</div>
-        <div id="player-wrap">
-          <div class="loading" id="loadingTxt">loading stream...</div>
-          <video id="player" controls autoplay playsinline preload="metadata" style="display:none;">
-            <source src="${videoUrl}">
-          </video>
-        </div>
-
-        <script>
-          const video = document.getElementById('player');
-          const loading = document.getElementById('loadingTxt');
-
-          video.addEventListener('loadedmetadata', function() {
-            loading.style.display = 'none';
-            video.style.display = 'block';
-          });
-
-          video.addEventListener('error', function() {
-            loading.textContent = '❌ Stream unavailable';
-            loading.style.color = '#ff5555';
-          });
-
-          setTimeout(function() {
-            if (video.readyState < 2) {
-              loading.textContent = '⚠️ Stream slow hai, wait karein...';
-            }
-          }, 5000);
-        </script>
-      </body>
-      </html>
-    `);
-  } catch (err) {
-    console.error('TB play error:', err.message);
-    res.status(500).send(`
-      <!DOCTYPE html>
-      <html><head><meta charset="UTF-8"><title>MayaJaal</title>
-      <style>body{background:#000;color:#fff;font-family:sans-serif;text-align:center;padding:50px}h2{color:#00ff88}</style></head>
-      <body><h2>MayaJaal</h2><p>Error loading media.</p></body></html>
     `);
   }
 });
