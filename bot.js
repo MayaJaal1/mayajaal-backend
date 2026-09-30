@@ -26,9 +26,10 @@ const PORT = process.env.PORT || 3000;
 const linkStore = new Map();
 const LINK_TTL_MS = 24 * 60 * 60 * 1000;
 
-const BASE_URL = process.env.RAILWAY_PUBLIC_DOMAIN
-  ? `https://${process.env.RAILWAY_PUBLIC_DOMAIN}`
-  : process.env.BASE_URL || `http://localhost:${PORT}`;
+// Naya custom domain yahan add kar diya gaya hai
+const BASE_URL = process.env.CUSTOM_DOMAIN 
+  ? (process.env.CUSTOM_DOMAIN.startsWith('http') ? process.env.CUSTOM_DOMAIN : `https://${process.env.CUSTOM_DOMAIN}`)
+  : 'https://mayajaal.online';
 
 app.get('/', (req, res) => res.send('MayaJaal Bot is running!'));
 app.get('/health', (req, res) => res.json({ status: 'ok', uptime: process.uptime() }));
@@ -118,7 +119,6 @@ app.get('/tb/:id', async (req, res) => {
     `);
   }
 });
-
 // ═══════════════════════════════════════════
 // ANDROID APP LINKS VERIFICATION
 // ═══════════════════════════════════════════
@@ -327,7 +327,9 @@ setInterval(() => {
     }
   }
   if (removed > 0) console.log(`🧹 Cleaned ${removed} expired links`);
-}, 10 * 60 * 1000);// ═══════════════════════════════════════════
+}, 10 * 60 * 1000);
+
+// ═══════════════════════════════════════════
 // 9. SET BOT COMMANDS
 // ═══════════════════════════════════════════
 async function setupBotCommands() {
@@ -455,7 +457,6 @@ bot.onText(/\/api(?:\s+(.+))?/, async (msg, match) => {
     );
   }
 });
-
 // ═══════════════════════════════════════════
 // 12. OTHER COMMANDS
 // ═══════════════════════════════════════════
@@ -595,7 +596,9 @@ function buildSuccessMessage(user, fileName, sizeMB, shortUrl) {
   parts.push(`⏰ <i>Valid 24 hours</i>`);
 
   return parts.join('\n');
-                             }// ═══════════════════════════════════════════
+}
+
+// ═══════════════════════════════════════════
 // 15. MEDIA HANDLER
 // ═══════════════════════════════════════════
 bot.on('message', async (msg) => {
@@ -878,3 +881,4 @@ process.on('uncaughtException', (e) => console.error('[uncaughtException]', e.me
   await setupBotCommands();
   console.log('🚀 MayaJaal Remote URL Uploader Bot chal pada hai...');
 })();
+           
