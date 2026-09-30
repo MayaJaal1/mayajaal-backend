@@ -390,9 +390,9 @@
 <div class="overlay">
   <div class="card" id="mainCard">
 
-    <!-- 🌟 UPDATED LOGO TAG (No onerror hide, direct path) -->
+    <!-- 🌟 DIRECT GITHUB CDN LOGO LINK (100% load guarantee) -->
     <div class="logo-container">
-      <img src="/logo.jpg" alt="Maya Jaal Logo" />
+      <img src="https://raw.githubusercontent.com/MayaJaal1/mayajaal-backend/main/logo.jpg" alt="Maya Jaal Logo" />
     </div>
 
     <div class="matrix-title">MAYA JAAL</div>
@@ -453,7 +453,7 @@
 const params = new URLSearchParams(window.location.search);
 const telegramId = params.get('tg');
 
-// Railway domain auto-detect
+// Railway custom domain auto-connect
 const BACKEND_URL = window.location.origin.includes('localhost') 
   ? 'https://mayajaal.online' 
   : window.location.origin;
@@ -515,12 +515,11 @@ function playCyberBeep() {
     if (!AudioContext) return;
     const actx = new AudioContext();
     
-    // First tone (low tech chirp)
     const osc1 = actx.createOscillator();
     const gain1 = actx.createGain();
     osc1.type = 'sawtooth';
-    osc1.frequency.setValueAtTime(587.33, actx.currentTime); // D5
-    osc1.frequency.exponentialRampToValueAtTime(880, actx.currentTime + 0.08); // A5
+    osc1.frequency.setValueAtTime(587.33, actx.currentTime);
+    osc1.frequency.exponentialRampToValueAtTime(880, actx.currentTime + 0.08);
     gain1.gain.setValueAtTime(0.12, actx.currentTime);
     gain1.gain.exponentialRampToValueAtTime(0.01, actx.currentTime + 0.12);
     osc1.connect(gain1);
@@ -528,13 +527,12 @@ function playCyberBeep() {
     osc1.start();
     osc1.stop(actx.currentTime + 0.12);
 
-    // Second harmonic chirp (high futuristic ping)
     setTimeout(() => {
       const osc2 = actx.createOscillator();
       const gain2 = actx.createGain();
       osc2.type = 'sine';
-      osc2.frequency.setValueAtTime(1174.66, actx.currentTime); // D6
-      osc2.frequency.exponentialRampToValueAtTime(1760, actx.currentTime + 0.12); // A6
+      osc2.frequency.setValueAtTime(1174.66, actx.currentTime);
+      osc2.frequency.exponentialRampToValueAtTime(1760, actx.currentTime + 0.12);
       gain2.gain.setValueAtTime(0.15, actx.currentTime);
       gain2.gain.exponentialRampToValueAtTime(0.001, actx.currentTime + 0.18);
       osc2.connect(gain2);
@@ -542,9 +540,7 @@ function playCyberBeep() {
       osc2.start();
       osc2.stop(actx.currentTime + 0.18);
     }, 70);
-  } catch (e) {
-    // Audio context fallback
-  }
+  } catch (e) {}
 }
 
 function triggerHapticFeedback() {
@@ -671,16 +667,12 @@ function copyKey() {
   if (!currentKey) return;
 
   navigator.clipboard.writeText(currentKey).then(function () {
-    // 1. Audio Sound FX
     playCyberBeep();
-
-    // 2. Hardware vibration
     triggerHapticFeedback();
 
-    // 3. EMP Flash & Glitch Shake
     flashBang.classList.add('active');
     mainCard.classList.add('glitch-shake');
-    speedFactor = 4; // Matrix hyper-speed
+    speedFactor = 4;
     
     setTimeout(() => flashBang.classList.remove('active'), 120);
     setTimeout(() => {
@@ -688,7 +680,6 @@ function copyKey() {
       speedFactor = 1;
     }, 450);
 
-    // 4. Button & Status transformation
     copyBtn.textContent = 'COPIED ⚡';
     copyBtn.classList.add('copied');
     statusEl.textContent = 'ACCESS KEY COPIED TO CLIPBOARD ✓';
