@@ -14,10 +14,14 @@
       "use": "@vercel/static"
     }
   ],
-    "routes": [
+  "routes": [
     {
       "src": "/.well-known/assetlinks.json",
       "dest": "/public/.well-known/assetlinks.json"
+    },
+    {
+      "src": "/download",
+      "dest": "/download.html"
     },
     {
       "src": "/v/(.*)",
