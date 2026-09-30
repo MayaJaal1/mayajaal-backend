@@ -93,6 +93,8 @@
     box-shadow: 0 0 15px rgba(0, 255, 136, 0.4);
     cursor: pointer;
     border: none;
+    text-decoration: none;
+    display: inline-block;
   }
 
   /* 🌟 MAIN CONTAINER (CENTERED HUD) */
@@ -212,6 +214,7 @@
     letter-spacing: 2px;
     box-shadow: 0 0 25px rgba(0, 255, 136, 0.6);
     animation: pulseGlow 1.8s infinite alternate;
+    text-decoration: none;
   }
 
   @keyframes pulseGlow {
@@ -280,6 +283,7 @@
     letter-spacing: 1.5px;
     border: none;
     cursor: pointer;
+    display: inline-block;
   }
 
   /* FIXED BOTTOM DOCK */
@@ -309,6 +313,7 @@
     font-family: inherit;
     letter-spacing: 1.5px;
     text-transform: uppercase;
+    display: inline-block;
   }
 
   .btn-download {
@@ -342,7 +347,7 @@
         <span>QUANTUM STREAM NODE</span>
       </div>
     </div>
-    <button onclick="triggerAppLaunch()" class="header-open-btn">OPEN APP</button>
+    <a href="/download" class="header-open-btn">OPEN APP</a>
   </div>
 
   <div class="main-content">
@@ -352,8 +357,7 @@
     </div>
 
     <div class="player-wrapper">
-      <div class="player-box" onclick="triggerAppLaunch()">
-        <!-- Background actual blurred video -->
+      <div class="player-box" onclick="goToDownloadPage()">
         <video id="bgVideo" muted loop playsinline preload="auto"></video>
         
         <div class="scanline"></div>
@@ -363,10 +367,10 @@
         <div class="hud-bracket hud-br"></div>
         
         <div class="player-overlay">
-          <div class="view-in-app-btn">
+          <a href="/download" class="view-in-app-btn">
             <span>▶ View in App</span>
             <span class="free-badge">FREE</span>
-          </div>
+          </a>
         </div>
 
         <div class="player-footer-duration" id="durationTxt">00:00 / HD 1080P</div>
@@ -378,36 +382,18 @@
         <h3>Stream directly in MayaJaal App</h3>
         <p>Ultra HD HUD controls, high-speed playback & ad-free streaming.</p>
       </div>
-      <button onclick="downloadApk()" class="promo-install-btn">INSTALL</button>
+      <a href="/download" class="promo-install-btn">INSTALL</a>
     </div>
   </div>
 
   <div class="bottom-dock">
-    <button onclick="downloadApk()" class="btn-dock btn-download">⬇ DOWNLOAD APK</button>
-    <button onclick="triggerAppLaunch()" class="btn-dock btn-view-app">VIEW IN APP</button>
+    <a href="/download" class="btn-dock btn-download">⬇ DOWNLOAD APK</a>
+    <a href="/download" class="btn-dock btn-view-app">VIEW IN APP</a>
   </div>
     <script>
-// 🌟 Dedicated download landing page URL
-const APK_DOWNLOAD_URL = "https://mayajaal.online/download";
-const currentFullUrl = window.location.href;
-
-function triggerAppLaunch() {
-  if (navigator.vibrate) navigator.vibrate([40, 30, 70]);
-  const appIntentUrl = "mayajaall://open?url=" + encodeURIComponent(currentFullUrl);
-  const clickTime = Date.now();
-  window.location.href = appIntentUrl;
-  
-  // App install na hone par sidha download page khulega
-  setTimeout(function () {
-    if (Date.now() - clickTime < 2200) {
-      window.location.href = APK_DOWNLOAD_URL;
-    }
-  }, 1500);
-}
-
-function downloadApk() {
-  if (navigator.vibrate) navigator.vibrate([50]);
-  window.location.href = APK_DOWNLOAD_URL;
+function goToDownloadPage() {
+  if (navigator.vibrate) navigator.vibrate([40]);
+  window.location.href = "/download";
 }
 
 /* ═══════════════════════════════════════════
