@@ -83,7 +83,7 @@
 
   .logo-container {
     text-align: center;
-    margin-bottom: 10px;
+    margin-bottom: 12px;
   }
 
   .logo-container img {
@@ -95,6 +95,7 @@
                 0 0 60px rgba(0, 255, 136, 0.3);
     animation: logoPulse 3s infinite alternate ease-in-out;
     border: 2px solid rgba(0, 255, 136, 0.6);
+    display: inline-block;
   }
 
   @keyframes logoPulse {
@@ -389,8 +390,9 @@
 <div class="overlay">
   <div class="card" id="mainCard">
 
+    <!-- 🌟 UPDATED LOGO TAG (No onerror hide, direct path) -->
     <div class="logo-container">
-      <img src="logo.jpg" alt="Maya Jaal Logo" onerror="this.style.display='none'" />
+      <img src="/logo.jpg" alt="Maya Jaal Logo" />
     </div>
 
     <div class="matrix-title">MAYA JAAL</div>
@@ -451,7 +453,7 @@
 const params = new URLSearchParams(window.location.search);
 const telegramId = params.get('tg');
 
-// Railway custom domain se auto-connect
+// Railway domain auto-detect
 const BACKEND_URL = window.location.origin.includes('localhost') 
   ? 'https://mayajaal.online' 
   : window.location.origin;
@@ -504,7 +506,7 @@ function drawMatrix() {
   }
 }
 let matrixInterval = setInterval(drawMatrix, 40);
-  /* ═══════════════════════════════════════════
+ /* ═══════════════════════════════════════════
    CYBER HAPTIC & SYNTH SOUND EFFECTS
    ═══════════════════════════════════════════ */
 function playCyberBeep() {
@@ -541,13 +543,12 @@ function playCyberBeep() {
       osc2.stop(actx.currentTime + 0.18);
     }, 70);
   } catch (e) {
-    // Audio context not allowed or supported
+    // Audio context fallback
   }
 }
 
 function triggerHapticFeedback() {
   if (navigator.vibrate) {
-    // Cyber double pulse: buzz - pause - heavier buzz
     navigator.vibrate([50, 40, 90]);
   }
 }
@@ -698,7 +699,6 @@ function copyKey() {
       statusEl.textContent = 'matrix key active ✓';
     }, 2200);
   }).catch(() => {
-    // Fallback if clipboard API is blocked
     const ta = document.createElement('textarea');
     ta.value = currentKey;
     document.body.appendChild(ta);
