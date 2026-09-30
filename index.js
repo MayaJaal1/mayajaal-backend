@@ -33,6 +33,17 @@ app.get('/', (req, res) => {
 });
 
 // ═══════════════════════════════════════════
+// DOWNLOAD LANDING PAGE ROUTE
+// ═══════════════════════════════════════════
+app.get('/download', (req, res) => {
+  const downloadPath = path.join(__dirname, 'download.html');
+  if (fs.existsSync(downloadPath)) {
+    return res.sendFile(downloadPath);
+  }
+  res.status(404).send('download.html not found on server');
+});
+
+// ═══════════════════════════════════════════
 // SAVE KEY (called from Vercel page)
 // ═══════════════════════════════════════════
 app.post('/save-key', async (req, res) => {
