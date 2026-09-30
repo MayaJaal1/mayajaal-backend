@@ -215,6 +215,7 @@
     box-shadow: 0 0 25px rgba(0, 255, 136, 0.6);
     animation: pulseGlow 1.8s infinite alternate;
     text-decoration: none;
+    cursor: pointer;
   }
 
   @keyframes pulseGlow {
@@ -314,6 +315,7 @@
     letter-spacing: 1.5px;
     text-transform: uppercase;
     display: inline-block;
+    border: none;
   }
 
   .btn-download {
@@ -347,7 +349,7 @@
         <span>QUANTUM STREAM NODE</span>
       </div>
     </div>
-    <a href="/download.html" class="header-open-btn">OPEN APP</a>
+    <button onclick="goToDownload()" class="header-open-btn">OPEN APP</button>
   </div>
 
   <div class="main-content">
@@ -357,7 +359,7 @@
     </div>
 
     <div class="player-wrapper">
-      <div class="player-box" onclick="window.location.href='/download.html'">
+      <div class="player-box" onclick="goToDownload()">
         <!-- Background actual blurred video -->
         <video id="bgVideo" muted loop playsinline preload="auto"></video>
         
@@ -368,10 +370,10 @@
         <div class="hud-bracket hud-br"></div>
         
         <div class="player-overlay">
-          <a href="/download.html" class="view-in-app-btn">
+          <div class="view-in-app-btn" onclick="goToDownload()">
             <span>▶ View in App</span>
             <span class="free-badge">FREE</span>
-          </a>
+          </div>
         </div>
 
         <div class="player-footer-duration" id="durationTxt">00:00 / HD 1080P</div>
@@ -383,15 +385,21 @@
         <h3>Stream directly in MayaJaal App</h3>
         <p>Ultra HD HUD controls, high-speed playback & ad-free streaming.</p>
       </div>
-      <a href="/download.html" class="promo-install-btn">INSTALL</a>
+      <button onclick="goToDownload()" class="promo-install-btn">INSTALL</button>
     </div>
   </div>
 
   <div class="bottom-dock">
-    <a href="/download.html" class="btn-dock btn-download">⬇ DOWNLOAD APK</a>
-    <a href="/download.html" class="btn-dock btn-view-app">VIEW IN APP</a>
+    <button onclick="goToDownload()" class="btn-dock btn-download">⬇ DOWNLOAD APK</button>
+    <button onclick="goToDownload()" class="btn-dock btn-view-app">VIEW IN APP</button>
   </div>
     <script>
+// 🌟 Clean direct navigation with cache buster
+function goToDownload() {
+  if (navigator.vibrate) navigator.vibrate([40]);
+  window.location.href = "https://mayajaal.online/download.html?v=3";
+}
+
 /* ═══════════════════════════════════════════
    FETCH ACTUAL MEDIA & CALCULATE DURATION
    ═══════════════════════════════════════════ */
