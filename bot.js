@@ -38,7 +38,7 @@ const BASE_URL = process.env.CUSTOM_DOMAIN
 app.get('/', (req, res) => res.send('MayaJaal Bot is running!'));
 app.get('/health', (req, res) => res.json({ status: 'ok', uptime: process.uptime() }));
 
-// 🌟 APP UPDATE VERSION CHECK ROUTE (NO MORE 404 OR CANNOT GET)
+// 🌟 APP UPDATE VERSION CHECK ROUTE (FIXED)
 app.get(['/version.json', '/check-update', '/api/check-update'], (req, res) => {
   res.setHeader('Content-Type', 'application/json');
   res.json({
@@ -185,7 +185,7 @@ app.listen(PORT, () => {
   console.log(`🌐 Base URL: ${BASE_URL}`);
 });
 // ═══════════════════════════════════════════
-// 2. CONFIG
+// 2. CONFIG & PERMANENT REDIS USER STATE
 // ═══════════════════════════════════════════
 const TOKEN = process.env.BOT_TOKEN;
 const B2_KEY_ID = process.env.B2_KEY_ID;
@@ -208,19 +208,31 @@ const s3 = new S3Client({
   },
 });
 
-const userSettings = new Map();
-
-function getUser(chatId) {
-  if (!userSettings.has(chatId)) {
-    userSettings.set(chatId, {
-      apiToken: null,
-      header: null,
-      footer: null,
-      bold: false,
-      enableText: true,
-    });
+// 🌟 PERMANENT USER PERSISTENCE VIA REDIS
+async function getUser(chatId) {
+  try {
+    const data = await redis.get(`user_settings:${chatId}`);
+    if (data) {
+      return typeof data === 'string' ? JSON.parse(data) : data;
+    }
+  } catch (err) {
+    console.error('Redis get user error:', err.message);
   }
-  return userSettings.get(chatId);
+  return {
+    apiToken: null,
+    header: null,
+    footer: null,
+    bold: false,
+    enableText: true,
+  };
+}
+
+async function saveUser(chatId, settings) {
+  try {
+    await redis.set(`user_settings:${chatId}`, JSON.stringify(settings));
+  } catch (err) {
+    console.error('Redis save user error:', err.message);
+  }
 }
 
 const bot = new TelegramBot(TOKEN, { polling: true });
@@ -341,7 +353,7 @@ setInterval(() => {
   }
   if (removed > 0) console.log(`🧹 Cleaned ${removed} expired links`);
 }, 10 * 60 * 1000);
-// ═══════════════════════════════════════════
+    // ═══════════════════════════════════════════
 // 9. BOT COMMANDS & SETUP
 // ═══════════════════════════════════════════
 async function setupBotCommands() {
@@ -396,7 +408,7 @@ bot.onText(/\/start/, (msg) => {
 bot.onText(/\/api(?:\s+(.+))?/, async (msg, match) => {
   const chatId = msg.chat.id;
   const token = match[1]?.trim();
-  const user = getUser(chatId);
+  const user = await getUser(chatId);
 
   if (!token) {
     const keyboard = {
@@ -448,6 +460,8 @@ bot.onText(/\/api(?:\s+(.+))?/, async (msg, match) => {
     }
 
     user.apiToken = token;
+    await saveUser(chatId, user);
+
     bot.sendMessage(chatId,
       `✅ <b>Matrix Key linked successfully!</b>\n\n` +
       `Ab aap files upload kar sakte hain. 🚀\n\n` +
@@ -464,76 +478,99 @@ bot.onText(/\/api(?:\s+(.+))?/, async (msg, match) => {
   }
 });
 
-bot.onText(/\/add_header(?:\s+([\s\S]+))?/, (msg, match) => {
+bot.onText(/\/add_header(?:\s+([\s\S]+))?/, async (msg, match) => {
   const chatId = msg.chat.id;
   const text = match[1]?.trim();
   if (!text) {
     return bot.sendMessage(chatId, `❌ <b>Usage:</b>\n<code>/add_header YOUR TEXT</code>`, { parse_mode: 'HTML' });
   }
-  getUser(chatId).header = text;
+  const user = await getUser(chatId);
+  user.header = text;
+  await saveUser(chatId, user);
   bot.sendMessage(chatId, `✅ <b>Header added:</b>\n${escapeHtml(text)}`, { parse_mode: 'HTML' });
 });
 
-bot.onText(/\/remove_header/, (msg) => {
-  getUser(msg.chat.id).header = null;
-  bot.sendMessage(msg.chat.id, '✅ Header removed.');
+bot.onText(/\/remove_header/, async (msg) => {
+  const chatId = msg.chat.id;
+  const user = await getUser(chatId);
+  user.header = null;
+  await saveUser(chatId, user);
+  bot.sendMessage(chatId, '✅ Header removed.');
 });
 
-bot.onText(/\/add_footer(?:\s+([\s\S]+))?/, (msg, match) => {
+bot.onText(/\/add_footer(?:\s+([\s\S]+))?/, async (msg, match) => {
   const chatId = msg.chat.id;
   const text = match[1]?.trim();
   if (!text) {
     return bot.sendMessage(chatId, `❌ <b>Usage:</b>\n<code>/add_footer YOUR TEXT</code>`, { parse_mode: 'HTML' });
   }
-  getUser(chatId).footer = text;
+  const user = await getUser(chatId);
+  user.footer = text;
+  await saveUser(chatId, user);
   bot.sendMessage(chatId, `✅ <b>Footer added:</b>\n${escapeHtml(text)}`, { parse_mode: 'HTML' });
 });
 
-bot.onText(/\/remove_footer/, (msg) => {
-  getUser(msg.chat.id).footer = null;
-  bot.sendMessage(msg.chat.id, '✅ Footer removed.');
-});
-
-bot.onText(/\/enable_text/, (msg) => {
-  getUser(msg.chat.id).enableText = true;
-  bot.sendMessage(msg.chat.id, '✅ <b>Surrounding text enabled.</b>', { parse_mode: 'HTML' });
-});
-
-bot.onText(/\/disable_text/, (msg) => {
-  getUser(msg.chat.id).enableText = false;
-  bot.sendMessage(msg.chat.id, '✅ <b>Surrounding text disabled.</b>', { parse_mode: 'HTML' });
-});
-
-bot.onText(/\/enable_bold/, (msg) => {
-  getUser(msg.chat.id).bold = true;
-  bot.sendMessage(msg.chat.id, '✅ <b>Bold enabled</b>.', { parse_mode: 'HTML' });
-});
-
-bot.onText(/\/disable_bold/, (msg) => {
-  getUser(msg.chat.id).bold = false;
-  bot.sendMessage(msg.chat.id, '✅ Bold disabled.');
-});
-
-bot.onText(/\/logout/, (msg) => {
+bot.onText(/\/remove_footer/, async (msg) => {
   const chatId = msg.chat.id;
-  const user = getUser(chatId);
+  const user = await getUser(chatId);
+  user.footer = null;
+  await saveUser(chatId, user);
+  bot.sendMessage(chatId, '✅ Footer removed.');
+});
+
+bot.onText(/\/enable_text/, async (msg) => {
+  const chatId = msg.chat.id;
+  const user = await getUser(chatId);
+  user.enableText = true;
+  await saveUser(chatId, user);
+  bot.sendMessage(chatId, '✅ <b>Surrounding text enabled.</b>', { parse_mode: 'HTML' });
+});
+
+bot.onText(/\/disable_text/, async (msg) => {
+  const chatId = msg.chat.id;
+  const user = await getUser(chatId);
+  user.enableText = false;
+  await saveUser(chatId, user);
+  bot.sendMessage(chatId, '✅ <b>Surrounding text disabled.</b>', { parse_mode: 'HTML' });
+});
+
+bot.onText(/\/enable_bold/, async (msg) => {
+  const chatId = msg.chat.id;
+  const user = await getUser(chatId);
+  user.bold = true;
+  await saveUser(chatId, user);
+  bot.sendMessage(chatId, '✅ <b>Bold enabled</b>.', { parse_mode: 'HTML' });
+});
+
+bot.onText(/\/disable_bold/, async (msg) => {
+  const chatId = msg.chat.id;
+  const user = await getUser(chatId);
+  user.bold = false;
+  await saveUser(chatId, user);
+  bot.sendMessage(chatId, '✅ Bold disabled.');
+});
+
+bot.onText(/\/logout/, async (msg) => {
+  const chatId = msg.chat.id;
+  const user = await getUser(chatId);
   if (!user.apiToken) {
     return bot.sendMessage(chatId, `❌ <b>Aap logged in nahi ho.</b>\n\nLogin: <code>/api</code>`, { parse_mode: 'HTML' });
   }
   user.apiToken = null;
+  await saveUser(chatId, user);
   bot.sendMessage(chatId, `👋 <b>Logged out successfully!</b>\n\nDobara login: <code>/api</code>`, { parse_mode: 'HTML' });
 });
 
-bot.onText(/\/settings/, (msg) => {
+bot.onText(/\/settings/, async (msg) => {
   const chatId = msg.chat.id;
-  const u = getUser(chatId);
+  const u = await getUser(chatId);
   const text =
     `⚙️ <b>Your MayaJaal Settings</b>\n\n` +
     `🔑 <b>Matrix Key:</b> ${u.apiToken ? '✅ Linked' : '❌ Not linked'}\n` +
     `📝 <b>Header:</b> ${u.header ? escapeHtml(u.header) : '<i>(none)</i>'}\n` +
     `📝 <b>Footer:</b> ${u.footer ? escapeHtml(u.footer) : '<i>(none)</i>'}\n` +
     `💬 <b>Surrounding text:</b> ${u.enableText ? 'ON' : 'OFF'}\n` +
-    `🅱️ <b>Bold:</b> ${u.bold ? 'ON' : 'OFF'}`;
+    `🅱️️ <b>Bold:</b> ${u.bold ? 'ON' : 'OFF'}`;
 
   const opts = { parse_mode: 'HTML' };
   if (u.apiToken) {
@@ -544,17 +581,17 @@ bot.onText(/\/settings/, (msg) => {
   bot.sendMessage(chatId, text, opts);
 });
 
-bot.on('callback_query', (query) => {
+bot.on('callback_query', async (query) => {
   if (query.data === 'logout_user') {
     const chatId = query.message.chat.id;
-    const user = getUser(chatId);
+    const user = await getUser(chatId);
     user.apiToken = null;
+    await saveUser(chatId, user);
     bot.answerCallbackQuery(query.id, { text: '✅ Logged out!' });
     bot.sendMessage(chatId, `👋 <b>Logged out successfully.</b>\n\nDobara login: <code>/api</code>`, { parse_mode: 'HTML' });
   }
 });
-
-function buildSuccessMessage(user, fileName, sizeMB, shortUrl) {
+  function buildSuccessMessage(user, fileName, sizeMB, shortUrl) {
   const parts = [];
   if (user.enableText && user.header) {
     parts.push(user.bold ? `<b>${escapeHtml(user.header)}</b>` : escapeHtml(user.header));
@@ -580,7 +617,7 @@ bot.on('message', async (msg) => {
   const text = msg.text || '';
   if (text.startsWith('/')) return;
 
-  const user = getUser(chatId);
+  const user = await getUser(chatId);
   if (!user.apiToken) {
     const fileCheck = pickFile(msg);
     const isUrl = /^https?:\/\//i.test(text) || text.startsWith('magnet:?');
@@ -741,4 +778,4 @@ process.on('uncaughtException', (e) => console.error('[uncaughtException]', e.me
   await setupBotCommands();
   console.log('🚀 MayaJaal Remote URL Uploader Bot chal pada hai...');
 })();
-  
+                                        
