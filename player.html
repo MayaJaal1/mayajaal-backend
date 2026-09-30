@@ -3,9 +3,12 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"/>
-<title>MayaJaal · Stream Player</title>
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
+<meta http-equiv="Pragma" content="no-cache" />
+<meta http-equiv="Expires" content="0" />
+<title>MAYA JAAL · Matrix Stream HUD</title>
 <style>
-  * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Courier New', -apple-system, monospace; }
+  * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Courier New', monospace; }
   
   body {
     background-color: #000;
@@ -14,21 +17,21 @@
     display: flex;
     flex-direction: column;
     overflow-x: hidden;
-    padding-bottom: 90px;
+    padding-bottom: 95px;
     position: relative;
   }
 
-  /* MATRIX CANVAS BACKGROUND */
+  /* FULLSCREEN MATRIX CANVAS */
   #matrixCanvas {
     position: fixed;
     top: 0; left: 0;
     width: 100%; height: 100%;
     z-index: 0;
-    opacity: 0.35;
+    opacity: 0.42;
     pointer-events: none;
   }
 
-  /* TOP HEADER WITH ORIGINAL CIRCLE LOGO */
+  /* 🌟 TOP HEADER WITH 3D CIRCLE LOGO */
   .header {
     position: relative;
     z-index: 10;
@@ -36,9 +39,10 @@
     align-items: center;
     justify-content: space-between;
     padding: 12px 18px;
-    background: rgba(0, 15, 8, 0.85);
-    border-bottom: 1px solid rgba(0, 255, 136, 0.25);
-    backdrop-filter: blur(10px);
+    background: rgba(0, 15, 8, 0.92);
+    border-bottom: 1px solid rgba(0, 255, 136, 0.35);
+    backdrop-filter: blur(12px);
+    box-shadow: 0 4px 20px rgba(0, 255, 136, 0.15);
   }
 
   .logo-box {
@@ -48,86 +52,93 @@
   }
 
   .logo-box img {
-    width: 44px;
-    height: 44px;
+    width: 46px;
+    height: 46px;
     border-radius: 50%;
     object-fit: cover;
     border: 2px solid #00ff88;
-    box-shadow: 0 0 15px rgba(0, 255, 136, 0.6);
+    box-shadow: 0 0 15px rgba(0, 255, 136, 0.7);
+    animation: logoPulse 3s infinite alternate ease-in-out;
+    background: #000;
+  }
+
+  @keyframes logoPulse {
+    0% { box-shadow: 0 0 10px rgba(0, 255, 136, 0.5); }
+    100% { box-shadow: 0 0 25px rgba(0, 255, 136, 0.9); }
   }
 
   .logo-text {
-    font-size: 18px;
+    font-size: 19px;
     font-weight: 900;
-    letter-spacing: 2px;
+    letter-spacing: 3px;
     color: #00ff88;
-    text-shadow: 0 0 10px rgba(0, 255, 136, 0.5);
+    text-shadow: 0 0 12px rgba(0, 255, 136, 0.6);
   }
 
   .logo-text span {
     color: #4fbf8b;
     font-size: 10px;
     display: block;
-    letter-spacing: 1px;
-    font-weight: normal;
+    letter-spacing: 1.5px;
   }
 
   .header-open-btn {
     background: linear-gradient(135deg, #00ff88, #00c96a);
-    color: #000;
-    padding: 7px 16px;
+    color: #001a0e;
+    padding: 8px 18px;
     border-radius: 20px;
     font-size: 12px;
-    font-weight: 800;
-    text-decoration: none;
+    font-weight: 900;
     letter-spacing: 1px;
     box-shadow: 0 0 15px rgba(0, 255, 136, 0.4);
     cursor: pointer;
+    border: none;
   }
 
-  /* MAIN CONTAINER (CENTERED) */
+  /* 🌟 MAIN CONTAINER (CENTERED HUD) */
   .main-content {
     position: relative;
     z-index: 5;
     width: 100%;
     max-width: 680px;
-    margin: 15px auto;
+    margin: 20px auto 0;
     padding: 0 16px;
   }
 
   .content-meta {
-    background: rgba(0, 15, 8, 0.85);
-    border: 1px solid rgba(0, 255, 136, 0.25);
+    background: rgba(0, 18, 10, 0.92);
+    border: 1px solid rgba(0, 255, 136, 0.4);
     border-radius: 12px 12px 0 0;
-    padding: 14px 18px;
+    padding: 16px 18px;
     border-bottom: none;
+    box-shadow: inset 0 0 20px rgba(0, 255, 136, 0.05);
   }
 
   .video-title {
     font-size: 16px;
-    font-weight: 700;
-    color: #d6ffe8;
+    font-weight: 800;
+    color: #ffffff;
     line-height: 1.4;
     word-break: break-all;
-    margin-bottom: 4px;
-    text-shadow: 0 0 6px rgba(0,255,136,0.3);
+    margin-bottom: 5px;
+    text-shadow: 0 0 8px rgba(0, 255, 136, 0.5);
   }
 
   .video-sub {
     font-size: 11px;
     color: #4fbf8b;
-    letter-spacing: 1px;
+    letter-spacing: 1.2px;
   }
 
-  /* 🌟 MATRIX BLURRED VIDEO PLAYER BOX */
+  /* 🌟 MATRIX BLURRED VIDEO PLAYER SCREEN */
   .player-wrapper {
     position: relative;
     width: 100%;
     background: #000;
-    border: 1px solid rgba(0, 255, 136, 0.35);
+    border: 1.5px solid rgba(0, 255, 136, 0.5);
     border-radius: 0 0 12px 12px;
     overflow: hidden;
-    box-shadow: 0 0 30px rgba(0, 255, 136, 0.15);
+    box-shadow: 0 0 35px rgba(0, 255, 136, 0.2);
   }
 
   .player-box {
@@ -139,33 +150,43 @@
     cursor: pointer;
   }
 
-  /* BACKGROUND ACTUAL BLURRED VIDEO ELEMENT */
+  /* ACTUAL VIDEO BACKGROUND BLUR */
   #bgVideo {
     position: absolute;
     top: 50%; left: 50%;
-    transform: translate(-50%, -50%) scale(1.15);
+    transform: translate(-50%, -50%) scale(1.18);
     min-width: 100%; min-height: 100%;
     width: auto; height: auto;
-    filter: blur(16px) brightness(0.45);
+    filter: blur(14px) brightness(0.55);
     object-fit: cover;
     pointer-events: none;
   }
 
-  /* MATRIX SCANNING LINE OVERLAY */
+  /* SCANLINE OVERLAY */
   .scanline {
     position: absolute;
     inset: 0;
-    background: linear-gradient(180deg, transparent, rgba(0, 255, 136, 0.08), transparent);
-    animation: scanLineAnim 3s linear infinite;
+    background: linear-gradient(180deg, transparent, rgba(0, 255, 136, 0.12), transparent);
+    animation: scanAnim 2.8s linear infinite;
     pointer-events: none;
     z-index: 4;
   }
-  @keyframes scanLineAnim {
-    0% { transform: translateY(-100%); }
-    100% { transform: translateY(100%); }
-  }
+  @keyframes scanAnim { 0% { transform: translateY(-100%); } 100% { transform: translateY(100%); } }
 
-  /* CENTER LOCK & VIEW BUTTON */
+  /* HUD CORNER BRACKETS */
+  .hud-bracket {
+    position: absolute;
+    width: 14px; height: 14px;
+    border: 2px solid #00ff88;
+    z-index: 5;
+    pointer-events: none;
+  }
+  .hud-tl { top: 10px; left: 10px; border-right: none; border-bottom: none; }
+  .hud-tr { top: 10px; right: 10px; border-left: none; border-bottom: none; }
+  .hud-bl { bottom: 10px; left: 10px; border-right: none; border-top: none; }
+  .hud-br { bottom: 10px; right: 10px; border-left: none; border-top: none; }
+
+  /* CENTER LOCKED BUTTON */
   .player-overlay {
     position: absolute;
     inset: 0;
@@ -174,39 +195,37 @@
     align-items: center;
     justify-content: center;
     z-index: 6;
-    background: rgba(0, 5, 2, 0.4);
+    background: radial-gradient(circle, rgba(0, 15, 8, 0.25) 0%, rgba(0, 0, 0, 0.65) 90%);
   }
 
   .view-in-app-btn {
     display: flex;
     align-items: center;
     gap: 10px;
-    background: rgba(0, 0, 0, 0.85);
+    background: rgba(0, 0, 0, 0.9);
     border: 2px solid #00ff88;
     color: #00ff88;
     padding: 13px 26px;
-    border-radius: 30px;
+    border-radius: 35px;
     font-size: 15px;
-    font-weight: 800;
+    font-weight: 900;
     letter-spacing: 2px;
-    text-decoration: none;
-    box-shadow: 0 0 25px rgba(0, 255, 136, 0.5);
+    box-shadow: 0 0 25px rgba(0, 255, 136, 0.6);
     animation: pulseGlow 1.8s infinite alternate;
   }
 
   @keyframes pulseGlow {
     from { transform: scale(1); box-shadow: 0 0 15px rgba(0, 255, 136, 0.4); }
-    to { transform: scale(1.05); box-shadow: 0 0 35px rgba(0, 255, 136, 0.8); }
+    to { transform: scale(1.05); box-shadow: 0 0 40px rgba(0, 255, 136, 0.9); }
   }
 
   .free-badge {
     background: #00ff88;
     color: #000;
-    font-size: 10px;
-    padding: 2px 7px;
+    font-size: 11px;
+    padding: 2px 8px;
     border-radius: 4px;
     font-weight: 900;
-    letter-spacing: 1px;
   }
 
   .player-footer-duration {
@@ -214,22 +233,23 @@
     bottom: 12px;
     left: 16px;
     font-size: 12px;
-    color: #d6ffe8;
-    font-family: monospace;
+    color: #00ff88;
+    font-weight: bold;
     z-index: 7;
-    background: rgba(0, 0, 0, 0.6);
-    padding: 2px 8px;
+    background: rgba(0, 0, 0, 0.75);
+    padding: 3px 10px;
     border-radius: 4px;
-    border: 1px solid rgba(0,255,136,0.3);
+    border: 1px solid rgba(0,255,136,0.4);
+    letter-spacing: 1px;
   }
 
   /* PROMO CARD */
   .promo-card {
-    margin-top: 15px;
-    padding: 16px;
-    background: rgba(0, 15, 8, 0.85);
+    margin-top: 16px;
+    padding: 16px 18px;
+    background: rgba(0, 18, 10, 0.92);
     border-radius: 12px;
-    border: 1px solid rgba(0, 255, 136, 0.25);
+    border: 1px solid rgba(0, 255, 136, 0.35);
     display: flex;
     align-items: center;
     justify-content: space-between;
@@ -238,9 +258,9 @@
 
   .promo-info h3 {
     font-size: 13px;
-    color: #fff;
+    color: #ffffff;
     margin-bottom: 4px;
-    letter-spacing: 0.5px;
+    letter-spacing: 1px;
   }
 
   .promo-info p {
@@ -252,27 +272,28 @@
   .promo-install-btn {
     background: #00ff88;
     color: #000;
-    font-weight: 800;
+    font-weight: 900;
     font-size: 12px;
-    padding: 9px 18px;
+    padding: 10px 20px;
     border-radius: 8px;
     text-decoration: none;
-    white-space: nowrap;
-    letter-spacing: 1px;
+    letter-spacing: 1.5px;
+    border: none;
+    cursor: pointer;
   }
 
-  /* FIXED BOTTOM ACTIONS */
+  /* FIXED BOTTOM DOCK */
   .bottom-dock {
     position: fixed;
     bottom: 0; left: 0; right: 0;
-    background: rgba(0, 10, 5, 0.95);
-    border-top: 1px solid rgba(0, 255, 136, 0.35);
+    background: rgba(0, 10, 5, 0.96);
+    border-top: 1px solid rgba(0, 255, 136, 0.4);
     padding: 14px 18px;
     display: flex;
     justify-content: center;
     gap: 12px;
     z-index: 99;
-    backdrop-filter: blur(10px);
+    backdrop-filter: blur(12px);
   }
 
   .btn-dock {
@@ -281,7 +302,7 @@
     padding: 13px 0;
     border-radius: 8px;
     font-size: 13px;
-    font-weight: 800;
+    font-weight: 900;
     text-align: center;
     text-decoration: none;
     cursor: pointer;
@@ -300,7 +321,7 @@
     background: #00ff88;
     color: #000;
     border: 1px solid #00ff88;
-    box-shadow: 0 0 20px rgba(0, 255, 136, 0.4);
+    box-shadow: 0 0 20px rgba(0, 255, 136, 0.5);
   }
 </style>
 </head>
@@ -308,31 +329,34 @@
 
   <canvas id="matrixCanvas"></canvas>
 
-  <!-- TOP HEADER WITH CIRCLE LOGO -->
+  <!-- TOP HEADER WITH CIRCULAR LOGO -->
   <div class="header">
     <div class="logo-box">
       <img src="https://files.catbox.moe/k3159k.jpg" alt="Maya Jaal" referrerpolicy="no-referrer" crossorigin="anonymous" />
       <div class="logo-text">
         MAYA JAAL
-        <span>NEURAL STREAM NODE</span>
+        <span>QUANTUM STREAM NODE</span>
       </div>
     </div>
-    <div onclick="triggerAppLaunch()" class="header-open-btn">OPEN APP</div>
+    <button onclick="triggerAppLaunch()" class="header-open-btn">OPEN APP</button>
   </div>
 
   <div class="main-content">
-    <!-- VIDEO DETAILS -->
     <div class="content-meta">
-      <div class="video-title" id="displayTitle">Connecting Node...</div>
-      <div class="video-sub">Quantum Cloud Stream · 1080P Ultra HD</div>
+      <div class="video-title" id="displayTitle">Decrypting Media Node...</div>
+      <div class="video-sub">Permanent Cloud Storage · Fast Hardware Stream</div>
     </div>
 
-    <!-- BLURRED SAME VIDEO SCREEN -->
     <div class="player-wrapper">
       <div class="player-box" onclick="triggerAppLaunch()">
-        <!-- Background actual video with blur -->
+        <!-- Background actual blurred video -->
         <video id="bgVideo" muted loop playsinline preload="auto"></video>
+        
         <div class="scanline"></div>
+        <div class="hud-bracket hud-tl"></div>
+        <div class="hud-bracket hud-tr"></div>
+        <div class="hud-bracket hud-bl"></div>
+        <div class="hud-bracket hud-br"></div>
         
         <div class="player-overlay">
           <div class="view-in-app-btn">
@@ -345,30 +369,25 @@
       </div>
     </div>
 
-    <!-- PROMO CARD -->
     <div class="promo-card">
       <div class="promo-info">
         <h3>Stream directly in MayaJaal App</h3>
         <p>Ultra HD HUD controls, high-speed playback & ad-free streaming.</p>
       </div>
-      <a href="javascript:void(0)" onclick="downloadApk()" class="promo-install-btn">INSTALL</a>
+      <button onclick="downloadApk()" class="promo-install-btn">INSTALL</button>
     </div>
   </div>
 
-  <!-- FIXED BOTTOM ACTIONS BAR -->
   <div class="bottom-dock">
     <button onclick="downloadApk()" class="btn-dock btn-download">⬇ DOWNLOAD APK</button>
     <button onclick="triggerAppLaunch()" class="btn-dock btn-view-app">VIEW IN APP</button>
   </div>
   <script>
-/* ═══════════════════════════════════════════
-   CONFIGURATION & APP FALLBACK
-   ═══════════════════════════════════════════ */
 const APK_DOWNLOAD_URL = "https://mayajaal.online/download/app-release.apk";
 const currentFullUrl = window.location.href;
 
 function triggerAppLaunch() {
-  if (navigator.vibrate) navigator.vibrate([40, 30, 60]);
+  if (navigator.vibrate) navigator.vibrate([40, 30, 70]);
   const appIntentUrl = "mayajaall://open?url=" + encodeURIComponent(currentFullUrl);
   const clickTime = Date.now();
   window.location.href = appIntentUrl;
@@ -385,7 +404,7 @@ function downloadApk() {
 }
 
 /* ═══════════════════════════════════════════
-   FETCH SAME VIDEO DETAILS & BLURRED STREAM
+   FETCH ACTUAL MEDIA & CALCULATE DURATION
    ═══════════════════════════════════════════ */
 const pathParts = window.location.pathname.split('/');
 const streamId = pathParts[pathParts.length - 1];
@@ -394,9 +413,9 @@ const titleEl = document.getElementById('displayTitle');
 const durationEl = document.getElementById('durationTxt');
 const bgVideo = document.getElementById('bgVideo');
 
-function formatTime(seconds) {
-  const m = Math.floor(seconds / 60);
-  const s = Math.floor(seconds % 60);
+function formatDuration(sec) {
+  const m = Math.floor(sec / 60);
+  const s = Math.floor(sec % 60);
   return (m < 10 ? '0' : '') + m + ':' + (s < 10 ? '0' : '') + s;
 }
 
@@ -404,12 +423,13 @@ async function loadMediaDetails() {
   if (!streamId) return;
 
   try {
-    // Backend API se actual video link & name mangwayenge
-    const res = await fetch(`/api/v/${streamId}`);
+    // Backend API call for direct stream data
+    const res = await fetch('/api/v/' + streamId);
     if (res.ok) {
       const data = await res.json();
       if (data.url) {
         bgVideo.src = data.url;
+        bgVideo.load();
         bgVideo.play().catch(() => {});
       }
       if (data.name) {
@@ -420,22 +440,29 @@ async function loadMediaDetails() {
     } else {
       titleEl.textContent = streamId + '.mp4';
     }
-  } catch (err) {
+  } catch (e) {
     titleEl.textContent = streamId + '.mp4';
   }
 }
 
-// Actual Video Loaded -> Duration Calculate karein
+// Actual video duration listener
 bgVideo.addEventListener('loadedmetadata', function() {
-  if (bgVideo.duration && !isNaN(bgVideo.duration)) {
-    durationEl.textContent = formatTime(bgVideo.duration) + ' / HD 1080P';
+  if (bgVideo.duration && !isNaN(bgVideo.duration) && bgVideo.duration > 0) {
+    durationEl.textContent = formatDuration(bgVideo.duration) + ' / HD 1080P';
+  }
+});
+
+// Agar direct playback block ho, tab duration extract karein
+bgVideo.addEventListener('durationchange', function() {
+  if (bgVideo.duration && !isNaN(bgVideo.duration) && bgVideo.duration > 0) {
+    durationEl.textContent = formatDuration(bgVideo.duration) + ' / HD 1080P';
   }
 });
 
 loadMediaDetails();
 
 /* ═══════════════════════════════════════════
-   MATRIX RAIN CANVAS ENGINE
+   MATRIX RAIN ENGINE
    ═══════════════════════════════════════════ */
 const canvas = document.getElementById('matrixCanvas');
 const ctx = canvas.getContext('2d');
