@@ -37,7 +37,7 @@ app.get('/', (req, res) => {
 // ═══════════════════════════════════════════
 app.get(['/api/check-update', '/check-update'], (req, res) => {
   res.json({
-    latestVersionCode: 3,
+    latestVersionCode: 2,
     latestVersionName: "v1.2.0",
     updateUrl: "https://mayajaal.online/download.html",
     forceUpdate: false,
