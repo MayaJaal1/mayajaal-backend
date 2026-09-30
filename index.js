@@ -33,6 +33,19 @@ app.get('/', (req, res) => {
 });
 
 // ═══════════════════════════════════════════
+// APP VERSION CHECK API (Auto Update Checker)
+// ═══════════════════════════════════════════
+app.get('/api/check-update', (req, res) => {
+  res.json({
+    latestVersionCode: 1,               // Jab naya APK aaye toh ise 2 kar dena
+    latestVersionName: "v1.0.0",
+    updateUrl: "https://mayajaal.online/download.html",
+    forceUpdate: false,                 // true tab karein jab purana version band karna ho
+    changelog: "Bug fixes & high-speed playback improvements."
+  });
+});
+
+// ═══════════════════════════════════════════
 // DOWNLOAD LANDING PAGE ROUTE (/download & /download.html)
 // ═══════════════════════════════════════════
 app.get(['/download', '/download.html'], (req, res) => {
