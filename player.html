@@ -8,15 +8,18 @@
 <meta http-equiv="Expires" content="0" />
 <title>MAYA JAAL · Matrix Stream HUD</title>
 <style>
-  * { 
+  html, body, * { 
     margin: 0; 
     padding: 0; 
     box-sizing: border-box; 
     font-family: 'Courier New', monospace;
-    -webkit-tap-highlight-color: transparent;
-    -webkit-touch-callout: none;
-    -webkit-user-select: none;
-    user-select: none;
+    -webkit-tap-highlight-color: transparent !important;
+    -webkit-touch-callout: none !important;
+    -webkit-user-select: none !important;
+    -khtml-user-select: none !important;
+    -moz-user-select: none !important;
+    -ms-user-select: none !important;
+    user-select: none !important;
   }
   
   body {
@@ -30,7 +33,6 @@
     position: relative;
   }
 
-  /* FULLSCREEN MATRIX CANVAS */
   #matrixCanvas {
     position: fixed;
     top: 0; left: 0;
@@ -40,7 +42,6 @@
     pointer-events: none;
   }
 
-  /* TOP HEADER WITH 3D CIRCLE LOGO */
   .header {
     position: relative;
     z-index: 10;
@@ -69,6 +70,7 @@
     box-shadow: 0 0 15px rgba(0, 255, 136, 0.7);
     animation: logoPulse 3s infinite alternate ease-in-out;
     background: #000;
+    pointer-events: none;
   }
 
   @keyframes logoPulse {
@@ -105,7 +107,6 @@
     touch-action: manipulation;
   }
 
-  /* MAIN CONTAINER */
   .main-content {
     position: relative;
     z-index: 5;
@@ -140,7 +141,6 @@
     letter-spacing: 1.2px;
   }
 
-  /* MATRIX BLURRED VIDEO PLAYER SCREEN */
   .player-wrapper {
     position: relative;
     width: 100%;
@@ -203,7 +203,6 @@
     justify-content: center;
     z-index: 6;
     background: radial-gradient(circle, rgba(0, 15, 8, 0.25) 0%, rgba(0, 0, 0, 0.65) 90%);
-    pointer-events: none;
   }
 
   .view-in-app-btn {
@@ -220,9 +219,12 @@
     letter-spacing: 2px;
     box-shadow: 0 0 25px rgba(0, 255, 136, 0.6);
     animation: pulseGlow 1.8s infinite alternate;
-    pointer-events: auto;
     cursor: pointer;
     touch-action: manipulation;
+  }
+
+  .view-in-app-btn * {
+    pointer-events: none;
   }
 
   @keyframes pulseGlow {
@@ -252,6 +254,7 @@
     border-radius: 4px;
     border: 1px solid rgba(0,255,136,0.4);
     letter-spacing: 1px;
+    pointer-events: none;
   }
 
   .promo-card {
@@ -264,6 +267,10 @@
     align-items: center;
     justify-content: space-between;
     gap: 12px;
+  }
+
+  .promo-info {
+    pointer-events: none;
   }
 
   .promo-info h3 {
@@ -349,7 +356,7 @@
         <span>QUANTUM STREAM NODE</span>
       </div>
     </div>
-    <button onclick="goToDownload(event)" class="header-open-btn">OPEN APP</button>
+    <button class="header-open-btn nav-btn">OPEN APP</button>
   </div>
 
   <div class="main-content">
@@ -359,7 +366,7 @@
     </div>
 
     <div class="player-wrapper">
-      <div class="player-box" onclick="goToDownload(event)">
+      <div class="player-box nav-btn">
         <video id="bgVideo" muted loop playsinline preload="auto"></video>
         
         <div class="scanline"></div>
@@ -369,7 +376,7 @@
         <div class="hud-bracket hud-br"></div>
         
         <div class="player-overlay">
-          <div class="view-in-app-btn" onclick="goToDownload(event)">
+          <div class="view-in-app-btn nav-btn">
             <span>▶ View in App</span>
             <span class="free-badge">FREE</span>
           </div>
@@ -384,23 +391,38 @@
         <h3>Stream directly in MayaJaal App</h3>
         <p>Ultra HD HUD controls, high-speed playback & ad-free streaming.</p>
       </div>
-      <button onclick="goToDownload(event)" class="promo-install-btn">INSTALL</button>
+      <button class="promo-install-btn nav-btn">INSTALL</button>
     </div>
   </div>
 
   <div class="bottom-dock">
-    <button onclick="goToDownload(event)" class="btn-dock btn-download">⬇ DOWNLOAD APK</button>
-    <button onclick="goToDownload(event)" class="btn-dock btn-view-app">VIEW IN APP</button>
+    <button class="btn-dock btn-download nav-btn">⬇ DOWNLOAD APK</button>
+    <button class="btn-dock btn-view-app nav-btn">VIEW IN APP</button>
   </div>
     <script>
-function goToDownload(e) {
+// Mobile touch instant redirect (text selection bypass)
+function triggerDirectOpen(e) {
   if (e) {
-    e.preventDefault();
+    if (e.cancelable) e.preventDefault();
     e.stopPropagation();
   }
-  if (navigator.vibrate) navigator.vibrate([40]);
-  window.location.assign("/download.html?v=3");
+  if (window.getSelection) {
+    window.getSelection().removeAllRanges();
+  }
+  if (navigator.vibrate) navigator.vibrate([35]);
+  window.location.href = "https://mayajaal.online/download.html?v=4";
 }
+
+// Har clickable button ko direct touch response se link karein
+document.querySelectorAll('.nav-btn').forEach(function(el) {
+  el.addEventListener('touchend', triggerDirectOpen, { passive: false });
+  el.addEventListener('click', triggerDirectOpen);
+});
+
+// Selection context menu ko disable karein
+document.addEventListener('contextmenu', function(e) {
+  e.preventDefault();
+});
 
 /* ═══════════════════════════════════════════
    FETCH ACTUAL MEDIA & CALCULATE DURATION
