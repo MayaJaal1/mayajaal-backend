@@ -38,6 +38,18 @@ const BASE_URL = process.env.CUSTOM_DOMAIN
 app.get('/', (req, res) => res.send('MayaJaal Bot is running!'));
 app.get('/health', (req, res) => res.json({ status: 'ok', uptime: process.uptime() }));
 
+// 🌟 APP UPDATE VERSION CHECK ROUTE (NO MORE 404 OR CANNOT GET)
+app.get(['/version.json', '/check-update', '/api/check-update'], (req, res) => {
+  res.setHeader('Content-Type', 'application/json');
+  res.json({
+    latestVersionCode: 2,
+    latestVersionName: "v1.1.0",
+    updateUrl: "https://mayajaal.online/download.html",
+    forceUpdate: false,
+    changelog: "⚡ Fast player and auto-update test success!"
+  });
+});
+
 app.get('/logo.jpg', (req, res) => {
   res.sendFile(path.join(__dirname, 'logo.jpg'));
 });
@@ -45,6 +57,15 @@ app.get('/logo.jpg', (req, res) => {
 // 🌟 MATRIX KEY FRONTEND PAGE ROUTE
 app.get('/key', (req, res) => {
   res.sendFile(path.join(__dirname, 'index.html'));
+});
+
+// 🌟 DOWNLOAD PAGE ROUTE
+app.get(['/download', '/download.html'], (req, res) => {
+  const dlPath = path.join(__dirname, 'download.html');
+  if (fs.existsSync(dlPath)) {
+    return res.sendFile(dlPath);
+  }
+  res.status(404).send('download.html not found');
 });
 
 // 🌟 MATRIX KEY SAVE API
@@ -61,7 +82,6 @@ app.post('/save-key', async (req, res) => {
     res.status(500).json({ success: false, error: err.message });
   }
 });
-
 // 🌟 MATRIX KEY VERIFY API
 app.get('/verify-key/:key', async (req, res) => {
   try {
@@ -83,7 +103,6 @@ function servePlayerPage(req, res) {
   if (fs.existsSync(playerFile)) {
     return res.sendFile(playerFile);
   }
-  // Fallback template agar player.html exist na kare
   res.send(`
     <!DOCTYPE html>
     <html lang="en">
@@ -95,7 +114,6 @@ function servePlayerPage(req, res) {
 
 // ═══════════════════════════════════════════
 // 🌟 FIXED ROUTES (/v/:id & /tb/:id)
-// NO DIRECT S3 REDIRECT -> ALWAYS SERVES PLAYER.HTML
 // ═══════════════════════════════════════════
 app.get('/v/:id', (req, res) => {
   servePlayerPage(req, res);
@@ -166,7 +184,6 @@ app.listen(PORT, () => {
   console.log(`✅ Server listening on port ${PORT}`);
   console.log(`🌐 Base URL: ${BASE_URL}`);
 });
-
 // ═══════════════════════════════════════════
 // 2. CONFIG
 // ═══════════════════════════════════════════
@@ -207,6 +224,7 @@ function getUser(chatId) {
 }
 
 const bot = new TelegramBot(TOKEN, { polling: true });
+
 // ═══════════════════════════════════════════
 // 6. HELPERS
 // ═══════════════════════════════════════════
@@ -224,7 +242,6 @@ function createShortLink(signedUrl, fileName) {
     expiresAt: Date.now() + LINK_TTL_MS,
   });
   
-  // Redis backup taaki app aur player dono link ko fetch kar sakein
   redis.set(`video:${id}`, JSON.stringify({ url: signedUrl, name: fileName }), { ex: 86400 }).catch(() => {});
   return `${BASE_URL}/v/${id}`;
 }
@@ -324,7 +341,6 @@ setInterval(() => {
   }
   if (removed > 0) console.log(`🧹 Cleaned ${removed} expired links`);
 }, 10 * 60 * 1000);
-
 // ═══════════════════════════════════════════
 // 9. BOT COMMANDS & SETUP
 // ═══════════════════════════════════════════
@@ -725,4 +741,4 @@ process.on('uncaughtException', (e) => console.error('[uncaughtException]', e.me
   await setupBotCommands();
   console.log('🚀 MayaJaal Remote URL Uploader Bot chal pada hai...');
 })();
-      
+  
