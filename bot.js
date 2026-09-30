@@ -7,14 +7,16 @@ const { S3Client, PutObjectCommand, GetObjectCommand } = require('@aws-sdk/clien
 const { getSignedUrl } = require('@aws-sdk/s3-request-presigner');
 const crypto = require('crypto');
 const { Redis } = require('@upstash/redis');
+const path = require('path');
 
 // ═══════════════════════════════════════════
 // 0. REDIS + CONFIG
 // ═══════════════════════════════════════════
 const redis = Redis.fromEnv();
 
-const WEB_PAGE_URL = process.env.WEB_PAGE_URL || 'https://matrix-api-seven.vercel.app';
-const BACKEND_URL = process.env.BACKEND_URL || 'https://mayajaal-backend.vercel.app';
+// Matrix page & Backend ab direct mayajaal.online par set hai
+const WEB_PAGE_URL = process.env.WEB_PAGE_URL || 'https://mayajaal.online/key';
+const BACKEND_URL = process.env.BACKEND_URL || 'https://mayajaal.online';
 const TERABOX_API = process.env.TERABOX_API || 'https://terabox.hnn.workers.dev/api';
 
 // ═══════════════════════════════════════════
@@ -23,16 +25,53 @@ const TERABOX_API = process.env.TERABOX_API || 'https://terabox.hnn.workers.dev/
 const app = express();
 const PORT = process.env.PORT || 3000;
 
+app.use(express.json());
+
 const linkStore = new Map();
 const LINK_TTL_MS = 24 * 60 * 60 * 1000;
 
-// Naya custom domain yahan add kar diya gaya hai
 const BASE_URL = process.env.CUSTOM_DOMAIN 
   ? (process.env.CUSTOM_DOMAIN.startsWith('http') ? process.env.CUSTOM_DOMAIN : `https://${process.env.CUSTOM_DOMAIN}`)
   : 'https://mayajaal.online';
 
 app.get('/', (req, res) => res.send('MayaJaal Bot is running!'));
 app.get('/health', (req, res) => res.json({ status: 'ok', uptime: process.uptime() }));
+
+// 🌟 MATRIX KEY FRONTEND PAGE ROUTE
+app.get('/key', (req, res) => {
+  res.sendFile(path.join(__dirname, 'index.html'));
+});
+
+// 🌟 MATRIX KEY SAVE API (Page se key aane par Redis mein save hogi)
+app.post('/save-key', async (req, res) => {
+  try {
+    const { telegram_id, key } = req.body;
+    if (!telegram_id || !key) {
+      return res.status(400).json({ success: false, message: 'Missing parameters' });
+    }
+    // Key ko Redis mein 30 din ke liye store karenge
+    await redis.set(`matrix_key:${key}`, String(telegram_id), { ex: 30 * 86400 });
+    res.json({ success: true });
+  } catch (err) {
+    console.error('Save key error:', err.message);
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// 🌟 MATRIX KEY VERIFY API (Bot /api command ke liye)
+app.get('/verify-key/:key', async (req, res) => {
+  try {
+    const key = req.params.key;
+    const tgId = await redis.get(`matrix_key:${key}`);
+    if (tgId) {
+      return res.json({ valid: true, telegram_id: tgId });
+    }
+    res.json({ valid: false });
+  } catch (err) {
+    console.error('Verify key error:', err.message);
+    res.status(500).json({ valid: false, error: err.message });
+  }
+});
 
 app.get('/v/:id', (req, res) => {
   const data = linkStore.get(req.params.id);
@@ -881,4 +920,4 @@ process.on('uncaughtException', (e) => console.error('[uncaughtException]', e.me
   await setupBotCommands();
   console.log('🚀 MayaJaal Remote URL Uploader Bot chal pada hai...');
 })();
-           
+      
