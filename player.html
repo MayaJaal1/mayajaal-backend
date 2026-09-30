@@ -8,7 +8,16 @@
 <meta http-equiv="Expires" content="0" />
 <title>MAYA JAAL · Matrix Stream HUD</title>
 <style>
-  * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Courier New', monospace; }
+  * { 
+    margin: 0; 
+    padding: 0; 
+    box-sizing: border-box; 
+    font-family: 'Courier New', monospace;
+    -webkit-tap-highlight-color: transparent;
+    -webkit-touch-callout: none;
+    -webkit-user-select: none;
+    user-select: none;
+  }
   
   body {
     background-color: #000;
@@ -31,7 +40,7 @@
     pointer-events: none;
   }
 
-  /* 🌟 TOP HEADER WITH 3D CIRCLE LOGO */
+  /* TOP HEADER WITH 3D CIRCLE LOGO */
   .header {
     position: relative;
     z-index: 10;
@@ -93,11 +102,10 @@
     box-shadow: 0 0 15px rgba(0, 255, 136, 0.4);
     cursor: pointer;
     border: none;
-    text-decoration: none;
-    display: inline-block;
+    touch-action: manipulation;
   }
 
-  /* 🌟 MAIN CONTAINER (CENTERED HUD) */
+  /* MAIN CONTAINER */
   .main-content {
     position: relative;
     z-index: 5;
@@ -132,7 +140,7 @@
     letter-spacing: 1.2px;
   }
 
-  /* 🌟 MATRIX BLURRED VIDEO PLAYER SCREEN */
+  /* MATRIX BLURRED VIDEO PLAYER SCREEN */
   .player-wrapper {
     position: relative;
     width: 100%;
@@ -146,13 +154,13 @@
   .player-box {
     position: relative;
     width: 100%;
-    padding-top: 56.25%; /* 16:9 Aspect Ratio */
+    padding-top: 56.25%;
     background: #000;
     overflow: hidden;
     cursor: pointer;
+    touch-action: manipulation;
   }
 
-  /* ACTUAL VIDEO BACKGROUND BLUR */
   #bgVideo {
     position: absolute;
     top: 50%; left: 50%;
@@ -164,7 +172,6 @@
     pointer-events: none;
   }
 
-  /* SCANLINE OVERLAY */
   .scanline {
     position: absolute;
     inset: 0;
@@ -175,7 +182,6 @@
   }
   @keyframes scanAnim { 0% { transform: translateY(-100%); } 100% { transform: translateY(100%); } }
 
-  /* HUD CORNER BRACKETS */
   .hud-bracket {
     position: absolute;
     width: 14px; height: 14px;
@@ -188,7 +194,6 @@
   .hud-bl { bottom: 10px; left: 10px; border-right: none; border-top: none; }
   .hud-br { bottom: 10px; right: 10px; border-left: none; border-top: none; }
 
-  /* CENTER LOCKED BUTTON */
   .player-overlay {
     position: absolute;
     inset: 0;
@@ -198,6 +203,7 @@
     justify-content: center;
     z-index: 6;
     background: radial-gradient(circle, rgba(0, 15, 8, 0.25) 0%, rgba(0, 0, 0, 0.65) 90%);
+    pointer-events: none;
   }
 
   .view-in-app-btn {
@@ -214,8 +220,9 @@
     letter-spacing: 2px;
     box-shadow: 0 0 25px rgba(0, 255, 136, 0.6);
     animation: pulseGlow 1.8s infinite alternate;
-    text-decoration: none;
+    pointer-events: auto;
     cursor: pointer;
+    touch-action: manipulation;
   }
 
   @keyframes pulseGlow {
@@ -247,7 +254,6 @@
     letter-spacing: 1px;
   }
 
-  /* PROMO CARD */
   .promo-card {
     margin-top: 16px;
     padding: 16px 18px;
@@ -280,14 +286,11 @@
     font-size: 12px;
     padding: 10px 20px;
     border-radius: 8px;
-    text-decoration: none;
-    letter-spacing: 1.5px;
     border: none;
     cursor: pointer;
-    display: inline-block;
+    touch-action: manipulation;
   }
 
-  /* FIXED BOTTOM DOCK */
   .bottom-dock {
     position: fixed;
     bottom: 0; left: 0; right: 0;
@@ -309,13 +312,11 @@
     font-size: 13px;
     font-weight: 900;
     text-align: center;
-    text-decoration: none;
     cursor: pointer;
-    font-family: inherit;
     letter-spacing: 1.5px;
     text-transform: uppercase;
-    display: inline-block;
     border: none;
+    touch-action: manipulation;
   }
 
   .btn-download {
@@ -336,7 +337,6 @@
 
   <canvas id="matrixCanvas"></canvas>
 
-  <!-- TOP HEADER WITH CIRCULAR LOGO -->
   <div class="header">
     <div class="logo-box">
       <img 
@@ -349,7 +349,7 @@
         <span>QUANTUM STREAM NODE</span>
       </div>
     </div>
-    <button onclick="goToDownload()" class="header-open-btn">OPEN APP</button>
+    <button onclick="goToDownload(event)" class="header-open-btn">OPEN APP</button>
   </div>
 
   <div class="main-content">
@@ -359,8 +359,7 @@
     </div>
 
     <div class="player-wrapper">
-      <div class="player-box" onclick="goToDownload()">
-        <!-- Background actual blurred video -->
+      <div class="player-box" onclick="goToDownload(event)">
         <video id="bgVideo" muted loop playsinline preload="auto"></video>
         
         <div class="scanline"></div>
@@ -370,7 +369,7 @@
         <div class="hud-bracket hud-br"></div>
         
         <div class="player-overlay">
-          <div class="view-in-app-btn" onclick="goToDownload()">
+          <div class="view-in-app-btn" onclick="goToDownload(event)">
             <span>▶ View in App</span>
             <span class="free-badge">FREE</span>
           </div>
@@ -385,19 +384,22 @@
         <h3>Stream directly in MayaJaal App</h3>
         <p>Ultra HD HUD controls, high-speed playback & ad-free streaming.</p>
       </div>
-      <button onclick="goToDownload()" class="promo-install-btn">INSTALL</button>
+      <button onclick="goToDownload(event)" class="promo-install-btn">INSTALL</button>
     </div>
   </div>
 
   <div class="bottom-dock">
-    <button onclick="goToDownload()" class="btn-dock btn-download">⬇ DOWNLOAD APK</button>
-    <button onclick="goToDownload()" class="btn-dock btn-view-app">VIEW IN APP</button>
+    <button onclick="goToDownload(event)" class="btn-dock btn-download">⬇ DOWNLOAD APK</button>
+    <button onclick="goToDownload(event)" class="btn-dock btn-view-app">VIEW IN APP</button>
   </div>
     <script>
-// 🌟 Clean direct navigation with cache buster
-function goToDownload() {
+function goToDownload(e) {
+  if (e) {
+    e.preventDefault();
+    e.stopPropagation();
+  }
   if (navigator.vibrate) navigator.vibrate([40]);
-  window.location.href = "https://mayajaal.online/download.html?v=3";
+  window.location.assign("/download.html?v=3");
 }
 
 /* ═══════════════════════════════════════════
