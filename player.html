@@ -329,7 +329,7 @@
 
   <canvas id="matrixCanvas"></canvas>
 
-  <!-- TOP HEADER WITH CIRCULAR LOGO (UPDATED) -->
+  <!-- TOP HEADER WITH CIRCULAR LOGO -->
   <div class="header">
     <div class="logo-box">
       <img 
@@ -387,7 +387,8 @@
     <button onclick="triggerAppLaunch()" class="btn-dock btn-view-app">VIEW IN APP</button>
   </div>
     <script>
-const APK_DOWNLOAD_URL = "https://mayajaal.online/download/app-release.apk";
+// 🌟 Dedicated download landing page URL
+const APK_DOWNLOAD_URL = "https://mayajaal.online/download";
 const currentFullUrl = window.location.href;
 
 function triggerAppLaunch() {
@@ -395,6 +396,8 @@ function triggerAppLaunch() {
   const appIntentUrl = "mayajaall://open?url=" + encodeURIComponent(currentFullUrl);
   const clickTime = Date.now();
   window.location.href = appIntentUrl;
+  
+  // App install na hone par sidha download page khulega
   setTimeout(function () {
     if (Date.now() - clickTime < 2200) {
       window.location.href = APK_DOWNLOAD_URL;
