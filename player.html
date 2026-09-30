@@ -1,0 +1,353 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"/>
+<title>MayaJaal · Stream Player</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
+  
+  body {
+    background-color: #0b0f14;
+    color: #ffffff;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    overflow-x: hidden;
+    padding-bottom: 90px;
+  }
+
+  /* TOP HEADER (TERABOX STYLE) */
+  .header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 14px 18px;
+    background: #111720;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  }
+
+  .logo-box {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .logo-box img {
+    width: 38px;
+    height: 38px;
+    border-radius: 8px;
+    object-fit: cover;
+    border: 1px solid #00ff88;
+  }
+
+  .logo-text {
+    font-size: 17px;
+    font-weight: 700;
+    letter-spacing: 0.5px;
+    color: #fff;
+  }
+
+  .logo-text span {
+    color: #00ff88;
+    font-size: 11px;
+    display: block;
+    font-weight: 500;
+  }
+
+  .header-open-btn {
+    background: #0084ff;
+    color: #fff;
+    padding: 7px 16px;
+    border-radius: 20px;
+    font-size: 13px;
+    font-weight: 600;
+    text-decoration: none;
+    transition: 0.2s;
+  }
+
+  /* VIDEO META INFO */
+  .content-meta {
+    padding: 16px 18px 12px;
+  }
+
+  .video-title {
+    font-size: 16px;
+    font-weight: 600;
+    color: #e6edf3;
+    line-height: 1.4;
+    word-break: break-all;
+    margin-bottom: 6px;
+  }
+
+  .video-sub {
+    font-size: 12px;
+    color: #8b949e;
+  }
+
+  /* 🌟 BLURRED VIDEO PLAYER SCREEN (EXACT TERABOX LOOK) */
+  .player-wrapper {
+    position: relative;
+    width: 100%;
+    max-width: 680px;
+    margin: 0 auto;
+    background: #000;
+    border-radius: 0;
+    overflow: hidden;
+  }
+
+  @media (min-width: 681px) {
+    .player-wrapper {
+      border-radius: 12px;
+      margin-top: 15px;
+    }
+  }
+
+  .player-box {
+    position: relative;
+    width: 100%;
+    padding-top: 56.25%; /* 16:9 Cinema Aspect */
+    background: #000;
+    overflow: hidden;
+  }
+
+  /* BLURRED BACKGROUND FRAME */
+  .player-bg {
+    position: absolute;
+    inset: 0;
+    background: url('https://files.catbox.moe/k3159k.jpg') center/cover no-repeat;
+    filter: blur(14px) brightness(0.45);
+    transform: scale(1.15); /* Blur edges hiding */
+  }
+
+  /* CENTER LOCK OVERLAY */
+  .player-overlay {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    z-index: 5;
+    background: rgba(0, 0, 0, 0.35);
+  }
+
+  /* PULSING VIEW IN APP BUTTON */
+  .view-in-app-btn {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background: rgba(0, 0, 0, 0.82);
+    border: 1.5px solid #00ff88;
+    color: #fff;
+    padding: 13px 26px;
+    border-radius: 30px;
+    font-size: 15px;
+    font-weight: 700;
+    text-decoration: none;
+    box-shadow: 0 0 25px rgba(0, 255, 136, 0.45);
+    cursor: pointer;
+    animation: pulseGlow 2s infinite alternate;
+  }
+
+  @keyframes pulseGlow {
+    from { transform: scale(1); box-shadow: 0 0 15px rgba(0, 255, 136, 0.35); }
+    to { transform: scale(1.04); box-shadow: 0 0 30px rgba(0, 255, 136, 0.7); }
+  }
+
+  .free-badge {
+    background: #0084ff;
+    color: #fff;
+    font-size: 11px;
+    padding: 2px 7px;
+    border-radius: 4px;
+    font-weight: 600;
+    letter-spacing: 0.3px;
+  }
+
+  .player-footer-duration {
+    position: absolute;
+    bottom: 12px;
+    left: 16px;
+    font-size: 12px;
+    color: rgba(255, 255, 255, 0.75);
+    font-family: monospace;
+    z-index: 6;
+  }
+
+  /* APP PROMO BANNER */
+  .promo-card {
+    max-width: 680px;
+    margin: 18px auto;
+    padding: 16px;
+    background: #141c26;
+    border-radius: 12px;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+  }
+
+  .promo-info h3 {
+    font-size: 14px;
+    color: #fff;
+    margin-bottom: 4px;
+  }
+
+  .promo-info p {
+    font-size: 12px;
+    color: #8b949e;
+    line-height: 1.4;
+  }
+
+  .promo-install-btn {
+    background: #00ff88;
+    color: #000;
+    font-weight: 700;
+    font-size: 13px;
+    padding: 9px 18px;
+    border-radius: 8px;
+    text-decoration: none;
+    white-space: nowrap;
+  }
+
+  /* 🌟 FIXED BOTTOM BAR (TERABOX REPLICA) */
+  .bottom-dock {
+    position: fixed;
+    bottom: 0; left: 0; right: 0;
+    background: #111720;
+    border-top: 1px solid rgba(255, 255, 255, 0.1);
+    padding: 14px 18px;
+    display: flex;
+    justify-content: center;
+    gap: 12px;
+    z-index: 99;
+  }
+
+  .btn-dock {
+    flex: 1;
+    max-width: 260px;
+    padding: 13px 0;
+    border-radius: 8px;
+    font-size: 14px;
+    font-weight: 700;
+    text-align: center;
+    text-decoration: none;
+    cursor: pointer;
+    border: none;
+    transition: 0.2s;
+  }
+
+  .btn-download {
+    background: #1c2633;
+    color: #0084ff;
+    border: 1px solid rgba(0, 132, 255, 0.4);
+  }
+
+  .btn-view-app {
+    background: #0084ff;
+    color: #fff;
+    box-shadow: 0 4px 15px rgba(0, 132, 255, 0.4);
+  }
+</style>
+</head>
+<body>
+
+  <!-- TOP HEADER -->
+  <div class="header">
+    <div class="logo-box">
+      <img src="https://files.catbox.moe/k3159k.jpg" alt="MayaJaal Logo" />
+      <div class="logo-text">
+        MayaJaal
+        <span>Cloud Secure Node</span>
+      </div>
+    </div>
+    <a href="javascript:void(0)" onclick="triggerAppLaunch()" class="header-open-btn">Open App</a>
+  </div>
+
+  <!-- VIDEO DETAILS -->
+  <div class="content-meta">
+    <div class="video-title" id="displayTitle">Encrypted_Media_Stream.mp4</div>
+    <div class="video-sub">Permanent Cloud Storage · Fast Hardware Stream</div>
+  </div>
+
+  <!-- 🌟 BLURRED VIDEO FRAME WITH CENTER BUTTON -->
+  <div class="player-wrapper">
+    <div class="player-box" onclick="triggerAppLaunch()">
+      <!-- Ye div blur hokar picture preview dega -->
+      <div class="player-bg" id="playerBg"></div>
+      
+      <div class="player-overlay">
+        <div class="view-in-app-btn">
+          <span>▶ View in App</span>
+          <span class="free-badge">Free</span>
+        </div>
+      </div>
+
+      <div class="player-footer-duration">00:00:00 / HD 1080P</div>
+    </div>
+  </div>
+
+  <!-- PROMO CARD -->
+  <div class="promo-card">
+    <div class="promo-info">
+      <h3>Stream directly in MayaJaal App</h3>
+      <p>Enjoy ad-free streaming, fullscreen HUD controls, and offline downloads.</p>
+    </div>
+    <a href="javascript:void(0)" onclick="downloadApk()" class="promo-install-btn">Install</a>
+  </div>
+
+  <!-- 🌟 FIXED BOTTOM ACTIONS -->
+  <div class="bottom-dock">
+    <button onclick="downloadApk()" class="btn-dock btn-download">⬇ Download APK</button>
+    <button onclick="triggerAppLaunch()" class="btn-dock btn-view-app">View in MayaJaal</button>
+  </div>
+  <script>
+/* ═══════════════════════════════════════════
+   CONFIGURATION & DISPATCHING
+   ═══════════════════════════════════════════ */
+// 🌟 Apna actual APK Download link yahan dalein
+const APK_DOWNLOAD_URL = "https://mayajaal.online/download/app-release.apk";
+
+// Current page URL
+const currentFullUrl = window.location.href;
+
+// Dynamic title nikalne ka try karein
+try {
+  const pathParts = window.location.pathname.split('/');
+  const id = pathParts[pathParts.length - 1] || 'Stream_Media';
+  if (id && id.length > 3) {
+    document.getElementById('displayTitle').textContent = id + '.mp4';
+  }
+} catch (e) {}
+
+/* ═══════════════════════════════════════════
+   APP LAUNCHER OR AUTO-APK FALLBACK
+   ═══════════════════════════════════════════ */
+function triggerAppLaunch() {
+  if (navigator.vibrate) navigator.vibrate([40, 30, 60]);
+
+  // Deep-link intent URL for MayaJaal
+  const appIntentUrl = "mayajaall://open?url=" + encodeURIComponent(currentFullUrl);
+  const clickTime = Date.now();
+
+  // 1. Android phone ko bolenge app kholo
+  window.location.href = appIntentUrl;
+
+  // 2. Agar 1.5 seconds tak app open nahi hua (Phone me app nahi hai)
+  setTimeout(function () {
+    // Agar user abhi bhi isi webpage par hai, to direct download start kar do
+    if (Date.now() - clickTime < 2200) {
+      window.location.href = APK_DOWNLOAD_URL;
+    }
+  }, 1500);
+}
+
+function downloadApk() {
+  if (navigator.vibrate) navigator.vibrate([50]);
+  window.location.href = APK_DOWNLOAD_URL;
+}
+</script>
+</body>
+</html>
