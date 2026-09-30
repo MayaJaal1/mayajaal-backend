@@ -28,10 +28,6 @@
     {
       "source": "/key",
       "destination": "/index.html"
-    },
-    {
-      "source": "/(.*)",
-      "destination": "/index.js"
     }
   ]
 }
