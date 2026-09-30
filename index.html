@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-<title>MAYA JAAL · Neural Media Dispatcher</title>
+<title>MAYA JAAL · Matrix Key</title>
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; }
   
@@ -24,6 +24,7 @@
     transition: filter 0.3s;
   }
 
+  /* Flash shockwave effect */
   .flash-bang {
     position: fixed;
     inset: 0;
@@ -33,7 +34,9 @@
     opacity: 0;
     transition: opacity 0.08s ease-out;
   }
-  .flash-bang.active { opacity: 1; }
+  .flash-bang.active {
+    opacity: 1;
+  }
 
   .overlay {
     position: relative;
@@ -42,19 +45,21 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    padding: 24px 16px 100px;
-    background: radial-gradient(circle at center, rgba(0,0,0,0.3) 0%, rgba(0,0,0,0.88) 80%);
+    padding: 24px 16px;
+    background: radial-gradient(circle at center, rgba(0,0,0,0.3) 0%, rgba(0,0,0,0.85) 80%);
   }
 
   .card {
     width: 100%;
     max-width: 720px;
-    background: rgba(0, 15, 8, 0.92);
+    background: rgba(0, 15, 8, 0.88);
     border: 1px solid rgba(0, 255, 136, 0.35);
     border-radius: 14px;
     padding: 30px 24px;
-    backdrop-filter: blur(10px);
-    box-shadow: 0 0 35px rgba(0, 255, 136, 0.18), inset 0 0 40px rgba(0, 255, 136, 0.04);
+    backdrop-filter: blur(8px);
+    box-shadow:
+      0 0 30px rgba(0, 255, 136, 0.15),
+      inset 0 0 40px rgba(0, 255, 136, 0.04);
     animation: fadeIn 0.8s ease-out;
     transition: transform 0.15s, box-shadow 0.2s;
   }
@@ -76,14 +81,21 @@
     to   { opacity: 1; transform: translateY(0); }
   }
 
-  .logo-container { text-align: center; margin-bottom: 12px; }
+  .logo-container {
+    text-align: center;
+    margin-bottom: 12px;
+  }
+
   .logo-container img {
-    width: 110px; height: 110px;
+    width: 120px;
+    height: 120px;
     border-radius: 50%;
     object-fit: cover;
-    box-shadow: 0 0 25px rgba(0, 255, 136, 0.7), 0 0 60px rgba(0, 255, 136, 0.3);
+    box-shadow: 0 0 25px rgba(0, 255, 136, 0.7),
+                0 0 60px rgba(0, 255, 136, 0.3);
     animation: logoPulse 3s infinite alternate ease-in-out;
     border: 2px solid rgba(0, 255, 136, 0.6);
+    display: inline-block;
     background: #000;
   }
 
@@ -93,13 +105,18 @@
   }
 
   .matrix-title {
-    font-size: clamp(24px, 7vw, 38px);
+    font-family: 'Courier New', monospace;
+    font-size: clamp(26px, 8vw, 42px);
     font-weight: 900;
     color: #00ff88;
     text-align: center;
     letter-spacing: 6px;
-    text-shadow: 0 0 10px #00ff88, 0 0 25px #00ff88;
-    margin: 12px 0 6px;
+    text-transform: uppercase;
+    text-shadow:
+      0 0 10px #00ff88,
+      0 0 20px #00ff88,
+      0 0 40px rgba(0,255,136,0.6);
+    margin: 14px 0 6px;
   }
 
   .brand {
@@ -107,8 +124,10 @@
     align-items: center;
     justify-content: center;
     gap: 10px;
-    margin-bottom: 15px;
+    margin-bottom: 6px;
+    margin-top: 10px;
   }
+
   .dot {
     width: 9px; height: 9px;
     border-radius: 50%;
@@ -116,137 +135,252 @@
     box-shadow: 0 0 10px #00ff88;
     animation: pulse 1.6s infinite;
   }
-  @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.3; } }
-  .brand span { font-size: 11px; letter-spacing: 3px; text-transform: uppercase; color: #00ff88; opacity: 0.85; }
 
-  /* 🌟 TERABOX STYLE STREAM CARD */
-  .video-preview-box {
-    position: relative;
-    width: 100%;
-    height: 250px;
-    border-radius: 12px;
-    background: radial-gradient(circle, #002b17 0%, #000000 85%);
-    border: 1.5px solid rgba(0, 255, 136, 0.45);
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    box-shadow: 0 0 30px rgba(0, 255, 136, 0.2), inset 0 0 20px rgba(0, 255, 136, 0.1);
-    margin: 18px 0;
-    cursor: pointer;
-    overflow: hidden;
+  @keyframes pulse {
+    0%,100% { opacity: 1; }
+    50%     { opacity: 0.3; }
   }
 
-  .video-preview-box::before {
+  .brand span {
+    font-size: 12px;
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    color: #00ff88;
+    opacity: 0.8;
+  }
+
+  h1 {
+    font-size: 22px;
+    font-weight: 700;
+    color: #d6ffe8;
+    margin-bottom: 8px;
+    letter-spacing: 1px;
+    text-align: center;
+  }
+
+  .subtitle {
+    font-size: 12.5px;
+    color: #4fbf8b;
+    margin-bottom: 20px;
+    line-height: 1.6;
+    text-align: center;
+  }
+
+  .status-line {
+    font-size: 12px;
+    color: #00ff88;
+    margin-bottom: 10px;
+    letter-spacing: 1px;
+    min-height: 16px;
+    opacity: 0.85;
+  }
+
+  .status-line::before { content: "> "; opacity: 0.6; }
+
+  .debug-box {
+    font-size: 11px;
+    color: #ffaa00;
+    background: #1a0f00;
+    border: 1px solid #553300;
+    padding: 10px 12px;
+    border-radius: 6px;
+    margin-bottom: 14px;
+    min-height: 20px;
+    word-break: break-all;
+    line-height: 1.5;
+    letter-spacing: 0.3px;
+  }
+  .debug-box.ok  { color: #00ff88; background: #001a0e; border-color: #00ff88; }
+  .debug-box.err { color: #ff5555; background: #1a0000; border-color: #ff3333; }
+
+  .key-box {
+    position: relative;
+    background: #000;
+    border: 1px solid rgba(0, 255, 136, 0.4);
+    border-radius: 10px;
+    padding: 20px 85px 20px 18px;
+    margin-bottom: 16px;
+    overflow: hidden;
+    min-height: 66px;
+    display: flex;
+    align-items: center;
+    cursor: pointer;
+    transition: border-color 0.2s;
+  }
+
+  .key-box:hover {
+    border-color: #00ff88;
+  }
+
+  .key-box::after {
     content: "";
     position: absolute;
     inset: 0;
-    background: linear-gradient(180deg, transparent, rgba(0, 255, 136, 0.08), transparent);
-    animation: scanLine 3s infinite linear;
+    background: linear-gradient(90deg, transparent, rgba(0,255,136,0.12), transparent);
+    transform: translateX(-100%);
+    animation: scan 2.5s infinite;
+    pointer-events: none;
   }
-  @keyframes scanLine { 0% { transform: translateY(-100%); } 100% { transform: translateY(100%); } }
 
-  .view-app-btn {
-    position: relative;
-    z-index: 2;
-    background: rgba(0, 0, 0, 0.85);
-    border: 2px solid #00ff88;
+  @keyframes scan {
+    0%   { transform: translateX(-100%); }
+    100% { transform: translateX(100%); }
+  }
+
+  #apiKey {
+    font-size: 16px;
     color: #00ff88;
-    padding: 13px 26px;
-    border-radius: 30px;
-    font-size: 15px;
-    font-weight: 900;
+    word-break: break-all;
     letter-spacing: 2px;
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    box-shadow: 0 0 25px rgba(0, 255, 136, 0.5);
-    animation: btnGlow 2s infinite alternate;
-  }
-  @keyframes btnGlow {
-    from { box-shadow: 0 0 15px rgba(0, 255, 136, 0.4); transform: scale(1); }
-    to { box-shadow: 0 0 30px rgba(0, 255, 136, 0.85); transform: scale(1.04); }
+    text-shadow: 0 0 6px rgba(0,255,136,0.6);
+    font-weight: bold;
+    user-select: all;
   }
 
-  .view-app-btn .badge {
+  .caret {
+    display: inline-block;
+    width: 9px;
+    height: 17px;
+    background: #00ff88;
+    margin-left: 3px;
+    vertical-align: middle;
+    animation: blink 0.9s step-end infinite;
+    box-shadow: 0 0 8px #00ff88;
+  }
+
+  @keyframes blink { 50% { opacity: 0; } }
+
+  .copy-btn {
+    position: absolute;
+    right: 10px;
+    top: 50%;
+    transform: translateY(-50%);
+    background: rgba(0, 255, 136, 0.08);
+    border: 1px solid rgba(0, 255, 136, 0.6);
+    color: #00ff88;
+    padding: 9px 14px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 11px;
+    letter-spacing: 1.5px;
+    font-weight: bold;
+    transition: all 0.2s;
+    font-family: inherit;
+    z-index: 2;
+  }
+
+  .copy-btn:hover {
     background: #00ff88;
     color: #000;
-    padding: 2px 7px;
-    border-radius: 4px;
-    font-size: 10px;
-    font-weight: bold;
-    letter-spacing: 1px;
+    box-shadow: 0 0 16px rgba(0, 255, 136, 0.8);
   }
 
-  .stream-meta {
-    position: absolute;
-    bottom: 12px;
-    left: 16px;
-    right: 16px;
-    display: flex;
-    justify-content: space-between;
-    font-size: 11px;
-    color: #4fbf8b;
-    z-index: 2;
+  .copy-btn.copied {
+    background: #00ff88;
+    color: #000;
+    box-shadow: 0 0 25px #00ff88;
   }
 
-  /* 🌟 FIXED BOTTOM BAR FOR NON-APP USERS */
-  .bottom-dock {
-    position: fixed;
-    bottom: 0; left: 0; right: 0;
-    background: rgba(5, 12, 8, 0.95);
-    border-top: 1px solid rgba(0, 255, 136, 0.4);
-    padding: 14px 20px;
+  .actions {
     display: flex;
-    justify-content: center;
     gap: 12px;
-    z-index: 99;
-    backdrop-filter: blur(12px);
+    margin-top: 22px;
+    flex-wrap: wrap;
   }
 
-  .dock-btn {
+  .btn {
     flex: 1;
-    max-width: 240px;
-    padding: 13px;
+    min-width: 140px;
+    padding: 13px 18px;
     border-radius: 8px;
     font-size: 12px;
-    font-weight: 700;
-    text-transform: uppercase;
-    letter-spacing: 1.5px;
-    text-align: center;
-    text-decoration: none;
     font-family: inherit;
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
     cursor: pointer;
-    transition: all 0.2s;
+    text-decoration: none;
+    text-align: center;
+    transition: all 0.25s;
+    border: 1px solid transparent;
   }
-  .dock-dl {
-    background: transparent;
-    border: 1px solid #00ff88;
-    color: #00ff88;
-  }
-  .dock-dl:hover { background: rgba(0, 255, 136, 0.15); box-shadow: 0 0 15px rgba(0, 255, 136, 0.4); }
-  .dock-open {
-    background: #00ff88;
-    border: 1px solid #00ff88;
-    color: #000;
-    box-shadow: 0 0 20px rgba(0, 255, 136, 0.4);
-  }
-  .dock-open:hover { box-shadow: 0 0 30px rgba(0, 255, 136, 0.8); transform: translateY(-1px); }
 
-  /* MATRIX KEY SECTION STYLES */
-  .status-line { font-size: 12px; color: #00ff88; margin-bottom: 10px; letter-spacing: 1px; min-height: 16px; opacity: 0.85; }
-  .status-line::before { content: "> "; opacity: 0.6; }
-  .debug-box { font-size: 11px; color: #ffaa00; background: #1a0f00; border: 1px solid #553300; padding: 10px 12px; border-radius: 6px; margin-bottom: 14px; min-height: 20px; word-break: break-all; }
-  .debug-box.ok  { color: #00ff88; background: #001a0e; border-color: #00ff88; }
-  .debug-box.err { color: #ff5555; background: #1a0000; border-color: #ff3333; }
-  .key-box { position: relative; background: #000; border: 1px solid rgba(0, 255, 136, 0.4); border-radius: 10px; padding: 18px 85px 18px 16px; margin: 16px 0; overflow: hidden; min-height: 62px; display: flex; align-items: center; cursor: pointer; }
-  #apiKey { font-size: 15px; letter-spacing: 2px; font-weight: bold; }
-  .copy-btn { position: absolute; right: 10px; top: 50%; transform: translateY(-50%); background: rgba(0, 255, 136, 0.1); border: 1px solid rgba(0, 255, 136, 0.6); color: #00ff88; padding: 8px 14px; border-radius: 6px; cursor: pointer; font-size: 11px; font-family: inherit; font-weight: bold; }
-  .copy-btn.copied { background: #00ff88; color: #000; box-shadow: 0 0 20px #00ff88; }
-  .stat-row { display: flex; gap: 12px; margin-top: 16px; flex-wrap: wrap; }
-  .stat { flex: 1; min-width: 110px; padding: 12px 14px; background: rgba(0, 255, 136, 0.04); border-left: 2px solid #00ff88; border-radius: 4px; }
-  .stat-label { font-size: 10px; letter-spacing: 2px; text-transform: uppercase; color: #4fbf8b; margin-bottom: 4px; }
-  .stat-value { font-size: 13px; color: #d6ffe8; }
+  .btn-primary {
+    background: linear-gradient(135deg, #00ff88, #00c96a);
+    color: #001a0e;
+    font-weight: 700;
+    box-shadow: 0 0 20px rgba(0, 255, 136, 0.35);
+  }
+
+  .btn-primary:hover {
+    box-shadow: 0 0 30px rgba(0, 255, 136, 0.6);
+    transform: translateY(-1px);
+  }
+
+  .btn-ghost {
+    background: transparent;
+    color: #00ff88;
+    border: 1px solid rgba(0, 255, 136, 0.4);
+  }
+
+  .btn-ghost:hover {
+    background: rgba(0, 255, 136, 0.08);
+  }
+
+  .footer-note {
+    margin-top: 26px;
+    padding-top: 18px;
+    border-top: 1px dashed rgba(0, 255, 136, 0.2);
+    font-size: 11.5px;
+    color: #4fbf8b;
+    line-height: 1.7;
+    letter-spacing: 0.3px;
+  }
+
+  .footer-note code {
+    background: rgba(0, 255, 136, 0.08);
+    padding: 2px 6px;
+    border-radius: 4px;
+    color: #7fffb8;
+    font-size: 11px;
+  }
+
+  .stat-row {
+    display: flex;
+    gap: 12px;
+    margin-top: 16px;
+    flex-wrap: wrap;
+  }
+
+  .stat {
+    flex: 1;
+    min-width: 110px;
+    padding: 12px 14px;
+    background: rgba(0, 255, 136, 0.04);
+    border-left: 2px solid #00ff88;
+    border-radius: 4px;
+  }
+
+  .stat-label {
+    font-size: 10px;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    color: #4fbf8b;
+    margin-bottom: 4px;
+  }
+
+  .stat-value {
+    font-size: 13px;
+    color: #d6ffe8;
+  }
+
+  @media (max-width: 520px) {
+    .card { padding: 22px 16px; }
+    .logo-container img { width: 95px; height: 95px; }
+    h1 { font-size: 19px; }
+    #apiKey { font-size: 13px; letter-spacing: 1.2px; }
+    .key-box { padding: 16px 72px 16px 14px; }
+    .matrix-title { letter-spacing: 3px; }
+  }
 </style>
 </head>
 <body>
@@ -257,180 +391,97 @@
 <div class="overlay">
   <div class="card" id="mainCard">
 
-    <!-- 🌟 MAYA JAAL PHOTO LOGO -->
+    <!-- 🌟 ORIGINAL 3D MAYA JAAL PHOTO LOGO -->
     <div class="logo-container">
-      <img src="https://files.catbox.moe/k3159k.jpg" alt="Maya Jaal" referrerpolicy="no-referrer" crossorigin="anonymous" />
+      <img 
+        src="https://files.catbox.moe/k3159k.jpg" 
+        alt="Maya Jaal Logo" 
+        referrerpolicy="no-referrer"
+        crossorigin="anonymous"
+      />
     </div>
 
     <div class="matrix-title">MAYA JAAL</div>
+
     <div class="brand">
       <div class="dot"></div>
-      <span id="headerTag">SECURE STREAM PORTAL</span>
+      <span>Secure Neural Node</span>
     </div>
 
-    <!-- 🌟 SECTION 1: VIDEO STREAM DETECTED (TERABOX STYLE LOCKED MEDIA) -->
-    <div id="videoStreamSection" style="display:none;">
-      <h2 style="font-size: 17px; color: #d6ffe8; text-align: center; margin-bottom: 4px;" id="videoName">
-        Node_Encrypted_Media.mp4
-      </h2>
-      <p style="font-size: 12px; color: #4fbf8b; text-align: center; margin-bottom: 14px;">
-        Hardware Accelerated Quantum Stream Protocol
-      </p>
+    <h1>Your Matrix Key</h1>
+    <p class="subtitle">
+      Aapki unique encrypted Matrix Key connect karne ke liye taiyar hai. Ek tap se copy karein aur bot mein activate karein.
+    </p>
 
-      <div class="video-preview-box" onclick="handleOpenApp()">
-        <div class="view-app-btn">
-          ▶ View in App <span class="badge">FREE</span>
-        </div>
-        <div class="stream-meta">
-          <span>● 1080P Ultra HD</span>
-          <span>MayaJaal Node</span>
-        </div>
-      </div>
+    <div class="status-line" id="status">initializing secure channel...</div>
 
-      <div style="font-size: 12px; color: #7fffb8; line-height: 1.6; text-align: center; padding: 12px; background: rgba(0, 255, 136, 0.04); border-radius: 8px; border: 1px dashed rgba(0, 255, 136, 0.3);">
-        Browser streaming is locked. Tap <strong>View in App</strong> or install <strong>MayaJaal APK</strong> to unlock full resolution playback.
-      </div>
+    <div class="debug-box" id="debug">Debug: waiting...</div>
+
+    <div class="key-box" onclick="copyKey()" title="Click to copy">
+      <span id="apiKey"></span><span class="caret" id="caret" style="display:none"></span>
+      <button class="copy-btn" id="copyBtn" style="display:none;" onclick="event.stopPropagation(); copyKey();">COPY</button>
     </div>
 
-    <!-- 🌟 SECTION 2: MATRIX KEY GENERATOR (AGAR TG ID HO) -->
-    <div id="keySection" style="display:none;">
-      <h1 style="font-size: 20px; text-align: center; color: #d6ffe8;">Your Matrix Key</h1>
-      <p style="font-size: 12.5px; color: #4fbf8b; text-align: center; margin: 6px 0 16px; line-height: 1.5;">
-        Aapki unique encrypted Matrix Key connect karne ke liye taiyar hai.
-      </p>
-
-      <div class="status-line" id="status">initializing secure channel...</div>
-      <div class="debug-box" id="debug">Debug: waiting...</div>
-
-      <div class="key-box" onclick="copyKey()" title="Click to copy">
-        <span id="apiKey"></span>
-        <button class="copy-btn" id="copyBtn" onclick="event.stopPropagation(); copyKey();">COPY</button>
+    <div class="stat-row" id="statRow" style="display:none;">
+      <div class="stat">
+        <div class="stat-label">Status</div>
+        <div class="stat-value" style="color:#00ff88;">● Active</div>
       </div>
-
-      <div class="stat-row" id="statRow" style="display:none;">
-        <div class="stat">
-          <div class="stat-label">Status</div>
-          <div class="stat-value" style="color:#00ff88;">● Active</div>
-        </div>
-        <div class="stat">
-          <div class="stat-label">Security</div>
-          <div class="stat-value">SHA-256</div>
-        </div>
-        <div class="stat">
-          <div class="stat-label">Created</div>
-          <div class="stat-value" id="createdAt">—</div>
-        </div>
+      <div class="stat">
+        <div class="stat-label">Security</div>
+        <div class="stat-value">SHA-256</div>
       </div>
-
-      <div style="display: flex; gap: 10px; margin-top: 18px; flex-wrap: wrap;">
-        <a href="https://t.me/Mayajaalfilebot" target="_blank" style="flex:1; min-width: 140px; background:#00ff88; color:#000; text-align:center; padding:12px; border-radius:8px; text-decoration:none; font-weight:bold; font-size:12px;">Open Telegram Bot</a>
-        <button onclick="regenerate()" style="flex:1; min-width: 140px; background:transparent; border:1px solid #00ff88; color:#00ff88; border-radius:8px; font-family:inherit; font-size:12px; cursor:pointer;">Regenerate</button>
+      <div class="stat">
+        <div class="stat-label">Created</div>
+        <div class="stat-value" id="createdAt">—</div>
       </div>
     </div>
 
+    <div class="actions">
+      <a href="https://t.me/Mayajaalfilebot" target="_blank" class="btn btn-primary">Open Telegram Bot</a>
+      <button class="btn btn-ghost" onclick="regenerate()">Regenerate Key</button>
+    </div>
+
+    <div class="footer-note">
+      <strong style="color:#7fffb8;">Kaise use karein:</strong><br/>
+      1. Upar wali Matrix Key par tap karke copy karein.<br/>
+      2. Telegram bot kholiye aur <code>/api YOUR_KEY</code> bhejein.<br/>
+      3. Bot se direct file stream &amp; manage karein.<br/>
+      <span style="color:#ff6b6b;">⚠ Ye key kisi ke sath share na karein.</span>
+    </div>
   </div>
-</div>
-
-<!-- 🌟 FIXED BOTTOM ACTIONS BAR (NON-APP USERS KE LIYE) -->
-<div class="bottom-dock" id="bottomDock" style="display:none;">
-  <a href="javascript:void(0)" onclick="downloadApk()" class="dock-btn dock-dl">⬇ Download APK</a>
-  <a href="javascript:void(0)" onclick="handleOpenApp()" class="dock-btn dock-open">View in MayaJaal</a>
 </div>
 <script>
 /* ═══════════════════════════════════════════
-   CONFIGURATION & DISPATCHING PATH
+   CONFIG & PARAMS
    ═══════════════════════════════════════════ */
-// 🌟 Yahan apna updated APK download link verify karein
-const APK_DOWNLOAD_URL = "https://mayajaal.online/download/app-release.apk";
-
 const params = new URLSearchParams(window.location.search);
 const telegramId = params.get('tg');
-const videoId = params.get('v') || params.get('tb');
-const currentUrl = window.location.href;
 
-// Detect agar link video se related hai
-const isVideoLink = videoId || window.location.pathname.includes('/v/') || window.location.pathname.includes('/tb/') || params.has('url');
+const BACKEND_URL = window.location.origin.includes('localhost') 
+  ? 'https://mayajaal.online' 
+  : window.location.origin;
 
-const videoSection = document.getElementById('videoStreamSection');
-const keySection = document.getElementById('keySection');
-const bottomDock = document.getElementById('bottomDock');
-const headerTag = document.getElementById('headerTag');
+const debugEl = document.getElementById('debug');
 const mainCard = document.getElementById('mainCard');
 const flashBang = document.getElementById('flashBang');
 
-if (isVideoLink) {
-  videoSection.style.display = 'block';
-  bottomDock.style.display = 'flex';
-  headerTag.textContent = 'STREAMING NODE DETECTED';
-} else {
-  keySection.style.display = 'block';
-  bottomDock.style.display = 'none';
-  headerTag.textContent = 'SECURE NEURAL NODE';
-  window.addEventListener('load', () => setTimeout(runGenerationFlow, 300));
+function setDebug(msg, type) {
+  debugEl.textContent = 'Debug: ' + msg;
+  debugEl.className = 'debug-box' + (type ? ' ' + type : '');
 }
+
+setDebug('telegram_id = ' + (telegramId || 'MISSING! URL mein ?tg= parameter chahiye'), telegramId ? '' : 'err');
 
 /* ═══════════════════════════════════════════
-   SMART APP LAUNCHER & FALLBACK TIMER
-   ═══════════════════════════════════════════ */
-function handleOpenApp() {
-  triggerHaptic();
-  playCyberBeep();
-  
-  // Custom Scheme URL Android App ke liye
-  const appSchemeUrl = "mayajaall://open?url=" + encodeURIComponent(currentUrl);
-  const startTime = Date.now();
-  
-  // 1. App open karne ka intent bhejein
-  window.location.href = appSchemeUrl;
-
-  // 2. Fallback: Agar 1.5 seconds me app trigger nahi hua, APK download initiate karein
-  setTimeout(function () {
-    if (Date.now() - startTime < 2200) {
-      window.location.href = APK_DOWNLOAD_URL;
-    }
-  }, 1500);
-}
-
-function downloadApk() {
-  triggerHaptic();
-  playCyberBeep();
-  window.location.href = APK_DOWNLOAD_URL;
-}
-
-/* ═══════════════════════════════════════════
-   HAPTICS & WEB AUDIO SYNTHESIZER
-   ═══════════════════════════════════════════ */
-function triggerHaptic() {
-  if (navigator.vibrate) navigator.vibrate([40, 30, 80]);
-}
-
-function playCyberBeep() {
-  try {
-    const AudioContext = window.AudioContext || window.webkitAudioContext;
-    if (!AudioContext) return;
-    const actx = new AudioContext();
-    const osc = actx.createOscillator();
-    const gain = actx.createGain();
-    osc.type = 'sawtooth';
-    osc.frequency.setValueAtTime(650, actx.currentTime);
-    osc.frequency.exponentialRampToValueAtTime(1100, actx.currentTime + 0.1);
-    gain.gain.setValueAtTime(0.12, actx.currentTime);
-    gain.gain.exponentialRampToValueAtTime(0.01, actx.currentTime + 0.12);
-    osc.connect(gain);
-    gain.connect(actx.destination);
-    osc.start();
-    osc.stop(actx.currentTime + 0.12);
-  } catch (e) {}
-}
-
-/* ═══════════════════════════════════════════
-   MATRIX RAIN CANVAS ENGINE
+   MATRIX RAIN ENGINE
    ═══════════════════════════════════════════ */
 const canvas = document.getElementById('matrix');
 const ctx = canvas.getContext('2d');
+
 let cols, drops;
 let speedFactor = 1;
-const chars = 'アイウエオカキクケコサシスセソタチツテトナニヌネノ0123456789ABCDEFXYZ@#$%&*'.split('');
+const chars = 'アイウエオカキクケコサシスセソタチツテトナニヌネノ0123456789ABCDEFXYZ@#$%&*<>{}'.split('');
 
 function resize() {
   canvas.width = window.innerWidth;
@@ -444,7 +495,7 @@ window.addEventListener('resize', resize);
 function drawMatrix() {
   ctx.fillStyle = 'rgba(0, 0, 0, 0.07)';
   ctx.fillRect(0, 0, canvas.width, canvas.height);
-  ctx.font = '14px monospace';
+  ctx.font = '14px "Courier New", monospace';
   
   for (let i = 0; i < drops.length; i++) {
     const text = chars[Math.floor(Math.random() * chars.length)];
@@ -458,95 +509,211 @@ function drawMatrix() {
     drops[i] += speedFactor;
   }
 }
-setInterval(drawMatrix, 40);
+let matrixInterval = setInterval(drawMatrix, 40);
 
 /* ═══════════════════════════════════════════
-   MATRIX KEY LOGIC & SERVER SYNC
+   CYBER HAPTIC & SYNTH SOUND EFFECTS
    ═══════════════════════════════════════════ */
-let currentKey = '';
+function playCyberBeep() {
+  try {
+    const AudioContext = window.AudioContext || window.webkitAudioContext;
+    if (!AudioContext) return;
+    const actx = new AudioContext();
+    
+    const osc1 = actx.createOscillator();
+    const gain1 = actx.createGain();
+    osc1.type = 'sawtooth';
+    osc1.frequency.setValueAtTime(587.33, actx.currentTime);
+    osc1.frequency.exponentialRampToValueAtTime(880, actx.currentTime + 0.08);
+    gain1.gain.setValueAtTime(0.12, actx.currentTime);
+    gain1.gain.exponentialRampToValueAtTime(0.01, actx.currentTime + 0.12);
+    osc1.connect(gain1);
+    gain1.connect(actx.destination);
+    osc1.start();
+    osc1.stop(actx.currentTime + 0.12);
+
+    setTimeout(() => {
+      const osc2 = actx.createOscillator();
+      const gain2 = actx.createGain();
+      osc2.type = 'sine';
+      osc2.frequency.setValueAtTime(1174.66, actx.currentTime);
+      osc2.frequency.exponentialRampToValueAtTime(1760, actx.currentTime + 0.12);
+      gain2.gain.setValueAtTime(0.15, actx.currentTime);
+      gain2.gain.exponentialRampToValueAtTime(0.001, actx.currentTime + 0.18);
+      osc2.connect(gain2);
+      gain2.connect(actx.destination);
+      osc2.start();
+      osc2.stop(actx.currentTime + 0.18);
+    }, 70);
+  } catch (e) {}
+}
+
+function triggerHapticFeedback() {
+  if (navigator.vibrate) {
+    navigator.vibrate([50, 40, 90]);
+  }
+}
+
+/* ═══════════════════════════════════════════
+   KEY GENERATION & SERVER SYNC
+   ═══════════════════════════════════════════ */
+const chars24 = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+const hexChars = '0123456789abcdef';
+
+function randomFrom(set, len) {
+  let out = '';
+  const arr = new Uint32Array(len);
+  crypto.getRandomValues(arr);
+  for (let i = 0; i < len; i++) out += set[arr[i] % set.length];
+  return out;
+}
+
+function generateKey() {
+  return randomFrom(chars24, 24);
+}
+
 const apiKeyEl = document.getElementById('apiKey');
+const caretEl = document.getElementById('caret');
 const copyBtn = document.getElementById('copyBtn');
 const statusEl = document.getElementById('status');
 const statRow = document.getElementById('statRow');
 const createdAtEl = document.getElementById('createdAt');
-const debugEl = document.getElementById('debug');
 
-function setDebug(msg, type) {
-  if (debugEl) {
-    debugEl.textContent = 'Debug: ' + msg;
-    debugEl.className = 'debug-box' + (type ? ' ' + type : '');
-  }
-}
+let currentKey = '';
 
 async function saveKeyToServer(key) {
+  setDebug('saving key to backend...');
   if (!telegramId) {
-    setDebug('URL parameter ?tg= missing!', 'err');
+    setDebug('❌ URL mein ?tg= MISSING — key link nahi ho payegi!', 'err');
     return;
   }
   try {
-    const res = await fetch(window.location.origin + '/save-key', {
+    const url = BACKEND_URL + '/save-key';
+    const res = await fetch(url, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ telegram_id: telegramId, key: key })
     });
     const data = await res.json();
-    if (res.ok && data.success) setDebug('Key linked to Telegram ID: ' + telegramId, 'ok');
-    else setDebug('Save error: ' + JSON.stringify(data), 'err');
+    if (res.ok && data.success) {
+      setDebug('✅ Key linked! Telegram ID: ' + telegramId, 'ok');
+    } else {
+      setDebug('❌ Save error: ' + JSON.stringify(data), 'err');
+    }
   } catch (err) {
-    setDebug('Network error: ' + err.message, 'err');
+    setDebug('❌ Network error: ' + err.message, 'err');
   }
 }
 
-function runGenerationFlow() {
-  if (!apiKeyEl) return;
-  apiKeyEl.textContent = '';
-  statRow.style.display = 'none';
-  const steps = ['connecting node...', 'extracting entropy...', 'signing token...', 'matrix key active ✓'];
-  let idx = 0;
-  statusEl.textContent = steps[0];
-  const timer = setInterval(() => {
-    idx++;
-    if (idx < steps.length) {
-      statusEl.textContent = steps[idx];
-    } else {
-      clearInterval(timer);
-      const chars24 = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
-      let out = '';
-      for (let i = 0; i < 24; i++) out += chars24[Math.floor(Math.random() * chars24.length)];
-      currentKey = out;
-      apiKeyEl.textContent = currentKey;
-      statRow.style.display = 'flex';
-      createdAtEl.textContent = new Date().toLocaleTimeString();
-      saveKeyToServer(currentKey);
+function scrambleEffect(target, duration, onDone) {
+  const totalFrames = Math.floor(duration / 30);
+  let frame = 0;
+  const revealStart = Math.floor(totalFrames * 0.55);
+
+  const timer = setInterval(function () {
+    frame++;
+    let display = '';
+    for (let i = 0; i < target.length; i++) {
+      if (frame >= revealStart + i) display += target[i];
+      else display += hexChars[Math.floor(Math.random() * hexChars.length)];
     }
-  }, 350);
+    apiKeyEl.textContent = display;
+    if (frame >= totalFrames) {
+      clearInterval(timer);
+      apiKeyEl.textContent = target;
+      if (onDone) onDone();
+    }
+  }, 30);
 }
 
+function runGenerationFlow() {
+  apiKeyEl.textContent = '';
+  caretEl.style.display = 'none';
+  copyBtn.style.display = 'none';
+  statRow.style.display = 'none';
+  currentKey = '';
+
+  const steps = [
+    'establishing neural link...',
+    'verifying node integrity...',
+    'extracting quantum entropy...',
+    'signing cryptographic token...',
+    'matrix key active ✓'
+  ];
+
+  let stepIndex = 0;
+  statusEl.textContent = steps[0];
+
+  const stepTimer = setInterval(function () {
+    stepIndex++;
+    if (stepIndex < steps.length) {
+      statusEl.textContent = steps[stepIndex];
+    } else {
+      clearInterval(stepTimer);
+      currentKey = generateKey();
+      caretEl.style.display = 'inline-block';
+
+      saveKeyToServer(currentKey);
+
+      scrambleEffect(currentKey, 1600, function () {
+        caretEl.style.display = 'none';
+        copyBtn.style.display = 'block';
+        statRow.style.display = 'flex';
+        createdAtEl.textContent = new Date().toLocaleTimeString();
+      });
+    }
+  }, 360);
+}
+
+/* ═══════════════════════════════════════════
+   ADVANCED COPY EXPERIENCE
+   ═══════════════════════════════════════════ */
 function copyKey() {
   if (!currentKey) return;
-  navigator.clipboard.writeText(currentKey).then(() => {
+
+  navigator.clipboard.writeText(currentKey).then(function () {
     playCyberBeep();
-    triggerHaptic();
+    triggerHapticFeedback();
+
     flashBang.classList.add('active');
     mainCard.classList.add('glitch-shake');
-    speedFactor = 3;
-    setTimeout(() => flashBang.classList.remove('active'), 100);
-    setTimeout(() => { mainCard.classList.remove('glitch-shake'); speedFactor = 1; }, 400);
+    speedFactor = 4;
+    
+    setTimeout(() => flashBang.classList.remove('active'), 120);
+    setTimeout(() => {
+      mainCard.classList.remove('glitch-shake');
+      speedFactor = 1;
+    }, 450);
 
     copyBtn.textContent = 'COPIED ⚡';
     copyBtn.classList.add('copied');
-    statusEl.textContent = 'ACCESS KEY COPIED ✓';
-    setTimeout(() => {
+    statusEl.textContent = 'ACCESS KEY COPIED TO CLIPBOARD ✓';
+
+    setTimeout(function () {
       copyBtn.textContent = 'COPY';
       copyBtn.classList.remove('copied');
       statusEl.textContent = 'matrix key active ✓';
-    }, 2000);
+    }, 2200);
+  }).catch(() => {
+    const ta = document.createElement('textarea');
+    ta.value = currentKey;
+    document.body.appendChild(ta);
+    ta.select();
+    document.execCommand('copy');
+    document.body.removeChild(ta);
+    playCyberBeep();
+    triggerHapticFeedback();
+    copyBtn.textContent = 'COPIED ⚡';
   });
 }
 
 function regenerate() {
   runGenerationFlow();
 }
+
+window.addEventListener('load', function () {
+  setTimeout(runGenerationFlow, 350);
+});
 </script>
 </body>
 </html>
