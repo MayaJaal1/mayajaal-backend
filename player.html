@@ -329,10 +329,14 @@
 
   <canvas id="matrixCanvas"></canvas>
 
-  <!-- TOP HEADER WITH CIRCULAR LOGO -->
+  <!-- TOP HEADER WITH CIRCULAR LOGO (UPDATED) -->
   <div class="header">
     <div class="logo-box">
-      <img src="https://files.catbox.moe/k3159k.jpg" alt="Maya Jaal" referrerpolicy="no-referrer" crossorigin="anonymous" />
+      <img 
+        src="/logo.jpg" 
+        alt="Maya Jaal" 
+        onerror="this.onerror=null; this.src='https://mayajaal.online/logo.jpg';"
+      />
       <div class="logo-text">
         MAYA JAAL
         <span>QUANTUM STREAM NODE</span>
@@ -382,7 +386,7 @@
     <button onclick="downloadApk()" class="btn-dock btn-download">⬇ DOWNLOAD APK</button>
     <button onclick="triggerAppLaunch()" class="btn-dock btn-view-app">VIEW IN APP</button>
   </div>
-  <script>
+    <script>
 const APK_DOWNLOAD_URL = "https://mayajaal.online/download/app-release.apk";
 const currentFullUrl = window.location.href;
 
@@ -423,7 +427,6 @@ async function loadMediaDetails() {
   if (!streamId) return;
 
   try {
-    // Backend API call for direct stream data
     const res = await fetch('/api/v/' + streamId);
     if (res.ok) {
       const data = await res.json();
@@ -445,14 +448,12 @@ async function loadMediaDetails() {
   }
 }
 
-// Actual video duration listener
 bgVideo.addEventListener('loadedmetadata', function() {
   if (bgVideo.duration && !isNaN(bgVideo.duration) && bgVideo.duration > 0) {
     durationEl.textContent = formatDuration(bgVideo.duration) + ' / HD 1080P';
   }
 });
 
-// Agar direct playback block ho, tab duration extract karein
 bgVideo.addEventListener('durationchange', function() {
   if (bgVideo.duration && !isNaN(bgVideo.duration) && bgVideo.duration > 0) {
     durationEl.textContent = formatDuration(bgVideo.duration) + ' / HD 1080P';
