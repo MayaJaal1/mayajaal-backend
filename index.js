@@ -33,7 +33,7 @@ app.get('/', (req, res) => {
 });
 
 // ═══════════════════════════════════════════
-// DOWNLOAD LANDING PAGE ROUTE
+// DOWNLOAD LANDING PAGE ROUTE (/download)
 // ═══════════════════════════════════════════
 app.get('/download', (req, res) => {
   const downloadPath = path.join(__dirname, 'download.html');
