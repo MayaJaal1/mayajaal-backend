@@ -2,24 +2,16 @@
   "version": 2,
   "rewrites": [
     {
+      "source": "/version.json",
+      "destination": "/public/version.json"
+    },
+    {
       "source": "/.well-known/assetlinks.json",
       "destination": "/public/.well-known/assetlinks.json"
     },
     {
-      "source": "/version.json",
-      "destination": "/bot.js"
-    },
-    {
-      "source": "/check-update",
-      "destination": "/bot.js"
-    },
-    {
-      "source": "/api/check-update",
-      "destination": "/bot.js"
-    },
-    {
       "source": "/app-release.apk",
-      "destination": "[https://github.com/MayaJaal1/mayajaall/releases/latest/download/app-release.apk](https://github.com/MayaJaal1/mayajaall/releases/latest/download/app-release.apk)"
+      "destination": "https://github.com/MayaJaal1/mayajaall/releases/latest/download/app-release.apk"
     },
     {
       "source": "/download",
@@ -40,10 +32,6 @@
     {
       "source": "/key",
       "destination": "/index.html"
-    },
-    {
-      "source": "/(.*)",
-      "destination": "/bot.js"
     }
   ]
 }
