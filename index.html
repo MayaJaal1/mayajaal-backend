@@ -96,7 +96,7 @@
     animation: logoPulse 3s infinite alternate ease-in-out;
     border: 2px solid rgba(0, 255, 136, 0.6);
     display: inline-block;
-    background: #001a0e;
+    background: #000;
   }
 
   @keyframes logoPulse {
@@ -391,9 +391,14 @@
 <div class="overlay">
   <div class="card" id="mainCard">
 
-    <!-- 🌟 IMGBB DIRECT WORKING CDN LOGO -->
+    <!-- 🌟 ORIGINAL 3D MAYA JAAL PHOTO LOGO (Catbox Direct Link + referrerpolicy) -->
     <div class="logo-container">
-      <img src="https://i.ibb.co/9HN60RmN/logo.png" alt="Maya Jaal Logo" />
+      <img 
+        src="https://files.catbox.moe/k3159k.jpg" 
+        alt="Maya Jaal Logo" 
+        referrerpolicy="no-referrer"
+        crossorigin="anonymous"
+      />
     </div>
 
     <div class="matrix-title">MAYA JAAL</div>
@@ -454,7 +459,6 @@
 const params = new URLSearchParams(window.location.search);
 const telegramId = params.get('tg');
 
-// Railway custom domain auto-connect
 const BACKEND_URL = window.location.origin.includes('localhost') 
   ? 'https://mayajaal.online' 
   : window.location.origin;
