@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"/>
+<title>Download MayaJaal App · Official APK</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Courier New', monospace; }
+  
+  body {
+    background-color: #000;
+    color: #00ff88;
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 20px 16px;
+    overflow-x: hidden;
+    position: relative;
+  }
+
+  #matrixBg {
+    position: fixed;
+    top: 0; left: 0;
+    width: 100%; height: 100%;
+    z-index: 0;
+    opacity: 0.35;
+    pointer-events: none;
+  }
+
+  .card {
+    position: relative;
+    z-index: 5;
+    width: 100%;
+    max-width: 440px;
+    background: rgba(0, 18, 10, 0.94);
+    border: 1.5px solid rgba(0, 255, 136, 0.45);
+    border-radius: 18px;
+    padding: 32px 24px;
+    text-align: center;
+    box-shadow: 0 0 40px rgba(0, 255, 136, 0.25), inset 0 0 20px rgba(0, 255, 136, 0.05);
+    backdrop-filter: blur(14px);
+  }
+
+  .app-icon {
+    width: 90px;
+    height: 90px;
+    border-radius: 50%;
+    object-fit: cover;
+    border: 2.5px solid #00ff88;
+    box-shadow: 0 0 25px rgba(0, 255, 136, 0.8);
+    margin-bottom: 16px;
+    animation: pulse 2.5s infinite alternate;
+  }
+
+  @keyframes pulse {
+    0% { transform: scale(1); box-shadow: 0 0 15px rgba(0, 255, 136, 0.5); }
+    100% { transform: scale(1.06); box-shadow: 0 0 35px rgba(0, 255, 136, 0.9); }
+  }
+
+  h1 {
+    font-size: 24px;
+    letter-spacing: 3px;
+    color: #fff;
+    margin-bottom: 6px;
+    text-shadow: 0 0 10px rgba(0, 255, 136, 0.6);
+  }
+
+  .tagline {
+    font-size: 11px;
+    color: #4fbf8b;
+    letter-spacing: 1.5px;
+    margin-bottom: 22px;
+  }
+
+  .meta-badges {
+    display: flex;
+    justify-content: center;
+    gap: 8px;
+    margin-bottom: 26px;
+    flex-wrap: wrap;
+  }
+
+  .badge {
+    background: rgba(0, 255, 136, 0.08);
+    border: 1px solid rgba(0, 255, 136, 0.3);
+    padding: 6px 12px;
+    border-radius: 6px;
+    font-size: 11px;
+    color: #d6ffe8;
+  }
+
+  .download-btn {
+    display: block;
+    width: 100%;
+    padding: 16px 20px;
+    background: linear-gradient(135deg, #00ff88, #00c96a);
+    color: #001a0e;
+    text-decoration: none;
+    font-size: 15px;
+    font-weight: 900;
+    letter-spacing: 2px;
+    border-radius: 10px;
+    box-shadow: 0 0 25px rgba(0, 255, 136, 0.6);
+    transition: transform 0.2s, box-shadow 0.2s;
+    border: none;
+    cursor: pointer;
+  }
+
+  .download-btn:active {
+    transform: scale(0.98);
+  }
+
+  .features-list {
+    margin-top: 26px;
+    padding-top: 18px;
+    border-top: 1px dashed rgba(0, 255, 136, 0.25);
+    text-align: left;
+    font-size: 11.5px;
+    color: #a3e6c3;
+    line-height: 2;
+  }
+
+  .features-list span {
+    color: #00ff88;
+    margin-right: 6px;
+  }
+</style>
+</head>
+<body>
+
+  <canvas id="matrixBg"></canvas>
+
+  <div class="card">
+    <img src="/logo.jpg" alt="MayaJaal Logo" class="app-icon" onerror="this.src='https://mayajaal.online/logo.jpg';" />
+    
+    <h1>MAYA JAAL</h1>
+    <div class="tagline">OFFICIAL ANDROID APPLICATION</div>
+
+    <div class="meta-badges">
+      <div class="badge">v1.0.0</div>
+      <div class="badge">Size: ~18 MB</div>
+      <div class="badge">Android 7.0+</div>
+    </div>
+
+    <!-- 🌟 Yahan aapka actual APK direct download link aayega -->
+    <a href="https://mayajaal.online/app-release.apk" class="download-btn" id="dlBtn">
+      ⬇ DOWNLOAD APK DIRECT
+    </a>
+
+    <div class="features-list">
+      <div><span>✔</span> Ad-Free Hardware Stream Player</div>
+      <div><span>✔</span> Fast Cloud Server Integration</div>
+      <div><span>✔</span> Fullscreen HUD & Brightness Control</div>
+      <div><span>✔</span> Background Offline Download Support</div>
+    </div>
+  </div>
+
+  <script>
+    // Matrix Rain Animation
+    const canvas = document.getElementById('matrixBg');
+    const ctx = canvas.getContext('2d');
+    let cols, drops;
+    const chars = '0123456789ABCDEFアイウエオカキクケコサシスセソタチツテト'.split('');
+
+    function resize() {
+      canvas.width = window.innerWidth;
+      canvas.height = window.innerHeight;
+      cols = Math.floor(canvas.width / 15);
+      drops = new Array(cols).fill(1);
+    }
+    resize();
+    window.addEventListener('resize', resize);
+
+    function draw() {
+      ctx.fillStyle = 'rgba(0, 0, 0, 0.08)';
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      ctx.font = '13px monospace';
+      for (let i = 0; i < drops.length; i++) {
+        const text = chars[Math.floor(Math.random() * chars.length)];
+        ctx.fillStyle = '#00ff88';
+        ctx.fillText(text, i * 15, drops[i] * 15);
+        if (drops[i] * 15 > canvas.height && Math.random() > 0.975) drops[i] = 0;
+        drops[i]++;
+      }
+    }
+    setInterval(draw, 40);
+  </script>
+</body>
+</html>
