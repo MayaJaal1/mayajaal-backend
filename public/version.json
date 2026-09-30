@@ -1,7 +1,41 @@
 {
-  "latestVersionCode": 2,
-  "latestVersionName": "v1.1.0",
-  "updateUrl": "https://mayajaal.online/download.html",
-  "forceUpdate": false,
-  "changelog": "⚡ Fast player and streaming stability improvements."
+  "version": 2,
+  "rewrites": [
+    {
+      "source": "/.well-known/assetlinks.json",
+      "destination": "/public/.well-known/assetlinks.json"
+    },
+    {
+      "source": "/version.json",
+      "destination": "/index.js"
+    },
+    {
+      "source": "/app-release.apk",
+      "destination": "https://github.com/MayaJaal1/mayajaall/releases/latest/download/app-release.apk"
+    },
+    {
+      "source": "/download",
+      "destination": "/download.html"
+    },
+    {
+      "source": "/download.html",
+      "destination": "/download.html"
+    },
+    {
+      "source": "/v/:id*",
+      "destination": "/player.html"
+    },
+    {
+      "source": "/tb/:id*",
+      "destination": "/player.html"
+    },
+    {
+      "source": "/key",
+      "destination": "/index.html"
+    },
+    {
+      "source": "/(.*)",
+      "destination": "/index.js"
+    }
+  ]
 }
