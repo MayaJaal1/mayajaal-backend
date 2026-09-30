@@ -37,8 +37,8 @@ app.get('/', (req, res) => {
 // ═══════════════════════════════════════════
 app.get('/api/check-update', (req, res) => {
   res.json({
-    latestVersionCode: 1,               // Jab naya APK aaye toh ise 2 kar dena
-    latestVersionName: "v1.0.0",
+    latestVersionCode: 2,               // Updated to trigger popup for version 1 users
+    latestVersionName: "v1.1.0",
     updateUrl: "https://mayajaal.online/download.html",
     forceUpdate: false,                 // true tab karein jab purana version band karna ho
     changelog: "Bug fixes & high-speed playback improvements."
@@ -88,7 +88,6 @@ app.get('/get-key/:telegram_id', async (req, res) => {
     res.status(500).json({ error: 'Failed to fetch key' });
   }
 });
-
 // ═══════════════════════════════════════════
 // VERIFY KEY
 // ═══════════════════════════════════════════
