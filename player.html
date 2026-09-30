@@ -5,122 +5,167 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"/>
 <title>MayaJaal · Stream Player</title>
 <style>
-  * { margin: 0; padding: 0; box-sizing: border-box; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
+  * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Courier New', -apple-system, monospace; }
   
   body {
-    background-color: #0b0f14;
-    color: #ffffff;
+    background-color: #000;
+    color: #00ff88;
     min-height: 100vh;
     display: flex;
     flex-direction: column;
     overflow-x: hidden;
     padding-bottom: 90px;
+    position: relative;
   }
 
-  /* TOP HEADER (TERABOX STYLE) */
+  /* MATRIX CANVAS BACKGROUND */
+  #matrixCanvas {
+    position: fixed;
+    top: 0; left: 0;
+    width: 100%; height: 100%;
+    z-index: 0;
+    opacity: 0.35;
+    pointer-events: none;
+  }
+
+  /* TOP HEADER WITH ORIGINAL CIRCLE LOGO */
   .header {
+    position: relative;
+    z-index: 10;
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: 14px 18px;
-    background: #111720;
-    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+    padding: 12px 18px;
+    background: rgba(0, 15, 8, 0.85);
+    border-bottom: 1px solid rgba(0, 255, 136, 0.25);
+    backdrop-filter: blur(10px);
   }
 
   .logo-box {
     display: flex;
     align-items: center;
-    gap: 10px;
+    gap: 12px;
   }
 
   .logo-box img {
-    width: 38px;
-    height: 38px;
-    border-radius: 8px;
+    width: 44px;
+    height: 44px;
+    border-radius: 50%;
     object-fit: cover;
-    border: 1px solid #00ff88;
+    border: 2px solid #00ff88;
+    box-shadow: 0 0 15px rgba(0, 255, 136, 0.6);
   }
 
   .logo-text {
-    font-size: 17px;
-    font-weight: 700;
-    letter-spacing: 0.5px;
-    color: #fff;
+    font-size: 18px;
+    font-weight: 900;
+    letter-spacing: 2px;
+    color: #00ff88;
+    text-shadow: 0 0 10px rgba(0, 255, 136, 0.5);
   }
 
   .logo-text span {
-    color: #00ff88;
-    font-size: 11px;
+    color: #4fbf8b;
+    font-size: 10px;
     display: block;
-    font-weight: 500;
+    letter-spacing: 1px;
+    font-weight: normal;
   }
 
   .header-open-btn {
-    background: #0084ff;
-    color: #fff;
+    background: linear-gradient(135deg, #00ff88, #00c96a);
+    color: #000;
     padding: 7px 16px;
     border-radius: 20px;
-    font-size: 13px;
-    font-weight: 600;
+    font-size: 12px;
+    font-weight: 800;
     text-decoration: none;
-    transition: 0.2s;
+    letter-spacing: 1px;
+    box-shadow: 0 0 15px rgba(0, 255, 136, 0.4);
+    cursor: pointer;
   }
 
-  /* VIDEO META INFO */
+  /* MAIN CONTAINER (CENTERED) */
+  .main-content {
+    position: relative;
+    z-index: 5;
+    width: 100%;
+    max-width: 680px;
+    margin: 15px auto;
+    padding: 0 16px;
+  }
+
   .content-meta {
-    padding: 16px 18px 12px;
+    background: rgba(0, 15, 8, 0.85);
+    border: 1px solid rgba(0, 255, 136, 0.25);
+    border-radius: 12px 12px 0 0;
+    padding: 14px 18px;
+    border-bottom: none;
   }
 
   .video-title {
     font-size: 16px;
-    font-weight: 600;
-    color: #e6edf3;
+    font-weight: 700;
+    color: #d6ffe8;
     line-height: 1.4;
     word-break: break-all;
-    margin-bottom: 6px;
+    margin-bottom: 4px;
+    text-shadow: 0 0 6px rgba(0,255,136,0.3);
   }
 
   .video-sub {
-    font-size: 12px;
-    color: #8b949e;
+    font-size: 11px;
+    color: #4fbf8b;
+    letter-spacing: 1px;
   }
 
-  /* 🌟 BLURRED VIDEO PLAYER SCREEN (EXACT TERABOX LOOK) */
+  /* 🌟 MATRIX BLURRED VIDEO PLAYER BOX */
   .player-wrapper {
     position: relative;
     width: 100%;
-    max-width: 680px;
-    margin: 0 auto;
     background: #000;
-    border-radius: 0;
+    border: 1px solid rgba(0, 255, 136, 0.35);
+    border-radius: 0 0 12px 12px;
     overflow: hidden;
-  }
-
-  @media (min-width: 681px) {
-    .player-wrapper {
-      border-radius: 12px;
-      margin-top: 15px;
-    }
+    box-shadow: 0 0 30px rgba(0, 255, 136, 0.15);
   }
 
   .player-box {
     position: relative;
     width: 100%;
-    padding-top: 56.25%; /* 16:9 Cinema Aspect */
+    padding-top: 56.25%; /* 16:9 Aspect Ratio */
     background: #000;
     overflow: hidden;
+    cursor: pointer;
   }
 
-  /* BLURRED BACKGROUND FRAME */
-  .player-bg {
+  /* BACKGROUND ACTUAL BLURRED VIDEO ELEMENT */
+  #bgVideo {
+    position: absolute;
+    top: 50%; left: 50%;
+    transform: translate(-50%, -50%) scale(1.15);
+    min-width: 100%; min-height: 100%;
+    width: auto; height: auto;
+    filter: blur(16px) brightness(0.45);
+    object-fit: cover;
+    pointer-events: none;
+  }
+
+  /* MATRIX SCANNING LINE OVERLAY */
+  .scanline {
     position: absolute;
     inset: 0;
-    background: url('https://files.catbox.moe/k3159k.jpg') center/cover no-repeat;
-    filter: blur(14px) brightness(0.45);
-    transform: scale(1.15); /* Blur edges hiding */
+    background: linear-gradient(180deg, transparent, rgba(0, 255, 136, 0.08), transparent);
+    animation: scanLineAnim 3s linear infinite;
+    pointer-events: none;
+    z-index: 4;
+  }
+  @keyframes scanLineAnim {
+    0% { transform: translateY(-100%); }
+    100% { transform: translateY(100%); }
   }
 
-  /* CENTER LOCK OVERLAY */
+  /* CENTER LOCK & VIEW BUTTON */
   .player-overlay {
     position: absolute;
     inset: 0;
@@ -128,41 +173,40 @@
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    z-index: 5;
-    background: rgba(0, 0, 0, 0.35);
+    z-index: 6;
+    background: rgba(0, 5, 2, 0.4);
   }
 
-  /* PULSING VIEW IN APP BUTTON */
   .view-in-app-btn {
     display: flex;
     align-items: center;
-    gap: 8px;
-    background: rgba(0, 0, 0, 0.82);
-    border: 1.5px solid #00ff88;
-    color: #fff;
+    gap: 10px;
+    background: rgba(0, 0, 0, 0.85);
+    border: 2px solid #00ff88;
+    color: #00ff88;
     padding: 13px 26px;
     border-radius: 30px;
     font-size: 15px;
-    font-weight: 700;
+    font-weight: 800;
+    letter-spacing: 2px;
     text-decoration: none;
-    box-shadow: 0 0 25px rgba(0, 255, 136, 0.45);
-    cursor: pointer;
-    animation: pulseGlow 2s infinite alternate;
+    box-shadow: 0 0 25px rgba(0, 255, 136, 0.5);
+    animation: pulseGlow 1.8s infinite alternate;
   }
 
   @keyframes pulseGlow {
-    from { transform: scale(1); box-shadow: 0 0 15px rgba(0, 255, 136, 0.35); }
-    to { transform: scale(1.04); box-shadow: 0 0 30px rgba(0, 255, 136, 0.7); }
+    from { transform: scale(1); box-shadow: 0 0 15px rgba(0, 255, 136, 0.4); }
+    to { transform: scale(1.05); box-shadow: 0 0 35px rgba(0, 255, 136, 0.8); }
   }
 
   .free-badge {
-    background: #0084ff;
-    color: #fff;
-    font-size: 11px;
+    background: #00ff88;
+    color: #000;
+    font-size: 10px;
     padding: 2px 7px;
     border-radius: 4px;
-    font-weight: 600;
-    letter-spacing: 0.3px;
+    font-weight: 900;
+    letter-spacing: 1px;
   }
 
   .player-footer-duration {
@@ -170,19 +214,22 @@
     bottom: 12px;
     left: 16px;
     font-size: 12px;
-    color: rgba(255, 255, 255, 0.75);
+    color: #d6ffe8;
     font-family: monospace;
-    z-index: 6;
+    z-index: 7;
+    background: rgba(0, 0, 0, 0.6);
+    padding: 2px 8px;
+    border-radius: 4px;
+    border: 1px solid rgba(0,255,136,0.3);
   }
 
-  /* APP PROMO BANNER */
+  /* PROMO CARD */
   .promo-card {
-    max-width: 680px;
-    margin: 18px auto;
+    margin-top: 15px;
     padding: 16px;
-    background: #141c26;
+    background: rgba(0, 15, 8, 0.85);
     border-radius: 12px;
-    border: 1px solid rgba(255, 255, 255, 0.08);
+    border: 1px solid rgba(0, 255, 136, 0.25);
     display: flex;
     align-items: center;
     justify-content: space-between;
@@ -190,39 +237,42 @@
   }
 
   .promo-info h3 {
-    font-size: 14px;
+    font-size: 13px;
     color: #fff;
     margin-bottom: 4px;
+    letter-spacing: 0.5px;
   }
 
   .promo-info p {
-    font-size: 12px;
-    color: #8b949e;
+    font-size: 11px;
+    color: #4fbf8b;
     line-height: 1.4;
   }
 
   .promo-install-btn {
     background: #00ff88;
     color: #000;
-    font-weight: 700;
-    font-size: 13px;
+    font-weight: 800;
+    font-size: 12px;
     padding: 9px 18px;
     border-radius: 8px;
     text-decoration: none;
     white-space: nowrap;
+    letter-spacing: 1px;
   }
 
-  /* 🌟 FIXED BOTTOM BAR (TERABOX REPLICA) */
+  /* FIXED BOTTOM ACTIONS */
   .bottom-dock {
     position: fixed;
     bottom: 0; left: 0; right: 0;
-    background: #111720;
-    border-top: 1px solid rgba(255, 255, 255, 0.1);
+    background: rgba(0, 10, 5, 0.95);
+    border-top: 1px solid rgba(0, 255, 136, 0.35);
     padding: 14px 18px;
     display: flex;
     justify-content: center;
     gap: 12px;
     z-index: 99;
+    backdrop-filter: blur(10px);
   }
 
   .btn-dock {
@@ -230,114 +280,99 @@
     max-width: 260px;
     padding: 13px 0;
     border-radius: 8px;
-    font-size: 14px;
-    font-weight: 700;
+    font-size: 13px;
+    font-weight: 800;
     text-align: center;
     text-decoration: none;
     cursor: pointer;
-    border: none;
-    transition: 0.2s;
+    font-family: inherit;
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
   }
 
   .btn-download {
-    background: #1c2633;
-    color: #0084ff;
-    border: 1px solid rgba(0, 132, 255, 0.4);
+    background: transparent;
+    color: #00ff88;
+    border: 1px solid #00ff88;
   }
 
   .btn-view-app {
-    background: #0084ff;
-    color: #fff;
-    box-shadow: 0 4px 15px rgba(0, 132, 255, 0.4);
+    background: #00ff88;
+    color: #000;
+    border: 1px solid #00ff88;
+    box-shadow: 0 0 20px rgba(0, 255, 136, 0.4);
   }
 </style>
 </head>
 <body>
 
-  <!-- TOP HEADER -->
+  <canvas id="matrixCanvas"></canvas>
+
+  <!-- TOP HEADER WITH CIRCLE LOGO -->
   <div class="header">
     <div class="logo-box">
-      <img src="https://files.catbox.moe/k3159k.jpg" alt="MayaJaal Logo" />
+      <img src="https://files.catbox.moe/k3159k.jpg" alt="Maya Jaal" referrerpolicy="no-referrer" crossorigin="anonymous" />
       <div class="logo-text">
-        MayaJaal
-        <span>Cloud Secure Node</span>
+        MAYA JAAL
+        <span>NEURAL STREAM NODE</span>
       </div>
     </div>
-    <a href="javascript:void(0)" onclick="triggerAppLaunch()" class="header-open-btn">Open App</a>
+    <div onclick="triggerAppLaunch()" class="header-open-btn">OPEN APP</div>
   </div>
 
-  <!-- VIDEO DETAILS -->
-  <div class="content-meta">
-    <div class="video-title" id="displayTitle">Encrypted_Media_Stream.mp4</div>
-    <div class="video-sub">Permanent Cloud Storage · Fast Hardware Stream</div>
-  </div>
+  <div class="main-content">
+    <!-- VIDEO DETAILS -->
+    <div class="content-meta">
+      <div class="video-title" id="displayTitle">Connecting Node...</div>
+      <div class="video-sub">Quantum Cloud Stream · 1080P Ultra HD</div>
+    </div>
 
-  <!-- 🌟 BLURRED VIDEO FRAME WITH CENTER BUTTON -->
-  <div class="player-wrapper">
-    <div class="player-box" onclick="triggerAppLaunch()">
-      <!-- Ye div blur hokar picture preview dega -->
-      <div class="player-bg" id="playerBg"></div>
-      
-      <div class="player-overlay">
-        <div class="view-in-app-btn">
-          <span>▶ View in App</span>
-          <span class="free-badge">Free</span>
+    <!-- BLURRED SAME VIDEO SCREEN -->
+    <div class="player-wrapper">
+      <div class="player-box" onclick="triggerAppLaunch()">
+        <!-- Background actual video with blur -->
+        <video id="bgVideo" muted loop playsinline preload="auto"></video>
+        <div class="scanline"></div>
+        
+        <div class="player-overlay">
+          <div class="view-in-app-btn">
+            <span>▶ View in App</span>
+            <span class="free-badge">FREE</span>
+          </div>
         </div>
+
+        <div class="player-footer-duration" id="durationTxt">00:00 / HD 1080P</div>
       </div>
+    </div>
 
-      <div class="player-footer-duration">00:00:00 / HD 1080P</div>
+    <!-- PROMO CARD -->
+    <div class="promo-card">
+      <div class="promo-info">
+        <h3>Stream directly in MayaJaal App</h3>
+        <p>Ultra HD HUD controls, high-speed playback & ad-free streaming.</p>
+      </div>
+      <a href="javascript:void(0)" onclick="downloadApk()" class="promo-install-btn">INSTALL</a>
     </div>
   </div>
 
-  <!-- PROMO CARD -->
-  <div class="promo-card">
-    <div class="promo-info">
-      <h3>Stream directly in MayaJaal App</h3>
-      <p>Enjoy ad-free streaming, fullscreen HUD controls, and offline downloads.</p>
-    </div>
-    <a href="javascript:void(0)" onclick="downloadApk()" class="promo-install-btn">Install</a>
-  </div>
-
-  <!-- 🌟 FIXED BOTTOM ACTIONS -->
+  <!-- FIXED BOTTOM ACTIONS BAR -->
   <div class="bottom-dock">
-    <button onclick="downloadApk()" class="btn-dock btn-download">⬇ Download APK</button>
-    <button onclick="triggerAppLaunch()" class="btn-dock btn-view-app">View in MayaJaal</button>
+    <button onclick="downloadApk()" class="btn-dock btn-download">⬇ DOWNLOAD APK</button>
+    <button onclick="triggerAppLaunch()" class="btn-dock btn-view-app">VIEW IN APP</button>
   </div>
   <script>
 /* ═══════════════════════════════════════════
-   CONFIGURATION & DISPATCHING
+   CONFIGURATION & APP FALLBACK
    ═══════════════════════════════════════════ */
-// 🌟 Apna actual APK Download link yahan dalein
 const APK_DOWNLOAD_URL = "https://mayajaal.online/download/app-release.apk";
-
-// Current page URL
 const currentFullUrl = window.location.href;
 
-// Dynamic title nikalne ka try karein
-try {
-  const pathParts = window.location.pathname.split('/');
-  const id = pathParts[pathParts.length - 1] || 'Stream_Media';
-  if (id && id.length > 3) {
-    document.getElementById('displayTitle').textContent = id + '.mp4';
-  }
-} catch (e) {}
-
-/* ═══════════════════════════════════════════
-   APP LAUNCHER OR AUTO-APK FALLBACK
-   ═══════════════════════════════════════════ */
 function triggerAppLaunch() {
   if (navigator.vibrate) navigator.vibrate([40, 30, 60]);
-
-  // Deep-link intent URL for MayaJaal
   const appIntentUrl = "mayajaall://open?url=" + encodeURIComponent(currentFullUrl);
   const clickTime = Date.now();
-
-  // 1. Android phone ko bolenge app kholo
   window.location.href = appIntentUrl;
-
-  // 2. Agar 1.5 seconds tak app open nahi hua (Phone me app nahi hai)
   setTimeout(function () {
-    // Agar user abhi bhi isi webpage par hai, to direct download start kar do
     if (Date.now() - clickTime < 2200) {
       window.location.href = APK_DOWNLOAD_URL;
     }
@@ -348,6 +383,92 @@ function downloadApk() {
   if (navigator.vibrate) navigator.vibrate([50]);
   window.location.href = APK_DOWNLOAD_URL;
 }
+
+/* ═══════════════════════════════════════════
+   FETCH SAME VIDEO DETAILS & BLURRED STREAM
+   ═══════════════════════════════════════════ */
+const pathParts = window.location.pathname.split('/');
+const streamId = pathParts[pathParts.length - 1];
+
+const titleEl = document.getElementById('displayTitle');
+const durationEl = document.getElementById('durationTxt');
+const bgVideo = document.getElementById('bgVideo');
+
+function formatTime(seconds) {
+  const m = Math.floor(seconds / 60);
+  const s = Math.floor(seconds % 60);
+  return (m < 10 ? '0' : '') + m + ':' + (s < 10 ? '0' : '') + s;
+}
+
+async function loadMediaDetails() {
+  if (!streamId) return;
+
+  try {
+    // Backend API se actual video link & name mangwayenge
+    const res = await fetch(`/api/v/${streamId}`);
+    if (res.ok) {
+      const data = await res.json();
+      if (data.url) {
+        bgVideo.src = data.url;
+        bgVideo.play().catch(() => {});
+      }
+      if (data.name) {
+        titleEl.textContent = data.name;
+      } else {
+        titleEl.textContent = streamId + '.mp4';
+      }
+    } else {
+      titleEl.textContent = streamId + '.mp4';
+    }
+  } catch (err) {
+    titleEl.textContent = streamId + '.mp4';
+  }
+}
+
+// Actual Video Loaded -> Duration Calculate karein
+bgVideo.addEventListener('loadedmetadata', function() {
+  if (bgVideo.duration && !isNaN(bgVideo.duration)) {
+    durationEl.textContent = formatTime(bgVideo.duration) + ' / HD 1080P';
+  }
+});
+
+loadMediaDetails();
+
+/* ═══════════════════════════════════════════
+   MATRIX RAIN CANVAS ENGINE
+   ═══════════════════════════════════════════ */
+const canvas = document.getElementById('matrixCanvas');
+const ctx = canvas.getContext('2d');
+let cols, drops;
+const chars = '0123456789ABCDEFアイウエオカキクケコサシスセソタチツテト'.split('');
+
+function resize() {
+  canvas.width = window.innerWidth;
+  canvas.height = window.innerHeight;
+  cols = Math.floor(canvas.width / 15);
+  drops = new Array(cols).fill(1);
+}
+resize();
+window.addEventListener('resize', resize);
+
+function drawMatrix() {
+  ctx.fillStyle = 'rgba(0, 0, 0, 0.08)';
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+  ctx.font = '13px monospace';
+  
+  for (let i = 0; i < drops.length; i++) {
+    const text = chars[Math.floor(Math.random() * chars.length)];
+    const x = i * 15;
+    const y = drops[i] * 15;
+    ctx.fillStyle = '#ccffe5';
+    ctx.fillText(text, x, y);
+    ctx.fillStyle = '#00ff88';
+    ctx.fillText(text, x, y - 15);
+    if (y > canvas.height && Math.random() > 0.975) drops[i] = 0;
+    drops[i]++;
+  }
+}
+setInterval(drawMatrix, 40);
 </script>
 </body>
 </html>
