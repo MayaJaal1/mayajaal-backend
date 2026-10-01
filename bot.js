@@ -4,6 +4,7 @@ const express = require('express');
 const TelegramBot = require('node-telegram-bot-api');
 const axios = require('axios');
 const { S3Client, PutObjectCommand, GetObjectCommand } = require('@aws-sdk/client-s3');
+const { Upload } = require('@aws-sdk/lib-storage');
 const { getSignedUrl } = require('@aws-sdk/s3-request-presigner');
 const crypto = require('crypto');
 const { Redis } = require('@upstash/redis');
@@ -18,6 +19,7 @@ const redis = Redis.fromEnv();
 const WEB_PAGE_URL = process.env.WEB_PAGE_URL || 'https://mayajaal.online/key';
 const BACKEND_URL = process.env.BACKEND_URL || 'https://mayajaal.online';
 const TERABOX_API = process.env.TERABOX_API || 'https://terabox.hnn.workers.dev/api';
+const LOCAL_BOT_API = process.env.LOCAL_BOT_API_URL || 'http://127.0.0.1:8081';
 
 // ═══════════════════════════════════════════
 // 1. EXPRESS SERVER
@@ -38,7 +40,6 @@ const BASE_URL = process.env.CUSTOM_DOMAIN
 app.get('/', (req, res) => res.send('MayaJaal Bot is running!'));
 app.get('/health', (req, res) => res.json({ status: 'ok', uptime: process.uptime() }));
 
-// 🌟 APP UPDATE VERSION CHECK ROUTE (NO MORE 404 OR CANNOT GET)
 app.get(['/version.json', '/check-update', '/api/check-update'], (req, res) => {
   res.setHeader('Content-Type', 'application/json');
   res.json({
@@ -54,22 +55,17 @@ app.get('/logo.jpg', (req, res) => {
   res.sendFile(path.join(__dirname, 'logo.jpg'));
 });
 
-// 🌟 MATRIX KEY FRONTEND PAGE ROUTE
 app.get('/key', (req, res) => {
   res.sendFile(path.join(__dirname, 'index.html'));
 });
 
-// 🌟 DOWNLOAD PAGE ROUTE
 app.get(['/download', '/download.html'], (req, res) => {
   const dlPath = path.join(__dirname, 'download.html');
   if (fs.existsSync(dlPath)) {
     return res.sendFile(dlPath);
   }
   res.status(404).send('download.html not found');
-});
-
-// 🌟 MATRIX KEY SAVE API
-app.post('/save-key', async (req, res) => {
+});app.post('/save-key', async (req, res) => {
   try {
     const { telegram_id, key } = req.body;
     if (!telegram_id || !key) {
@@ -82,7 +78,7 @@ app.post('/save-key', async (req, res) => {
     res.status(500).json({ success: false, error: err.message });
   }
 });
-// 🌟 MATRIX KEY VERIFY API
+
 app.get('/verify-key/:key', async (req, res) => {
   try {
     const key = req.params.key;
@@ -97,7 +93,6 @@ app.get('/verify-key/:key', async (req, res) => {
   }
 });
 
-// 🌟 1. VIDEO METADATA API (Preview Screen: Title + Uploader Name Fetcher)
 app.get('/api/stream-info/:id', async (req, res) => {
   try {
     const id = req.params.id;
@@ -120,7 +115,6 @@ app.get('/api/stream-info/:id', async (req, res) => {
   }
 });
 
-// 🌟 2. CLOUD WATCH HISTORY SAVE API
 app.post('/api/history/save', async (req, res) => {
   try {
     const { telegram_id, video } = req.body;
@@ -142,7 +136,6 @@ app.post('/api/history/save', async (req, res) => {
   }
 });
 
-// 🌟 3. CLOUD WATCH HISTORY RESTORE API
 app.get('/api/history/:telegram_id', async (req, res) => {
   try {
     const key = `user_history:${req.params.telegram_id}`;
@@ -228,7 +221,8 @@ app.listen(PORT, () => {
   console.log(`✅ Server listening on port ${PORT}`);
   console.log(`🌐 Base URL: ${BASE_URL}`);
 });
-        // ═══════════════════════════════════════════
+
+// ═══════════════════════════════════════════
 // 2. CONFIG & PERMANENT REDIS USER STATE
 // ═══════════════════════════════════════════
 const TOKEN = process.env.BOT_TOKEN;
@@ -252,7 +246,6 @@ const s3 = new S3Client({
   },
 });
 
-// 🌟 PERMANENT USER PERSISTENCE VIA REDIS
 async function getUser(chatId) {
   try {
     const data = await redis.get(`user_settings:${chatId}`);
@@ -279,7 +272,11 @@ async function saveUser(chatId, settings) {
   }
 }
 
-const bot = new TelegramBot(TOKEN, { polling: true });
+// 🌟 Local API enabled for 2GB Files
+const bot = new TelegramBot(TOKEN, { 
+  polling: true,
+  baseApiUrl: LOCAL_BOT_API
+});
 
 function escapeHtml(str = '') {
   return String(str).replace(/[&<>"']/g, (c) => (
@@ -306,9 +303,7 @@ function pickFile(msg) {
   if (msg.audio) return msg.audio;
   if (Array.isArray(msg.photo) && msg.photo.length) return msg.photo[msg.photo.length - 1];
   return null;
-}
-
-async function extractTeraboxLink(teraboxUrl) {
+  }async function extractTeraboxLink(teraboxUrl) {
   try {
     const res = await axios.get(TERABOX_API, {
       params: { url: teraboxUrl },
@@ -387,9 +382,7 @@ setInterval(() => {
   }
   if (removed > 0) console.log(`🧹 Cleaned ${removed} expired links`);
 }, 10 * 60 * 1000);
-    // ═══════════════════════════════════════════
-// 9. BOT COMMANDS & SETUP
-// ═══════════════════════════════════════════
+
 async function setupBotCommands() {
   const commands = [
     { command: 'start', description: 'Get started & view all commands' },
@@ -417,7 +410,7 @@ async function setupBotCommands() {
 const WELCOME_TEXT =
   `🎬 <b>Welcome to MayaJaal Uploader Bot!</b>\n\n` +
   `Send me any of the following:\n\n` +
-  `• <b>Telegram file</b> (video, document, audio)\n` +
+  `• <b>Telegram file</b> (Up to 2GB supported)\n` +
   `• <b>Direct file URL</b> (e.g. https://example.com/video.mp4)\n` +
   `• <b>Terabox link</b> (terabox.com / terasharefile.com)\n` +
   `• <b>Diskwala link</b> (diskwala.com)\n` +
@@ -624,8 +617,7 @@ bot.on('callback_query', async (query) => {
     bot.answerCallbackQuery(query.id, { text: '✅ Logged out!' });
     bot.sendMessage(chatId, `👋 <b>Logged out successfully.</b>\n\nDobara login: <code>/api</code>`, { parse_mode: 'HTML' });
   }
-});
-function buildSuccessMessage(user, fileName, sizeMB, shortUrl) {
+});function buildSuccessMessage(user, fileName, sizeMB, shortUrl) {
   const parts = [];
   if (user.enableText && user.header) {
     parts.push(user.bold ? `<b>${escapeHtml(user.header)}</b>` : escapeHtml(user.header));
@@ -721,33 +713,56 @@ bot.on('message', async (msg) => {
       return;
     }
 
+    // 🌟 2GB FILE HANDLING
     const file = pickFile(msg);
     if (file) {
-      if (file.file_size && file.file_size > 20 * 1024 * 1024) {
-        return bot.sendMessage(chatId, `❌ <b>File is too big! Telegram limit: 20MB</b>`, { parse_mode: 'HTML' });
+      if (file.file_size && file.file_size > 2000 * 1024 * 1024) {
+        return bot.sendMessage(chatId, `❌ <b>File 2GB se badi hai! Allowed limit: 2GB</b>`, { parse_mode: 'HTML' });
       }
 
       const rawName = file.file_name || msg.caption || `file_${Date.now()}`;
       const fileName = rawName.replace(/[^a-zA-Z0-9._-]/g, '_').slice(0, 80);
+      const sizeMB = file.file_size ? (file.file_size / (1024 * 1024)).toFixed(2) : null;
 
-      statusMsg = await bot.sendMessage(chatId, `🔄 <i>Downloading from Telegram...</i>`, { parse_mode: 'HTML' });
+      statusMsg = await bot.sendMessage(chatId, `🔄 <i>Fetching Telegram file info...</i>`, { parse_mode: 'HTML' });
+
       const fileInfo = await bot.getFile(file.file_id);
-      const tgFileUrl = `https://api.telegram.org/file/bot${TOKEN}/${fileInfo.file_path}`;
+      let streamSource;
 
-      const response = await axios.get(tgFileUrl, { responseType: 'arraybuffer', timeout: 300000 });
-      const buffer = Buffer.from(response.data);
-      const sizeMB = (buffer.byteLength / 1024 / 1024).toFixed(2);
+      if (path.isAbsolute(fileInfo.file_path) && fs.existsSync(fileInfo.file_path)) {
+        streamSource = fs.createReadStream(fileInfo.file_path);
+      } else {
+        const tgFileUrl = `${LOCAL_BOT_API}/file/bot${TOKEN}/${fileInfo.file_path}`;
+        const response = await axios({
+          method: 'GET',
+          url: tgFileUrl,
+          responseType: 'stream',
+          timeout: 0,
+        });
+        streamSource = response.data;
+      }
 
-      await bot.editMessageText(`⬆️ <i>Uploading to MayaJaal cloud (${sizeMB} MB)...</i>`, { chat_id: chatId, message_id: statusMsg.message_id, parse_mode: 'HTML' });
+      await bot.editMessageText(`⬆️ <i>Uploading to MayaJaal cloud (${sizeMB || 'Large'} MB)...</i>`, {
+        chat_id: chatId,
+        message_id: statusMsg.message_id,
+        parse_mode: 'HTML',
+      });
 
       const uniqueKey = `uploads/${Date.now()}_${crypto.randomBytes(4).toString('hex')}_${fileName}`;
-      await s3.send(new PutObjectCommand({
-        Bucket: B2_BUCKET,
-        Key: uniqueKey,
-        Body: buffer,
-        ContentType: file.mime_type || 'application/octet-stream',
-        ContentLength: buffer.byteLength,
-      }));
+
+      const parallelUploads3 = new Upload({
+        client: s3,
+        params: {
+          Bucket: B2_BUCKET,
+          Key: uniqueKey,
+          Body: streamSource,
+          ContentType: file.mime_type || 'application/octet-stream',
+        },
+        partSize: 10 * 1024 * 1024,
+        queueSize: 4,
+      });
+
+      await parallelUploads3.done();
 
       const signedUrl = await getSignedUrl(s3, new GetObjectCommand({ Bucket: B2_BUCKET, Key: uniqueKey }), { expiresIn: 86400 });
       const shortUrl = createShortLink(signedUrl, fileName, uploaderName);
@@ -778,26 +793,34 @@ bot.on('message', async (msg) => {
     } catch (e) {}
     fileName = fileName.replace(/[^a-zA-Z0-9._-]/g, '_').slice(0, 80) || 'file_' + Date.now();
 
-    const response = await axios.get(text, {
-      responseType: 'arraybuffer',
-      timeout: 300000,
+    const response = await axios({
+      method: 'GET',
+      url: text,
+      responseType: 'stream',
+      timeout: 0,
       headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36' },
     });
 
-    const buffer = Buffer.from(response.data);
     const contentType = response.headers['content-type'] || 'application/octet-stream';
-    const sizeMB = (buffer.byteLength / 1024 / 1024).toFixed(2);
+    const contentLength = response.headers['content-length'];
+    const sizeMB = contentLength ? (contentLength / (1024 * 1024)).toFixed(2) : null;
 
-    await bot.editMessageText(`⬆ <i>Uploading to MayaJaal cloud (${sizeMB} MB)...</i>`, { chat_id: chatId, message_id: statusMsg.message_id, parse_mode: 'HTML' });
+    await bot.editMessageText(`⬆ <i>Uploading to MayaJaal cloud (${sizeMB || 'Stream'} MB)...</i>`, { chat_id: chatId, message_id: statusMsg.message_id, parse_mode: 'HTML' });
 
     const uniqueKey = `uploads/${Date.now()}_${crypto.randomBytes(4).toString('hex')}_${fileName}`;
-    await s3.send(new PutObjectCommand({
-      Bucket: B2_BUCKET,
-      Key: uniqueKey,
-      Body: buffer,
-      ContentType: contentType,
-      ContentLength: buffer.byteLength,
-    }));
+    const parallelUploads3 = new Upload({
+      client: s3,
+      params: {
+        Bucket: B2_BUCKET,
+        Key: uniqueKey,
+        Body: response.data,
+        ContentType: contentType,
+      },
+      partSize: 10 * 1024 * 1024,
+      queueSize: 4,
+    });
+
+    await parallelUploads3.done();
 
     const signedUrl = await getSignedUrl(s3, new GetObjectCommand({ Bucket: B2_BUCKET, Key: uniqueKey }), { expiresIn: 86400 });
     const shortUrl = createShortLink(signedUrl, fileName, uploaderName);
