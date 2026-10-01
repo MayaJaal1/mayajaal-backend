@@ -714,7 +714,7 @@ bot.on('message', async (msg) => {
       return;
     }
 
-    // 🌟 FILE UPLOAD TO B2 (NO EXTERNAL LIB CRASH)
+    // 🌟 FILE UPLOAD TO B2
     const file = pickFile(msg);
     if (file) {
       const rawName = file.file_name || msg.caption || `file_${Date.now()}`;
