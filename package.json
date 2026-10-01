@@ -1,6 +1,6 @@
 {
   "name": "mayajaal-bot",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "MayaJaal 2GB Streamer Bot",
   "main": "bot.js",
   "scripts": {
