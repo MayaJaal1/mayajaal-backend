@@ -221,4 +221,614 @@ app.get('/api/tb/:id', async (req, res) => {
 app.listen(PORT, () => {
   console.log(`✅ Server listening on port ${PORT}`);
   console.log(`🌐 Base URL: ${BASE_URL}`);
+});// ═══════════════════════════════════════════
+// 2. CONFIG & PERMANENT REDIS USER STATE
+// ═══════════════════════════════════════════
+const TOKEN = process.env.BOT_TOKEN;
+const B2_KEY_ID = process.env.B2_KEY_ID;
+const B2_APP_KEY = process.env.B2_APP_KEY;
+const B2_BUCKET = process.env.B2_BUCKET;
+const B2_ENDPOINT = process.env.B2_ENDPOINT || 's3.us-east-005.backblazeb2.com';
+const B2_REGION = process.env.B2_REGION || 'us-east-005';
+
+if (!TOKEN || !B2_KEY_ID || !B2_APP_KEY || !B2_BUCKET) {
+  console.error('❌ Missing env variables!');
+  process.exit(1);
+}
+
+const s3 = new S3Client({
+  region: B2_REGION,
+  endpoint: `https://${B2_ENDPOINT}`,
+  credentials: {
+    accessKeyId: B2_KEY_ID,
+    secretAccessKey: B2_APP_KEY,
+  },
 });
+
+async function getUser(chatId) {
+  try {
+    const data = await redis.get(`user_settings:${chatId}`);
+    if (data) {
+      return typeof data === 'string' ? JSON.parse(data) : data;
+    }
+  } catch (err) {
+    console.error('Redis get user error:', err.message);
+  }
+  return {
+    apiToken: null,
+    header: null,
+    footer: null,
+    bold: false,
+    enableText: true,
+  };
+}
+
+async function saveUser(chatId, settings) {
+  try {
+    await redis.set(`user_settings:${chatId}`, JSON.stringify(settings));
+  } catch (err) {
+    console.error('Redis save user error:', err.message);
+  }
+}
+
+const botOptions = { polling: true };
+if (process.env.LOCAL_BOT_API_URL) {
+  botOptions.baseApiUrl = process.env.LOCAL_BOT_API_URL;
+}
+const bot = new TelegramBot(TOKEN, botOptions);
+
+function escapeHtml(str = '') {
+  return String(str).replace(/[&<>"']/g, (c) => (
+    { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]
+  ));
+}
+
+function createShortLink(signedUrl, fileName, uploaderName) {
+  const id = crypto.randomBytes(4).toString('hex');
+  const payload = {
+    url: signedUrl,
+    name: fileName,
+    uploader: uploaderName || 'Matrix Node',
+    expiresAt: Date.now() + LINK_TTL_MS,
+  };
+  linkStore.set(id, payload);
+  redis.set(`video:${id}`, JSON.stringify(payload), { ex: 86400 }).catch(() => {});
+  return `${BASE_URL}/v/${id}`;
+}
+
+function pickFile(msg) {
+  if (msg.video) return msg.video;
+  if (msg.document) return msg.document;
+  if (msg.audio) return msg.audio;
+  if (Array.isArray(msg.photo) && msg.photo.length) return msg.photo[msg.photo.length - 1];
+  return null;
+}
+
+async function extractTeraboxLink(teraboxUrl) {
+  try {
+    const res = await axios.get(TERABOX_API, {
+      params: { url: teraboxUrl },
+      timeout: 60000,
+    });
+
+    if (!res.data || !res.data.success || !res.data.files || !res.data.files.length) {
+      return null;
+    }
+
+    const file = res.data.files[0];
+    const streamUrl = file.streaming_url || file.download_url;
+
+    if (!streamUrl) return null;
+
+    return {
+      url: streamUrl,
+      name: file.file_name || 'Terabox Video',
+      size: file.file_size || null,
+    };
+  } catch (err) {
+    console.error('Terabox extract error:', err.message);
+    return null;
+  }
+}
+
+async function extractDiskwalaLink(diskwalaUrl) {
+  try {
+    const res = await axios.get(diskwalaUrl, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120.0.0.0 Safari/537.36',
+        'Referer': 'https://www.diskwala.com/'
+      },
+      timeout: 30000,
+      maxRedirects: 5
+    });
+
+    const html = typeof res.data === 'string' ? res.data : JSON.stringify(res.data);
+    const b2Match = html.match(/https?:\/\/[^"'\s\\]+\.backblazeb2\.com[^"'\s\\]*/i);
+    if (b2Match) {
+      return { url: b2Match[0], name: 'Diskwala Video', size: null };
+    }
+
+    const patterns = [
+      /"downloadUrl"\s*:\s*"([^"]+)"/i,
+      /"fileUrl"\s*:\s*"([^"]+)"/i,
+      /"videoUrl"\s*:\s*"([^"]+)"/i,
+      /"url"\s*:\s*"(https?:\/\/[^"]+\.mp4[^"]*)"/i,
+      /https?:\/\/[^"'\s]+\.(mp4|m3u8|mkv|webm)[^"'\s]*/i
+    ];
+
+    for (const p of patterns) {
+      const m = html.match(p);
+      if (m) {
+        const u = m[1] || m[0];
+        if (u && u.startsWith('http')) {
+          return { url: u, name: 'Diskwala Video', size: null };
+        }
+      }
+    }
+    return null;
+  } catch (err) {
+    console.error('Diskwala extract error:', err.message);
+    return null;
+  }
+}
+
+setInterval(() => {
+  const now = Date.now();
+  let removed = 0;
+  for (const [id, data] of linkStore.entries()) {
+    if (now > data.expiresAt) {
+      linkStore.delete(id);
+      removed++;
+    }
+  }
+  if (removed > 0) console.log(`🧹 Cleaned ${removed} expired links`);
+}, 10 * 60 * 1000);
+
+async function setupBotCommands() {
+  const commands = [
+    { command: 'start', description: 'Get started & view all commands' },
+    { command: 'api', description: 'Get your Matrix Key & link account' },
+    { command: 'logout', description: 'Disconnect your account' },
+    { command: 'add_header', description: 'Add text above your links' },
+    { command: 'remove_header', description: 'Remove header text' },
+    { command: 'add_footer', description: 'Add text below your links' },
+    { command: 'remove_footer', description: 'Remove footer text' },
+    { command: 'enable_text', description: 'Keep surrounding text in messages' },
+    { command: 'disable_text', description: 'Remove surrounding text from messages' },
+    { command: 'enable_bold', description: 'Make header & footer bold' },
+    { command: 'disable_bold', description: 'Make header & footer normal' },
+    { command: 'settings', description: 'View your current settings' },
+  ];
+
+  try {
+    await bot.setMyCommands(commands);
+    console.log('✅ Bot commands menu set successfully');
+  } catch (err) {
+    console.error('❌ Failed to set commands menu:', err.message);
+  }
+}
+
+const WELCOME_TEXT =
+  `🎬 <b>Welcome to MayaJaal Uploader Bot!</b>\n\n` +
+  `Send me any of the following:\n\n` +
+  `• <b>Telegram file</b> (video, document, audio)\n` +
+  `• <b>Direct file URL</b> (e.g. https://example.com/video.mp4)\n` +
+  `• <b>Terabox link</b> (terabox.com / terasharefile.com)\n` +
+  `• <b>Diskwala link</b> (diskwala.com)\n` +
+  `• <b>Magnet link</b> (magnet:?xt=urn:btih:…)\n\n` +
+  `<b>Commands:</b>\n` +
+  `/api — Get your Matrix Key & link account\n` +
+  `/logout — Disconnect your account\n` +
+  `/add_header TEXT — Add text above your link\n` +
+  `/remove_header — Remove header\n` +
+  `/add_footer TEXT — Add text below your link\n` +
+  `/remove_footer — Remove footer\n` +
+  `/enable_text — Keep surrounding text\n` +
+  `/disable_text — Remove surrounding text\n` +
+  `/enable_bold — Make bold\n` +
+  `/disable_bold — Normal text\n` +
+  `/settings — View your settings`;
+
+bot.onText(/\/start/, (msg) => {
+  bot.sendMessage(msg.chat.id, WELCOME_TEXT, { parse_mode: 'HTML' });
+});
+
+bot.onText(/\/api(?:\s+(.+))?/, async (msg, match) => {
+  const chatId = msg.chat.id;
+  const token = match[1]?.trim();
+  const user = await getUser(chatId);
+
+  if (!token) {
+    const keyboard = {
+      inline_keyboard: [[
+        { text: '🔑 Get Matrix Key', url: `${WEB_PAGE_URL}?tg=${chatId}` }
+      ]]
+    };
+
+    if (user.apiToken) {
+      const masked = user.apiToken.slice(0, 6) + '...' + user.apiToken.slice(-4);
+      return bot.sendMessage(chatId,
+        `✅ <b>Matrix Key already linked:</b>\n<code>${escapeHtml(masked)}</code>\n\n` +
+        `Naya key lene ke liye niche button dabayein 👇\n` +
+        `Disconnect karne ke liye: <code>/logout</code>`,
+        { parse_mode: 'HTML', reply_markup: keyboard }
+      );
+    }
+
+    return bot.sendMessage(chatId,
+      `🔐 <b>MayaJaal Account Linking</b>\n\n` +
+      `Apni <b>Matrix Key</b> lene ke liye niche button dabayein 👇\n\n` +
+      `<b>📌 Steps:</b>\n` +
+      `1️⃣ Button par tap karein\n` +
+      `2️⃣ Matrix Key copy karein\n` +
+      `3️⃣ Yahan bhejein: <code>/api YOUR_KEY</code>`,
+      { parse_mode: 'HTML', reply_markup: keyboard }
+    );
+  }
+
+  try {
+    const verifyRes = await axios.get(
+      `${BACKEND_URL}/verify-key/${encodeURIComponent(token)}`
+    );
+
+    if (!verifyRes.data.valid) {
+      return bot.sendMessage(chatId,
+        `❌ <b>Invalid Matrix Key</b>\n\n` +
+        `Sahi key lene ke liye <code>/api</code> bhejein.`,
+        { parse_mode: 'HTML' }
+      );
+    }
+
+    if (String(verifyRes.data.telegram_id) !== String(chatId)) {
+      return bot.sendMessage(chatId,
+        `❌ <b>Ye key kisi aur user ki hai.</b>\n\n` +
+        `Apni khud ki key lene ke liye <code>/api</code> bhejein.`,
+        { parse_mode: 'HTML' }
+      );
+    }
+
+    user.apiToken = token;
+    await saveUser(chatId, user);
+
+    bot.sendMessage(chatId,
+      `✅ <b>Matrix Key linked successfully!</b>\n\n` +
+      `Ab aap files upload kar sakte hain. 🚀\n\n` +
+      `Disconnect karne ke liye: <code>/logout</code>`,
+      { parse_mode: 'HTML' }
+    );
+
+  } catch (err) {
+    console.error('Verify error:', err.message);
+    bot.sendMessage(chatId,
+      `❌ <b>Verification failed.</b>\n\nThodi der baad try karein.`,
+      { parse_mode: 'HTML' }
+    );
+  }
+});
+
+bot.onText(/\/add_header(?:\s+([\s\S]+))?/, async (msg, match) => {
+  const chatId = msg.chat.id;
+  const text = match[1]?.trim();
+  if (!text) {
+    return bot.sendMessage(chatId, `❌ <b>Usage:</b>\n<code>/add_header YOUR TEXT</code>`, { parse_mode: 'HTML' });
+  }
+  const user = await getUser(chatId);
+  user.header = text;
+  await saveUser(chatId, user);
+  bot.sendMessage(chatId, `✅ <b>Header added:</b>\n${escapeHtml(text)}`, { parse_mode: 'HTML' });
+});
+
+bot.onText(/\/remove_header/, async (msg) => {
+  const chatId = msg.chat.id;
+  const user = await getUser(chatId);
+  user.header = null;
+  await saveUser(chatId, user);
+  bot.sendMessage(chatId, '✅ Header removed.');
+});
+
+bot.onText(/\/add_footer(?:\s+([\s\S]+))?/, async (msg, match) => {
+  const chatId = msg.chat.id;
+  const text = match[1]?.trim();
+  if (!text) {
+    return bot.sendMessage(chatId, `❌ <b>Usage:</b>\n<code>/add_footer YOUR TEXT</code>`, { parse_mode: 'HTML' });
+  }
+  const user = await getUser(chatId);
+  user.footer = text;
+  await saveUser(chatId, user);
+  bot.sendMessage(chatId, `✅ <b>Footer added:</b>\n${escapeHtml(text)}`, { parse_mode: 'HTML' });
+});
+
+bot.onText(/\/remove_footer/, async (msg) => {
+  const chatId = msg.chat.id;
+  const user = await getUser(chatId);
+  user.footer = null;
+  await saveUser(chatId, user);
+  bot.sendMessage(chatId, '✅ Footer removed.');
+});
+
+bot.onText(/\/enable_text/, async (msg) => {
+  const chatId = msg.chat.id;
+  const user = await getUser(chatId);
+  user.enableText = true;
+  await saveUser(chatId, user);
+  bot.sendMessage(chatId, '✅ <b>Surrounding text enabled.</b>', { parse_mode: 'HTML' });
+});
+
+bot.onText(/\/disable_text/, async (msg) => {
+  const chatId = msg.chat.id;
+  const user = await getUser(chatId);
+  user.enableText = false;
+  await saveUser(chatId, user);
+  bot.sendMessage(chatId, '✅ <b>Surrounding text disabled.</b>', { parse_mode: 'HTML' });
+});
+
+bot.onText(/\/enable_bold/, async (msg) => {
+  const chatId = msg.chat.id;
+  const user = await getUser(chatId);
+  user.bold = true;
+  await saveUser(chatId, user);
+  bot.sendMessage(chatId, '✅ <b>Bold enabled</b>.', { parse_mode: 'HTML' });
+});
+
+bot.onText(/\/disable_bold/, async (msg) => {
+  const chatId = msg.chat.id;
+  const user = await getUser(chatId);
+  user.bold = false;
+  await saveUser(chatId, user);
+  bot.sendMessage(chatId, '✅ Bold disabled.');
+});
+
+bot.onText(/\/logout/, async (msg) => {
+  const chatId = msg.chat.id;
+  const user = await getUser(chatId);
+  if (!user.apiToken) {
+    return bot.sendMessage(chatId, `❌ <b>Aap logged in nahi ho.</b>\n\nLogin: <code>/api</code>`, { parse_mode: 'HTML' });
+  }
+  user.apiToken = null;
+  await saveUser(chatId, user);
+  bot.sendMessage(chatId, `👋 <b>Logged out successfully!</b>\n\nDobara login: <code>/api</code>`, { parse_mode: 'HTML' });
+});
+
+bot.onText(/\/settings/, async (msg) => {
+  const chatId = msg.chat.id;
+  const u = await getUser(chatId);
+  const text =
+    `⚙️ <b>Your MayaJaal Settings</b>\n\n` +
+    `🔑 <b>Matrix Key:</b> ${u.apiToken ? '✅ Linked' : '❌ Not linked'}\n` +
+    `📝 <b>Header:</b> ${u.header ? escapeHtml(u.header) : '<i>(none)</i>'}\n` +
+    `📝 <b>Footer:</b> ${u.footer ? escapeHtml(u.footer) : '<i>(none)</i>'}\n` +
+    `💬 <b>Surrounding text:</b> ${u.enableText ? 'ON' : 'OFF'}\n` +
+    `🅱️ <b>Bold:</b> ${u.bold ? 'ON' : 'OFF'}`;
+
+  const opts = { parse_mode: 'HTML' };
+  if (u.apiToken) {
+    opts.reply_markup = {
+      inline_keyboard: [[{ text: '🚪 Logout', callback_data: 'logout_user' }]]
+    };
+  }
+  bot.sendMessage(chatId, text, opts);
+});
+
+bot.on('callback_query', async (query) => {
+  if (query.data === 'logout_user') {
+    const chatId = query.message.chat.id;
+    const user = await getUser(chatId);
+    user.apiToken = null;
+    await saveUser(chatId, user);
+    bot.answerCallbackQuery(query.id, { text: '✅ Logged out!' });
+    bot.sendMessage(chatId, `👋 <b>Logged out successfully.</b>\n\nDobara login: <code>/api</code>`, { parse_mode: 'HTML' });
+  }
+});function buildSuccessMessage(user, fileName, sizeMB, shortUrl) {
+  const parts = [];
+  if (user.enableText && user.header) {
+    parts.push(user.bold ? `<b>${escapeHtml(user.header)}</b>` : escapeHtml(user.header));
+    parts.push('');
+  }
+  parts.push(`✨ <b>MayaJaal Upload Complete!</b>`);
+  parts.push('');
+  parts.push(`📌 <b>File:</b> ${escapeHtml(fileName)}`);
+  if (sizeMB) parts.push(`📦 <b>Size:</b> ${sizeMB} MB`);
+  parts.push('');
+  parts.push(`🔗 <b>Link:</b>\n${shortUrl}`);
+  if (user.enableText && user.footer) {
+    parts.push('');
+    parts.push(user.bold ? `<b>${escapeHtml(user.footer)}</b>` : escapeHtml(user.footer));
+  }
+  parts.push('');
+  parts.push(`⏰ <i>Valid 24 hours</i>`);
+  return parts.join('\n');
+}
+
+bot.on('message', async (msg) => {
+  const chatId = msg.chat.id;
+  const text = msg.text || '';
+  if (text.startsWith('/')) return;
+
+  const user = await getUser(chatId);
+  const uploaderName = msg.from?.username ? `@${msg.from.username}` : (msg.from?.first_name || 'Matrix User');
+
+  if (!user.apiToken) {
+    const fileCheck = pickFile(msg);
+    const isUrl = /^https?:\/\//i.test(text) || text.startsWith('magnet:?');
+    if (fileCheck || isUrl) {
+      const keyboard = {
+        inline_keyboard: [[{ text: '🔑 Get Matrix Key', url: `${WEB_PAGE_URL}?tg=${chatId}` }]]
+      };
+      return bot.sendMessage(chatId,
+        `❌ <b>Pehle apna Matrix Key link karo!</b>\n\n` +
+        `Niche button se Matrix Key lein, phir <code>/api YOUR_KEY</code> bhejein.`,
+        { parse_mode: 'HTML', reply_markup: keyboard }
+      );
+    }
+    return;
+  }
+
+  let statusMsg = null;
+  try {
+    const isTerabox = /(terabox|terasharefile|1024tera|teraboxapp|teraboxshare|teraboxlink|tibibox|momerybox|mirrorbox|4funbox|dubox|freeterabox|nekopoi)/i.test(text);
+
+    if (isTerabox && /^https?:\/\//i.test(text)) {
+      statusMsg = await bot.sendMessage(chatId, `🔄 <i>Extracting Terabox link...</i>`, { parse_mode: 'HTML' });
+      const extracted = await extractTeraboxLink(text);
+
+      if (!extracted || !extracted.url) {
+        await bot.deleteMessage(chatId, statusMsg.message_id).catch(() => {});
+        return bot.sendMessage(chatId, `❌ <b>Terabox link extract nahi ho paya.</b>`, { parse_mode: 'HTML' });
+      }
+
+      const shortId = crypto.randomBytes(4).toString('hex');
+      await redis.set(`terabox:${shortId}`, JSON.stringify({
+        url: extracted.url,
+        name: extracted.name,
+        uploader: uploaderName
+      }), { ex: 86400 });
+
+      const myLink = `${BASE_URL}/tb/${shortId}`;
+      await bot.deleteMessage(chatId, statusMsg.message_id).catch(() => {});
+      statusMsg = null;
+      await bot.sendMessage(chatId, buildSuccessMessage(user, extracted.name, null, myLink), { parse_mode: 'HTML', disable_web_page_preview: true });
+      return;
+    }
+
+    const isDiskwala = /diskwala\.com/i.test(text);
+    if (isDiskwala && /^https?:\/\//i.test(text)) {
+      statusMsg = await bot.sendMessage(chatId, `🔄 <i>Extracting Diskwala link...</i>`, { parse_mode: 'HTML' });
+      const extracted = await extractDiskwalaLink(text);
+
+      if (!extracted || !extracted.url) {
+        await bot.deleteMessage(chatId, statusMsg.message_id).catch(() => {});
+        return bot.sendMessage(chatId, `❌ <b>Diskwala link extract nahi ho paya.</b>`, { parse_mode: 'HTML' });
+      }
+
+      const shortId = crypto.randomBytes(4).toString('hex');
+      await redis.set(`terabox:${shortId}`, JSON.stringify({
+        url: extracted.url,
+        name: extracted.name,
+        uploader: uploaderName
+      }), { ex: 86400 });
+
+      const myLink = `${BASE_URL}/tb/${shortId}`;
+      await bot.deleteMessage(chatId, statusMsg.message_id).catch(() => {});
+      statusMsg = null;
+      await bot.sendMessage(chatId, buildSuccessMessage(user, extracted.name, null, myLink), { parse_mode: 'HTML', disable_web_page_preview: true });
+      return;
+    }
+
+    // 🌟 FILE UPLOAD TO B2 (NO EXTERNAL LIB CRASH)
+    const file = pickFile(msg);
+    if (file) {
+      const rawName = file.file_name || msg.caption || `file_${Date.now()}`;
+      const fileName = rawName.replace(/[^a-zA-Z0-9._-]/g, '_').slice(0, 80);
+      const sizeMB = file.file_size ? (file.file_size / (1024 * 1024)).toFixed(2) : null;
+
+      statusMsg = await bot.sendMessage(chatId, `🔄 <i>Fetching Telegram file info...</i>`, { parse_mode: 'HTML' });
+
+      const fileInfo = await bot.getFile(file.file_id);
+      let streamSource;
+
+      if (path.isAbsolute(fileInfo.file_path) && fs.existsSync(fileInfo.file_path)) {
+        streamSource = fs.createReadStream(fileInfo.file_path);
+      } else {
+        const fileBase = process.env.LOCAL_BOT_API_URL || 'https://api.telegram.org';
+        const tgFileUrl = `${fileBase}/file/bot${TOKEN}/${fileInfo.file_path}`;
+        const response = await axios({
+          method: 'GET',
+          url: tgFileUrl,
+          responseType: 'stream',
+          timeout: 0,
+        });
+        streamSource = response.data;
+      }
+
+      await bot.editMessageText(`⬆️ <i>Uploading to MayaJaal cloud (${sizeMB || 'Large'} MB)...</i>`, {
+        chat_id: chatId,
+        message_id: statusMsg.message_id,
+        parse_mode: 'HTML',
+      });
+
+      const uniqueKey = `uploads/${Date.now()}_${crypto.randomBytes(4).toString('hex')}_${fileName}`;
+
+      await s3.send(new PutObjectCommand({
+        Bucket: B2_BUCKET,
+        Key: uniqueKey,
+        Body: streamSource,
+        ContentType: file.mime_type || 'application/octet-stream',
+        ContentLength: file.file_size,
+      }));
+
+      const signedUrl = await getSignedUrl(s3, new GetObjectCommand({ Bucket: B2_BUCKET, Key: uniqueKey }), { expiresIn: 86400 });
+      const shortUrl = createShortLink(signedUrl, fileName, uploaderName);
+
+      await bot.deleteMessage(chatId, statusMsg.message_id).catch(() => {});
+      statusMsg = null;
+      await bot.sendMessage(chatId, buildSuccessMessage(user, fileName, sizeMB, shortUrl), { parse_mode: 'HTML', disable_web_page_preview: true });
+      return;
+    }
+
+    const isMagnet = text.startsWith('magnet:?');
+    const isTorrentUrl = /\.torrent(\?|$)/i.test(text);
+    const isHttpUrl = /^https?:\/\//i.test(text);
+
+    if (!isMagnet && !isTorrentUrl && !isHttpUrl) return;
+
+    if (isMagnet || isTorrentUrl) {
+      return bot.sendMessage(chatId, `🧲 <b>Torrent support coming soon!</b>`, { parse_mode: 'HTML' });
+    }
+
+    statusMsg = await bot.sendMessage(chatId, `🔄 <i>Downloading from URL...</i>`, { parse_mode: 'HTML' });
+
+    let fileName = 'file_' + Date.now();
+    try {
+      const urlObj = new URL(text);
+      const last = urlObj.pathname.split('/').pop();
+      if (last) fileName = decodeURIComponent(last);
+    } catch (e) {}
+    fileName = fileName.replace(/[^a-zA-Z0-9._-]/g, '_').slice(0, 80) || 'file_' + Date.now();
+
+    const response = await axios({
+      method: 'GET',
+      url: text,
+      responseType: 'stream',
+      timeout: 0,
+      headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36' },
+    });
+
+    const contentType = response.headers['content-type'] || 'application/octet-stream';
+    const contentLength = response.headers['content-length'];
+    const sizeMB = contentLength ? (contentLength / (1024 * 1024)).toFixed(2) : null;
+
+    await bot.editMessageText(`⬆ <i>Uploading to MayaJaal cloud (${sizeMB || 'Stream'} MB)...</i>`, { chat_id: chatId, message_id: statusMsg.message_id, parse_mode: 'HTML' });
+
+    const uniqueKey = `uploads/${Date.now()}_${crypto.randomBytes(4).toString('hex')}_${fileName}`;
+    
+    await s3.send(new PutObjectCommand({
+      Bucket: B2_BUCKET,
+      Key: uniqueKey,
+      Body: response.data,
+      ContentType: contentType,
+      ContentLength: contentLength ? Number(contentLength) : undefined,
+    }));
+
+    const signedUrl = await getSignedUrl(s3, new GetObjectCommand({ Bucket: B2_BUCKET, Key: uniqueKey }), { expiresIn: 86400 });
+    const shortUrl = createShortLink(signedUrl, fileName, uploaderName);
+
+    await bot.deleteMessage(chatId, statusMsg.message_id).catch(() => {});
+    statusMsg = null;
+    await bot.sendMessage(chatId, buildSuccessMessage(user, fileName, sizeMB, shortUrl), { parse_mode: 'HTML', disable_web_page_preview: true });
+
+  } catch (error) {
+    console.error('Upload error:', error.message);
+    if (statusMsg) await bot.deleteMessage(chatId, statusMsg.message_id).catch(() => {});
+    bot.sendMessage(chatId, `❌ <b>Error:</b>\n<code>${escapeHtml(error.message)}</code>`, { parse_mode: 'HTML' }).catch(() => {});
+  }
+});
+
+bot.on('polling_error', (error) => console.log('Polling error:', error.code, error.message));
+bot.on('error', (error) => console.log('Bot error:', error.message));
+process.on('unhandledRejection', (r) => console.error('[unhandledRejection]', r));
+process.on('uncaughtException', (e) => console.error('[uncaughtException]', e.message));
+
+(async () => {
+  await setupBotCommands();
+  console.log('🚀 MayaJaal Remote URL Uploader Bot chal pada hai...');
+})();
