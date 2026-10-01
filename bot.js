@@ -3,7 +3,8 @@ require('dotenv').config();
 const express = require('express');
 const TelegramBot = require('node-telegram-bot-api');
 const axios = require('axios');
-const { S3Client, PutObjectCommand, GetObjectCommand } = require('@aws-sdk/client-s3');
+const { S3Client, GetObjectCommand } = require('@aws-sdk/client-s3');
+const { Upload } = require('@aws-sdk/lib-storage');
 const { getSignedUrl } = require('@aws-sdk/s3-request-presigner');
 const crypto = require('crypto');
 const { Redis } = require('@upstash/redis');
@@ -64,7 +65,9 @@ app.get(['/download', '/download.html'], (req, res) => {
     return res.sendFile(dlPath);
   }
   res.status(404).send('download.html not found');
-});app.post('/save-key', async (req, res) => {
+});
+
+app.post('/save-key', async (req, res) => {
   try {
     const { telegram_id, key } = req.body;
     if (!telegram_id || !key) {
@@ -219,9 +222,7 @@ app.get('/api/tb/:id', async (req, res) => {
 app.listen(PORT, () => {
   console.log(`✅ Server listening on port ${PORT}`);
   console.log(`🌐 Base URL: ${BASE_URL}`);
-});
-
-// ═══════════════════════════════════════════
+});// ═══════════════════════════════════════════
 // 2. CONFIG & PERMANENT REDIS USER STATE
 // ═══════════════════════════════════════════
 const TOKEN = process.env.BOT_TOKEN;
@@ -302,7 +303,9 @@ function pickFile(msg) {
   if (msg.audio) return msg.audio;
   if (Array.isArray(msg.photo) && msg.photo.length) return msg.photo[msg.photo.length - 1];
   return null;
-  }async function extractTeraboxLink(teraboxUrl) {
+}
+
+async function extractTeraboxLink(teraboxUrl) {
   try {
     const res = await axios.get(TERABOX_API, {
       params: { url: teraboxUrl },
@@ -712,7 +715,7 @@ bot.on('message', async (msg) => {
       return;
     }
 
-    // 🌟 STREAM FILE TO B2
+    // 🌟 STREAM FILE TO B2 (MULTIPART CHUNKS)
     const file = pickFile(msg);
     if (file) {
       const rawName = file.file_name || msg.caption || `file_${Date.now()}`;
@@ -746,13 +749,19 @@ bot.on('message', async (msg) => {
 
       const uniqueKey = `uploads/${Date.now()}_${crypto.randomBytes(4).toString('hex')}_${fileName}`;
 
-      await s3.send(new PutObjectCommand({
-        Bucket: B2_BUCKET,
-        Key: uniqueKey,
-        Body: streamSource,
-        ContentType: file.mime_type || 'application/octet-stream',
-        ContentLength: file.file_size,
-      }));
+      const parallelUpload = new Upload({
+        client: s3,
+        params: {
+          Bucket: B2_BUCKET,
+          Key: uniqueKey,
+          Body: streamSource,
+          ContentType: file.mime_type || 'application/octet-stream',
+        },
+        partSize: 10 * 1024 * 1024,
+        queueSize: 4,
+      });
+
+      await parallelUpload.done();
 
       const signedUrl = await getSignedUrl(s3, new GetObjectCommand({ Bucket: B2_BUCKET, Key: uniqueKey }), { expiresIn: 86400 });
       const shortUrl = createShortLink(signedUrl, fileName, uploaderName);
@@ -799,13 +808,19 @@ bot.on('message', async (msg) => {
 
     const uniqueKey = `uploads/${Date.now()}_${crypto.randomBytes(4).toString('hex')}_${fileName}`;
     
-    await s3.send(new PutObjectCommand({
-      Bucket: B2_BUCKET,
-      Key: uniqueKey,
-      Body: response.data,
-      ContentType: contentType,
-      ContentLength: contentLength ? Number(contentLength) : undefined,
-    }));
+    const parallelUploadUrl = new Upload({
+      client: s3,
+      params: {
+        Bucket: B2_BUCKET,
+        Key: uniqueKey,
+        Body: response.data,
+        ContentType: contentType,
+      },
+      partSize: 10 * 1024 * 1024,
+      queueSize: 4,
+    });
+
+    await parallelUploadUrl.done();
 
     const signedUrl = await getSignedUrl(s3, new GetObjectCommand({ Bucket: B2_BUCKET, Key: uniqueKey }), { expiresIn: 86400 });
     const shortUrl = createShortLink(signedUrl, fileName, uploaderName);
