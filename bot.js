@@ -52,7 +52,7 @@ const mtprotoClient = new TelegramClient(new StringSession(''), API_ID, API_HASH
 })();
 
 // ═══════════════════════════════════════════
-// 2. EXPRESS HTTP SERVER & STREAM PROXY (Range 206 Enabled)
+// 2. EXPRESS HTTP SERVER & STREAM PROXY (HTTP 206 Enabled)
 // ═══════════════════════════════════════════
 const app = express();
 const PORT = process.env.PORT || 8080;
@@ -170,9 +170,7 @@ function servePlayerPage(req, res) {
 app.get('/v/:id', (req, res) => servePlayerPage(req, res));
 app.get('/tb/:id', (req, res) => servePlayerPage(req, res));
 
-// ───────────────────────────────────────────
-// DIRECT STREAM ENGINE (Player Fast Streaming)
-// ───────────────────────────────────────────
+// DIRECT STREAM ENGINE (Cloud Range 206 Streaming)
 app.get('/stream/:id', async (req, res) => {
   try {
     const id = req.params.id;
@@ -182,7 +180,7 @@ app.get('/stream/:id', async (req, res) => {
       if (raw) data = typeof raw === 'string' ? JSON.parse(raw) : raw;
     }
 
-    if (!data || !data.url) return res.status(404).send('Stream link missing');
+    if (!data || !data.url) return res.status(404).send('Stream link missing or expired');
 
     const rawCookie = process.env.TERABOX_COOKIE || 'ndus=Yzdpm64teHuiTpyF1tSZ-m4ANxhFN7shhUG1hMNu;';
     const cookie = rawCookie.includes('ndus=') ? rawCookie : `ndus=${rawCookie};`;
@@ -332,12 +330,9 @@ async function extractDiskwalaLink(diskwalaUrl) {
 }
 
 // ───────────────────────────────────────────
-// B. ROBUST TERABOX EXTRACTOR
+// B. TERABOX EXTRACTOR
 // ───────────────────────────────────────────
 async function extractTeraboxLink(teraboxUrl) {
-  const rawCookie = process.env.TERABOX_COOKIE || 'ndus=Yzdpm64teHuiTpyF1tSZ-m4ANxhFN7shhUG1hMNu;';
-  const cookie = rawCookie.includes('ndus=') ? rawCookie : `ndus=${rawCookie};`;
-
   try {
     const res = await axios.post('https://terabox-dl.qtcloud.workers.dev/api/get-info', { url: teraboxUrl }, { timeout: 10000 });
     if (res.data?.downloadLink || res.data?.dlink) {
@@ -356,7 +351,7 @@ async function extractTeraboxLink(teraboxUrl) {
 }
 
 // ───────────────────────────────────────────
-// C. 2GB MTPROTO FAST BACKUP (Direct Channel Vault Upload)
+// C. 2GB MTPROTO FAST BACKUP (Direct Telegram Storage)
 // ───────────────────────────────────────────
 async function uploadToStorageChannel2GB(videoUrl, fileName, caption) {
   if (!STORAGE_CHANNEL_ID) return null;
@@ -431,7 +426,7 @@ async function uploadToStorageChannel2GB(videoUrl, fileName, caption) {
 bot.onText(/\/start/, (msg) => {
   bot.sendMessage(msg.chat.id,
     `🎬 <b>Welcome to MayaJaal Converter Bot!</b>\n\n` +
-    `Bhejo koi bhi <b>Diskwala ya Terabox link</b> aur turant 2GB permanent stream link pao.\n\n` +
+    `Bhejo koi bhi <b>Diskwala ya Terabox link</b> aur turant permanent stream link pao.\n\n` +
     `<b>Commands:</b>\n` +
     `/api - Matrix key link karein\n` +
     `/logout - Disconnect karein\n` +
@@ -492,7 +487,7 @@ bot.onText(/\/add_footer(?:\s+([\s\S]+))?/, async (msg, match) => {
 });
 
 // ═══════════════════════════════════════════
-// 4. MASTER HANDLER (2GB SECURE BACKUP)
+// 4. MASTER HANDLER (2GB SECURE BACKUP & CLOUD STREAM)
 // ═══════════════════════════════════════════
 bot.on('message', async (msg) => {
   const chatId = msg.chat.id;
@@ -562,9 +557,11 @@ bot.on('message', async (msg) => {
       uploader: uploaderName,
     };
 
+    // Save in Memory & Upstash Redis Cloud
     linkStore.set(shortId, payload);
     await redis.set(`terabox:${shortId}`, JSON.stringify(payload), { ex: 30 * 86400 });
 
+    // Custom Cloudflare Web Player URL
     const playUrl = `${BASE_URL}/tb/${shortId}`;
 
     if (statusMsg) await bot.deleteMessage(chatId, statusMsg.message_id).catch(() => {});
@@ -578,4 +575,4 @@ bot.on('message', async (msg) => {
     bot.sendMessage(chatId, `❌ <b>Error:</b> <code>${escapeHtml(err.message)}</code>`, { parse_mode: 'HTML' });
   }
 });
-               
+    
