@@ -221,32 +221,52 @@ function buildSuccessMessage(user, fileName, shortUrl) {
 
 async function extractTeraboxLink(teraboxUrl) {
   try {
-    const cookie = process.env.TERABOX_COOKIE || 'ndus=Yzdpm64teHuiTpyF1tSZ-m4ANxhFN7shhUG1hMNu;';
+    const rawCookie = process.env.TERABOX_COOKIE || 'ndus=Yzdpm64teHuiTpyF1tSZ-m4ANxhFN7shhUG1hMNu;';
+    const cookie = rawCookie.includes('ndus=') ? rawCookie : `ndus=${rawCookie};`;
+
     const match = teraboxUrl.match(/(\/s\/|surl=)([a-zA-Z0-9_-]+)/);
     if (!match) return null;
-    
+
     let surl = match[2];
     if (surl.startsWith('1')) surl = surl.substring(1);
 
-    const apiUrl = `https://www.1024terabox.com/share/list?app_id=250528&shorturl=${surl}&root=1`;
+    const domains = [
+      'https://www.terabox1024.com',
+      'https://www.1024terabox.com',
+      'https://www.terabox.app'
+    ];
 
-    const res = await axios.get(apiUrl, {
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-        'Cookie': cookie,
-        'Referer': 'https://www.1024terabox.com/'
-      },
-      timeout: 15000
-    });
+    for (const baseDomain of domains) {
+      try {
+        const apiUrl = `${baseDomain}/share/list?app_id=250528&shorturl=${surl}&root=1`;
 
-    if (res.data && res.data.errno === 0 && res.data.list && res.data.list.length > 0) {
-      const file = res.data.list[0];
-      const streamUrl = file.dlink;
-      const fileName = file.server_filename || 'Terabox Video';
-      if (streamUrl) return { url: streamUrl, name: fileName };
+        const res = await axios.get(apiUrl, {
+          headers: {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+            'Cookie': cookie,
+            'Referer': `${baseDomain}/sharing/link?surl=${surl}`,
+            'Accept': 'application/json, text/plain, */*'
+          },
+          timeout: 15000
+        });
+
+        console.log(`[Extractor] Response from ${baseDomain}:`, res.data?.errno);
+
+        if (res.data && res.data.errno === 0 && res.data.list && res.data.list.length > 0) {
+          const file = res.data.list[0];
+          const streamUrl = file.dlink;
+          const fileName = file.server_filename || 'Terabox Video';
+
+          if (streamUrl) {
+            return { url: streamUrl, name: fileName };
+          }
+        }
+      } catch (err) {
+        console.error(`[Extractor] Domain ${baseDomain} error:`, err.message);
+      }
     }
   } catch (err) {
-    console.error('[Extractor] Error:', err.message);
+    console.error('[Extractor Critical Error]:', err.message);
   }
   return null;
 }
@@ -333,6 +353,7 @@ bot.on('message', async (msg) => {
   );
 
   if (!teraboxUrl) {
+    // Agar link TeraBox ka nahi mila toh user ko inform karein
     return;
   }
 
