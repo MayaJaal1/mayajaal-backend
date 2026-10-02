@@ -52,7 +52,7 @@ const mtprotoClient = new TelegramClient(new StringSession(''), API_ID, API_HASH
 })();
 
 // ═══════════════════════════════════════════
-// 2. EXPRESS HTTP SERVER & STREAM PROXY (HTTP 206 Enabled)
+// 2. EXPRESS HTTP SERVER & DIRECT STREAM PROXY
 // ═══════════════════════════════════════════
 const app = express();
 const PORT = process.env.PORT || 8080;
@@ -78,7 +78,7 @@ app.get(['/version.json', '/check-update', '/api/check-update'], (req, res) => {
     latestVersionName: "v1.1.0",
     updateUrl: "https://mayajaal.online/download.html",
     forceUpdate: false,
-    changelog: "⚡ Fast player, Terabox & Diskwala streaming active!"
+    changelog: "⚡ Fast player streaming active!"
   });
 });
 
@@ -91,43 +91,16 @@ app.get(['/download', '/download.html'], (req, res) => {
   res.status(404).send('download.html not found');
 });
 
-app.get('/.well-known/assetlinks.json', (req, res) => {
-  res.set('Content-Type', 'application/json');
-  res.json([{
-    relation: ["delegate_permission/common.handle_all_urls"],
-    target: {
-      namespace: "android_app",
-      package_name: "com.example.mayajaall",
-      sha256_cert_fingerprints: [
-        "11:EE:5A:9A:37:60:BB:80:3F:5E:4F:9B:3B:88:C4:C2:14:6A:C4:2E:D0:60:B1:98:20:9E:58:F8:2D:7F:ED:74"
-      ]
-    }
-  }]);
-});
-
-app.post('/save-key', async (req, res) => {
-  try {
-    const { telegram_id, key } = req.body;
-    if (!telegram_id || !key) return res.status(400).json({ success: false });
-    await redis.set(`matrix_key:${key}`, String(telegram_id), { ex: 30 * 86400 });
-    res.json({ success: true });
-  } catch (err) {
-    res.status(500).json({ success: false, error: err.message });
-  }
-});
-
-app.get('/verify-key/:key', async (req, res) => {
-  try {
-    const tgId = await redis.get(`matrix_key:${req.params.key}`);
-    res.json({ valid: !!tgId, telegram_id: tgId || null });
-  } catch (err) {
-    res.status(500).json({ valid: false, error: err.message });
-  }
-});
-
+// Custom Embedded Player with Auto-Fallback
 function servePlayerPage(req, res) {
+  const id = req.params.id;
   const playerFile = path.join(__dirname, 'player.html');
-  if (fs.existsSync(playerFile)) return res.sendFile(playerFile);
+  
+  if (fs.existsSync(playerFile)) {
+    return res.sendFile(playerFile);
+  }
+
+  // Inline Fallback Web Player
   res.send(`
     <!DOCTYPE html>
     <html lang="en">
@@ -136,14 +109,30 @@ function servePlayerPage(req, res) {
       <meta name="viewport" content="width=device-width, initial-scale=1.0">
       <title>MayaJaal Stream Player</title>
       <style>
-        body { background: #07090e; color: #00ff88; font-family: monospace; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; margin: 0; }
-        video { width: 92%; max-width: 850px; border-radius: 12px; box-shadow: 0 0 25px rgba(0,255,136,0.3); outline: none; }
-        h3 { margin-bottom: 15px; letter-spacing: 1px; }
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { background: #07090e; color: #00ff88; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, monospace; display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 100vh; padding: 15px; }
+        .player-card { width: 100%; max-width: 900px; background: #0f172a; border: 1px solid #1e293b; border-radius: 16px; padding: 15px; box-shadow: 0 10px 30px rgba(0, 255, 136, 0.15); }
+        video { width: 100%; border-radius: 10px; background: #000; outline: none; aspect-ratio: 16/9; max-height: 70vh; }
+        .title { margin-top: 12px; font-size: 16px; font-weight: bold; color: #f8fafc; }
+        .badge { display: inline-block; background: #00ff8822; color: #00ff88; padding: 4px 10px; border-radius: 6px; font-size: 12px; margin-bottom: 10px; font-weight: 600; }
       </style>
     </head>
     <body>
-      <h3>⚡ MAYAJAAL CLOUD STREAM</h3>
-      <video id="player" controls autoplay playsinline src="/stream/${req.params.id}"></video>
+      <div class="player-card">
+        <span class="badge">MAYAJAAL CLOUD PLAYER</span>
+        <video id="player" controls autoplay playsinline preload="auto">
+          <source src="/stream/${id}" type="video/mp4">
+          Aapka browser video tag support nahi karta.
+        </video>
+        <div class="title" id="vidTitle">MayaJaal Streaming Video</div>
+      </div>
+      <script>
+        fetch('/api/stream-info/${id}')
+          .then(r => r.json())
+          .then(d => {
+            if(d.title) document.getElementById('vidTitle').innerText = d.title;
+          }).catch(()=>{});
+      </script>
     </body>
     </html>
   `);
@@ -152,26 +141,39 @@ function servePlayerPage(req, res) {
 app.get('/v/:id', (req, res) => servePlayerPage(req, res));
 app.get('/tb/:id', (req, res) => servePlayerPage(req, res));
 
-// DIRECT STREAM ENGINE (Cloud Range 206 Streaming)
+// ───────────────────────────────────────────
+// DIRECT STREAM ENGINE (Playable Fast Route)
+// ───────────────────────────────────────────
 app.get('/stream/:id', async (req, res) => {
   try {
     const id = req.params.id;
     let data = linkStore.get(id);
+
     if (!data) {
       const raw = await redis.get(`video:${id}`) || await redis.get(`terabox:${id}`);
       if (raw) data = typeof raw === 'string' ? JSON.parse(raw) : raw;
     }
 
-    if (!data || !data.url) return res.status(404).send('Stream link missing or expired');
+    if (!data || !data.url) {
+      return res.status(404).send('Stream link missing or expired');
+    }
 
+    const targetUrl = data.url;
+
+    // 1. Agar Telegram ka direct file URL hai, toh redirect kar dein taaki fast stream ho sake
+    if (targetUrl.includes('api.telegram.org') || targetUrl.includes('telegram')) {
+      return res.redirect(302, targetUrl);
+    }
+
+    // 2. Terabox aur Diskwala ke liye range proxy headers
     const rawCookie = process.env.TERABOX_COOKIE || 'ndus=Yzdpm64teHuiTpyF1tSZ-m4ANxhFN7shhUG1hMNu;';
     const cookie = rawCookie.includes('ndus=') ? rawCookie : `ndus=${rawCookie};`;
 
-    const isTerabox = data.url.includes('terabox') || data.url.includes('1024tera') || data.url.includes('baidupcs');
+    const isTerabox = targetUrl.includes('terabox') || targetUrl.includes('1024tera') || targetUrl.includes('baidupcs');
 
     const headers = {
       'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36',
-      'Referer': isTerabox ? 'https://www.1024tera.com/' : (data.url.includes('diskwala') ? 'https://diskwala.com/' : 'https://mayajaal.online/'),
+      'Referer': isTerabox ? 'https://www.1024tera.com/' : (targetUrl.includes('diskwala') ? 'https://diskwala.com/' : 'https://mayajaal.online/'),
       'Cookie': cookie,
       'Accept': '*/*'
     };
@@ -180,14 +182,12 @@ app.get('/stream/:id', async (req, res) => {
       headers['Range'] = req.headers.range;
     }
 
-    const videoStream = await axios.get(data.url, {
+    const videoStream = await axios.get(targetUrl, {
       responseType: 'stream',
       headers: headers,
       maxRedirects: 10,
-      beforeRedirect: (options) => {
-        options.headers = { ...options.headers, ...headers };
-      },
-      timeout: 180000
+      validateStatus: (status) => status >= 200 && status < 400,
+      timeout: 120000
     });
 
     res.status(videoStream.status);
@@ -199,7 +199,14 @@ app.get('/stream/:id', async (req, res) => {
     videoStream.data.pipe(res);
   } catch (err) {
     console.error('[Stream Error]:', err.message);
-    if (!res.headersSent) res.status(500).send('Streaming error');
+    if (!res.headersSent) {
+      // Fallback: direct redirect agar proxy pipe fail ho jaye
+      try {
+        let fallbackData = linkStore.get(req.params.id);
+        if (fallbackData && fallbackData.url) return res.redirect(302, fallbackData.url);
+      } catch (e) {}
+      res.status(500).send('Streaming error: ' + err.message);
+    }
   }
 });
 
@@ -240,7 +247,7 @@ const bot = new TelegramBot(TOKEN, { polling: { autoStart: true, params: { timeo
 
 bot.on('polling_error', (error) => {
   if (error.message && error.message.includes('409 Conflict')) {
-    console.error('⚠️ [409 Conflict]: Duplicate bot instance detected.');
+    console.error('⚠️ [409 Conflict]: Ek se zyada bot instances active hain.');
   }
 });
 
@@ -317,6 +324,19 @@ async function extractDiskwalaLink(diskwalaUrl) {
       'Referer': 'https://diskwala.com/'
     };
 
+    // Scrape HTML for direct video source
+    try {
+      const pageRes = await axios.get(diskwalaUrl, { headers: baseHeaders, timeout: 8000 });
+      const html = pageRes.data;
+      if (typeof html === 'string') {
+        const streamMatch = html.match(/"(https?:\/\/[^"]+\.(mp4|m3u8)[^"]*)"/i) || 
+                            html.match(/src=["'](https?:\/\/[^"']+)["']/i);
+        if (streamMatch && streamMatch[1]) {
+          return { url: streamMatch[1], name: 'Diskwala Video' };
+        }
+      }
+    } catch (e) {}
+
     const apis = [
       `https://www.diskwala.com/api/post/${fileId}`,
       `https://diskwala.com/api/file/${fileId}`,
@@ -375,7 +395,7 @@ bot.onText(/\/start/, (msg) => {
     `🎬 <b>Welcome to MayaJaal Stream Engine!</b>\n\n` +
     `• Koi bhi <b>Video file upload</b> karein\n` +
     `• Ya <b>MayaJaal, Terabox, Diskwala</b> ka link bhejein\n\n` +
-    `Aapko turant working cloud streaming link mil jayega!`,
+    `Aapko working cloud streaming link mil jayega jo seedha player mein chalega!`,
     { parse_mode: 'HTML' }
   );
 });
@@ -423,17 +443,15 @@ bot.on('message', async (msg) => {
     }
   }
 
-  // Case B: Link Conversion (MayaJaal, Terabox, Diskwala)
+  // Case B: Link Conversion (MayaJaal, Terabox, Diskwala, or Any MP4 Link)
   const incomingText = (msg.text || msg.caption || '').trim();
   if (!incomingText || incomingText.startsWith('/')) return;
 
   const urlRegex = /(https?:\/\/[^\s<>"']+)/gi;
   const matches = incomingText.match(urlRegex) || [];
-  const targetUrl = matches.find(url => 
-    /(mayajaal|diskwala|terabox|1024tera|teraboxlink)/i.test(url)
-  );
-
-  if (!targetUrl) return;
+  
+  if (matches.length === 0) return;
+  const targetUrl = matches[0];
 
   const statusMsg = await bot.sendMessage(chatId, `🔄 <i>Link convert kiya ja raha hai...</i>`, { parse_mode: 'HTML' });
 
@@ -444,8 +462,11 @@ bot.on('message', async (msg) => {
       extracted = await extractMayaJaalLink(targetUrl);
     } else if (/diskwala/i.test(targetUrl)) {
       extracted = await extractDiskwalaLink(targetUrl);
-    } else {
+    } else if (/(terabox|1024tera|teraboxlink)/i.test(targetUrl)) {
       extracted = await extractTeraboxLink(targetUrl);
+    } else {
+      // Direct playable link support
+      extracted = { url: targetUrl, name: 'Web Stream Video' };
     }
 
     if (!extracted || !extracted.url) {
@@ -456,6 +477,7 @@ bot.on('message', async (msg) => {
     const shortId = crypto.randomBytes(4).toString('hex');
     const payload = { url: extracted.url, name: extracted.name, uploader: uploaderName };
 
+    // Redis aur memory dono me save karein taaki instantly load ho sake
     linkStore.set(shortId, payload);
     await redis.set(`video:${shortId}`, JSON.stringify(payload), { ex: 30 * 86400 });
 
@@ -470,3 +492,4 @@ bot.on('message', async (msg) => {
     bot.sendMessage(chatId, `❌ <b>Error:</b> <code>${escapeHtml(err.message)}</code>`, { parse_mode: 'HTML' });
   }
 });
+                    
