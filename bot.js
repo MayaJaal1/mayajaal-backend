@@ -21,11 +21,10 @@ const linkStore = new Map();
 
 const TOKEN = process.env.BOT_TOKEN;
 
-// Auto-detect variable names (aliases support)
-const rawApiId = process.env.TELEGRAM_API_ID || process.env.API_ID || '';
+// Credentials Auto-Detection
+const rawApiId = process.env.TELEGRAM_API_ID || process.env.API_ID || '35399167';
 const API_ID = parseInt(String(rawApiId).trim(), 10);
-const API_HASH = String(process.env.TELEGRAM_API_HASH || process.env.API_HASH || '').trim();
-const STRING_SESSION = String(process.env.TELEGRAM_STRING_SESSION || process.env.SESSION_STRING || process.env.STRING_SESSION || '').trim();
+const API_HASH = String(process.env.TELEGRAM_API_HASH || process.env.API_HASH || '88a34526a5e73078110072770dd85e5b').trim();
 const STORAGE_CHANNEL_ID = String(process.env.STORAGE_CHANNEL_ID || process.env.CHANNEL_ID || '').trim();
 
 const BASE_URL = process.env.CUSTOM_DOMAIN 
@@ -38,13 +37,13 @@ if (!TOKEN) {
 }
 
 // ═══════════════════════════════════════════
-// 1. GRAMJS MTPROTO CLIENT (2GB Streaming Engine)
+// 1. GRAMJS BOT-TOKEN MTPROTO AUTH (NO SESSION STRING NEEDED!)
 // ═══════════════════════════════════════════
 let tgClient = null;
 
-if (!isNaN(API_ID) && API_ID > 0 && API_HASH && STRING_SESSION) {
+if (!isNaN(API_ID) && API_ID > 0 && API_HASH && TOKEN) {
   tgClient = new TelegramClient(
-    new StringSession(STRING_SESSION),
+    new StringSession(''), // Empty session: Direct bot token login
     API_ID,
     API_HASH,
     { connectionRetries: 5 }
@@ -52,18 +51,16 @@ if (!isNaN(API_ID) && API_ID > 0 && API_HASH && STRING_SESSION) {
 
   (async () => {
     try {
-      await tgClient.connect();
-      console.log('✅ GramJS MTProto Client connected successfully (2GB Vault Stream Active)!');
+      await tgClient.start({
+        botAuthToken: TOKEN
+      });
+      console.log('✅ GramJS Connected via BOT_TOKEN! 2GB Cloudflare Zero-Buffer Active!');
     } catch (e) {
-      console.error('❌ GramJS Connection Failed:', e.message);
+      console.error('❌ GramJS Bot Token Auth Error:', e.message);
     }
   })();
 } else {
-  console.warn('⚠️ Credentials check details:', {
-    hasApiId: !isNaN(API_ID) && API_ID > 0,
-    hasApiHash: Boolean(API_HASH),
-    hasSession: Boolean(STRING_SESSION)
-  });
+  console.warn('⚠️ API_ID, API_HASH ya BOT_TOKEN missing hai.');
 }
 
 // ═══════════════════════════════════════════
@@ -185,7 +182,6 @@ app.get('/stream/:id', async (req, res) => {
 
     if (!data) return res.status(404).send('Stream unavailable');
 
-    // Headers for Cloudflare Edge Optimization
     res.setHeader('Cache-Control', 'public, max-age=86400');
     res.setHeader('Accept-Ranges', 'bytes');
 
@@ -333,13 +329,13 @@ function escapeHtml(str = '') {
 }
 
 // ───────────────────────────────────────────
-// A. EXTRACTORS (Auto-Redirects & Fast Endpoints)
+// A. EXTRACTORS (Terabox Redirects & API Resolvers)
 // ───────────────────────────────────────────
 async function extractTeraboxLink(rawUrl) {
   try {
     let resolvedUrl = rawUrl;
     
-    // Follow redirect if short domain like teraboxlink.com
+    // Auto-follow teraboxlink redirects
     try {
       const resp = await axios.get(rawUrl, {
         maxRedirects: 5,
@@ -467,9 +463,9 @@ async function extractMayaJaalLink(mayaUrl) {
 bot.onText(/\/start/, (msg) => {
   bot.sendMessage(msg.chat.id,
     `🎬 <b>MayaJaal 2GB Cloudflare Streamer</b>\n\n` +
-    `• <b>2GB Video Upload:</b> Telegram Channel Storage Vault + Cloudflare CDN Player\n` +
-    `• <b>Bulk Links:</b> Teraboxlink, Terabox, Diskwala ke multiple links bhejein\n` +
-    `• <b>API Setup:</b> <code>/api</code> se connect karein`,
+    `• <b>2GB Video Upload:</b> Telegram Vault Storage + Fast CDN Streaming\n` +
+    `• <b>Bulk Converter:</b> Teraboxlink, Terabox, Diskwala links bhejein\n` +
+    `• <b>API Setup:</b> <code>/api</code> command se connect karein`,
     { parse_mode: 'HTML' }
   );
 });
