@@ -10,7 +10,7 @@ const { StringSession } = require('telegram/sessions');
 const { NewMessage } = require('telegram/events');
 
 // ═══════════════════════════════════════════
-// 0. CONFIG & MEMORY + REDIS STORES
+// 0. CONFIG & REDIS
 // ═══════════════════════════════════════════
 const redis = Redis.fromEnv();
 const videoStore = new Map();
@@ -26,7 +26,7 @@ const BASE_URL = process.env.CUSTOM_DOMAIN
   : 'https://mayajaal.online';
 
 if (!BOT_TOKEN || !RAW_CHANNEL_ID) {
-  console.error('❌ BOT_TOKEN ya STORAGE_CHANNEL_ID missing hain!');
+  console.error('❌ BOT_TOKEN ya STORAGE_CHANNEL_ID missing!');
   process.exit(1);
 }
 
@@ -39,7 +39,6 @@ const PORT = process.env.PORT || 3000;
 app.use(express.json());
 app.use(express.static(__dirname));
 
-// Universal CORS & Streaming Headers
 app.use((req, res, next) => {
   res.header('Access-Control-Allow-Origin', '*');
   res.header('Access-Control-Allow-Headers', '*');
@@ -152,17 +151,13 @@ app.get('/v/:id', (req, res) => {
 app.get('/api/stream-info/:id', async (req, res) => {
   try {
     const id = req.params.id;
-    console.log(`[Stream-Info] Request for ID: ${id}`);
     let data = videoStore.get(id);
     if (!data) {
       const redisData = await redis.get(`video:${id}`);
       if (redisData) data = typeof redisData === 'string' ? JSON.parse(redisData) : redisData;
     }
 
-    if (!data) {
-      console.log(`[Stream-Info] Video NOT FOUND for ID: ${id}`);
-      return res.status(404).json({ success: false, message: 'Stream not found' });
-    }
+    if (!data) return res.status(404).json({ success: false, message: 'Stream not found' });
 
     res.json({
       success: true,
@@ -172,11 +167,9 @@ app.get('/api/stream-info/:id', async (req, res) => {
       id: id
     });
   } catch (err) {
-    console.error('[Stream-Info] Error:', err.message);
     res.status(500).json({ success: false, error: err.message });
   }
-});// Storage Peer Entity Resolver
-let cachedTargetEntity = null;
+});let cachedTargetEntity = null;
 async function getStorageEntity() {
   if (cachedTargetEntity) return cachedTargetEntity;
   try {
@@ -198,8 +191,6 @@ async function getStorageEntity() {
 // 🌟 Reliable 2GB Streaming Endpoint for ExoPlayer & Web
 app.get('/stream/:id', async (req, res) => {
   const id = req.params.id;
-  console.log(`[Stream] Incoming stream request for ID: ${id}, Range: ${req.headers.range || 'Full'}`);
-
   try {
     let meta = videoStore.get(id);
     if (!meta) {
@@ -207,8 +198,8 @@ app.get('/stream/:id', async (req, res) => {
       if (rawData) meta = typeof rawData === 'string' ? JSON.parse(rawData) : rawData;
     }
 
-    if (!meta) {
-      console.log(`[Stream] Video meta not found for ID: ${id}`);
+    if (!meta || !meta.messageId) {
+      console.log(`[Stream] Metadata ya messageId missing for ID: ${id}`);
       return res.status(404).send('Video not found or expired');
     }
 
@@ -217,7 +208,7 @@ app.get('/stream/:id', async (req, res) => {
     const targetMsg = messages && messages.length ? messages[0] : null;
 
     if (!targetMsg || !targetMsg.media) {
-      console.log(`[Stream] Media missing in Telegram channel for messageId: ${meta.messageId}`);
+      console.log(`[Stream] Media missing in channel for messageId: ${meta.messageId}`);
       return res.status(404).send('Media not found on Telegram');
     }
 
@@ -272,10 +263,9 @@ app.get('/stream/:id', async (req, res) => {
     }
 
     if (!res.writableEnded) res.end();
-    console.log(`[Stream] Streamed successfully for ID: ${id}`);
 
   } catch (err) {
-    console.error('[Stream] Streaming pipeline error:', err.message);
+    console.error('[Stream] Streaming error:', err.message);
     if (!res.headersSent) res.status(500).send('Stream connection error');
   }
 });
@@ -413,7 +403,18 @@ tgClient.addEventHandler(async (event) => {
         fromPeer: chatId,
       });
 
-      const storedMsg = stored[0];
+      // Safe Message ID Resolver
+      let targetMessageId = null;
+      if (Array.isArray(stored) && stored.length > 0) {
+        targetMessageId = stored[0]?.id;
+      } else if (stored && stored.id) {
+        targetMessageId = stored.id;
+      }
+
+      if (!targetMessageId) {
+        throw new Error('Channel forward success, par Message ID retrieve nahi hui');
+      }
+
       const doc = message.media.document;
       const sizeBytes = doc ? Number(doc.size) : 0;
       const sizeMB = sizeBytes ? (sizeBytes / (1024 * 1024)).toFixed(2) : null;
@@ -427,18 +428,17 @@ tgClient.addEventHandler(async (event) => {
 
       const shortId = crypto.randomBytes(4).toString('hex');
       const payload = {
-        messageId: storedMsg.id,
+        messageId: Number(targetMessageId),
         size: sizeBytes,
         mimeType: doc?.mimeType || 'video/mp4',
         name: fileName,
         uploader: uploaderName,
       };
 
-      // 1. Memory Store (Instant Fallback)
       videoStore.set(shortId, payload);
-
-      // 2. Redis Store (Persistent for 30 days)
       await redis.set(`video:${shortId}`, JSON.stringify(payload), { ex: 30 * 86400 });
+
+      console.log(`✅ Stored Video shortId: ${shortId} -> Channel Msg ID: ${targetMessageId}`);
 
       const playUrl = `${BASE_URL}/v/${shortId}`;
 
