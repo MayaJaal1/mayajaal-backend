@@ -185,9 +185,11 @@ app.get('/stream/:id', async (req, res) => {
     const rawCookie = process.env.TERABOX_COOKIE || 'ndus=Yzdpm64teHuiTpyF1tSZ-m4ANxhFN7shhUG1hMNu;';
     const cookie = rawCookie.includes('ndus=') ? rawCookie : `ndus=${rawCookie};`;
 
+    const isTerabox = data.url.includes('terabox') || data.url.includes('1024tera') || data.url.includes('baidupcs');
+
     const headers = {
       'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36',
-      'Referer': data.url.includes('terabox') || data.url.includes('1024tera') ? 'https://www.1024tera.com/' : 'https://diskwala.com/',
+      'Referer': isTerabox ? 'https://www.1024tera.com/' : 'https://diskwala.com/',
       'Cookie': cookie,
       'Accept': '*/*'
     };
@@ -249,7 +251,7 @@ app.get(['/api/stream-info/:id', '/api/tb/:id', '/api/v/:id'], async (req, res) 
 app.listen(PORT, () => {
   console.log(`✅ MayaJaal Web Server active on port ${PORT}`);
 });
-// ═══════════════════════════════════════════
+        // ═══════════════════════════════════════════
 // 3. BOT CONTROLLER & ADVANCED EXTRACTORS
 // ═══════════════════════════════════════════
 const bot = new TelegramBot(TOKEN, { polling: { autoStart: true, params: { timeout: 10 } } });
@@ -353,26 +355,60 @@ async function extractDiskwalaLink(diskwalaUrl) {
 }
 
 // ───────────────────────────────────────────
-// B. MULTI-ENGINE TERABOX EXTRACTOR
+// B. DIRECT COOKIE-BASED TERABOX EXTRACTOR
 // ───────────────────────────────────────────
 async function extractTeraboxLink(teraboxUrl) {
-  const match = teraboxUrl.match(/\/s\/([a-zA-Z0-9_-]+)/i);
-  const surl = match ? match[1] : '';
+  const rawCookie = process.env.TERABOX_COOKIE || 'ndus=Yzdpm64teHuiTpyF1tSZ-m4ANxhFN7shhUG1hMNu;';
+  const cookie = rawCookie.includes('ndus=') ? rawCookie : `ndus=${rawCookie};`;
 
-  // Engine 1: Terabox Direct SURL Resolver
-  if (surl) {
+  const match = teraboxUrl.match(/\/s\/([a-zA-Z0-9_-]+)/i);
+  let shorturl = match ? match[1] : '';
+  if (shorturl.startsWith('1')) shorturl = shorturl.substring(1);
+
+  const baseHeaders = {
+    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36',
+    'Referer': 'https://www.1024tera.com/',
+    'Cookie': cookie,
+    'Accept': 'application/json, text/plain, */*'
+  };
+
+  // 1. Direct Terabox Official Share List API using Railway Cookie
+  if (shorturl) {
     try {
-      const res = await axios.get(`https://terabox.hnn.workers.dev/api/get-info?shorturl=${surl}`, { timeout: 12000 });
-      if (res.data && res.data.downloadLink) {
-        return { 
-          url: res.data.downloadLink, 
-          name: res.data.fileName || res.data.title || 'Terabox Video' 
-        };
+      const apiUrl = `https://www.1024tera.com/share/list?app_id=250528&shorturl=${shorturl}&root=1`;
+      const res = await axios.get(apiUrl, { headers: baseHeaders, timeout: 15000 });
+      
+      if (res.data?.errno === 0 && res.data?.list?.length > 0) {
+        const file = res.data.list[0];
+        const streamUrl = file.dlink || file.direct_link || file.url;
+        if (streamUrl) {
+          return {
+            url: streamUrl,
+            name: file.server_filename || file.filename || 'Terabox Video'
+          };
+        }
+      }
+    } catch (err) {
+      console.error('[Terabox Official API Error]:', err.message);
+    }
+
+    // 2. ShortURL Info Fallback API
+    try {
+      const infoUrl = `https://www.1024tera.com/api/shorturlinfo?shorturl=${shorturl}&app_id=250528`;
+      const infoRes = await axios.get(infoUrl, { headers: baseHeaders, timeout: 12000 });
+      if (infoRes.data?.list?.length > 0) {
+        const item = infoRes.data.list[0];
+        if (item.dlink) {
+          return {
+            url: item.dlink,
+            name: item.server_filename || 'Terabox Video'
+          };
+        }
       }
     } catch (e) {}
   }
 
-  // Engine 2: Alternative Worker API
+  // 3. Fallback Worker API (agar direct API par captcha ya rate limit ho)
   try {
     const res = await axios.post('https://terabox-downloader.ashlynn.workers.dev/api', 
       { url: teraboxUrl }, 
@@ -382,18 +418,6 @@ async function extractTeraboxLink(teraboxUrl) {
       return { 
         url: res.data.downloadUrl || res.data.url || res.data.dlink, 
         name: res.data.fileName || 'Terabox Video' 
-      };
-    }
-  } catch (e) {}
-
-  // Engine 3: Rapid Worker Gateway
-  try {
-    const res = await axios.get(`https://terabox-api-five.vercel.app/api?url=${encodeURIComponent(teraboxUrl)}`, { timeout: 10000 });
-    const direct = res.data?.download_url || res.data?.dlink || res.data?.direct_link;
-    if (direct) {
-      return { 
-        url: direct, 
-        name: res.data.file_name || 'Terabox Video' 
       };
     }
   } catch (e) {}
@@ -626,3 +650,4 @@ bot.on('message', async (msg) => {
     bot.sendMessage(chatId, `❌ <b>Error:</b> <code>${escapeHtml(err.message)}</code>`, { parse_mode: 'HTML' });
   }
 });
+             
