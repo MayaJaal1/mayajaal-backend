@@ -18,6 +18,7 @@ const redis = Redis.fromEnv();
 const linkStore = new Map();
 
 const TOKEN = process.env.BOT_TOKEN;
+const STORAGE_CHANNEL_ID = process.env.STORAGE_CHANNEL_ID || ''; // Aapke storage channel ki ID
 const WEB_PAGE_URL = process.env.WEB_PAGE_URL || 'https://mayajaal.online/key';
 const BASE_URL = process.env.CUSTOM_DOMAIN 
   ? (process.env.CUSTOM_DOMAIN.startsWith('http') ? process.env.CUSTOM_DOMAIN : `https://${process.env.CUSTOM_DOMAIN}`)
@@ -45,7 +46,7 @@ app.use((req, res, next) => {
   next();
 });
 
-app.get('/', (req, res) => res.send('MayaJaal Stream Engine is Active!'));
+app.get('/', (req, res) => res.send('MayaJaal Stream & Storage Engine is Active!'));
 app.get('/health', (req, res) => res.json({ status: 'ok', uptime: process.uptime() }));
 
 app.get(['/version.json', '/check-update', '/api/check-update'], (req, res) => {
@@ -205,7 +206,7 @@ function buildSuccessMessage(user, fileName, shortUrl) {
     parts.push(user.bold ? `<b>${escapeHtml(user.header)}</b>` : escapeHtml(user.header));
     parts.push('');
   }
-  parts.push(`✨ <b>MayaJaal Stream Ready!</b>`);
+  parts.push(`✨ <b>MayaJaal Stream Ready (Permanent Backup)!</b>`);
   parts.push('');
   parts.push(`📌 <b>File:</b> ${escapeHtml(fileName)}`);
   parts.push('');
@@ -215,34 +216,29 @@ function buildSuccessMessage(user, fileName, shortUrl) {
     parts.push(user.bold ? `<b>${escapeHtml(user.footer)}</b>` : escapeHtml(user.footer));
   }
   parts.push('');
-  parts.push(`⚡ <i>Instant Cloud Playback</i>`);
+  parts.push(`⚡ <i>Permanent Cloud Playback</i>`);
   return parts.join('\n');
 }
 
 // ───────────────────────────────────────────
-// A. DISKWALA COMPLETE MULTI-STAGE EXTRACTOR
+// A. DISKWALA EXTRACTOR
 // ───────────────────────────────────────────
 async function extractDiskwalaLink(diskwalaUrl) {
   try {
-    console.log(`[Diskwala] Processing link: ${diskwalaUrl}`);
     const match = diskwalaUrl.match(/\/(app|view|file|p|post|d)\/([a-zA-Z0-9_-]+)/i) || diskwalaUrl.match(/diskwala\.com\/([a-zA-Z0-9_-]+)/i);
     const fileId = match ? (match[2] || match[1]) : null;
-
     if (!fileId) return null;
 
     const reqHeaders = {
       'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
       'Referer': diskwalaUrl,
-      'Origin': 'https://www.diskwala.com',
-      'Accept': 'application/json, text/plain, */*'
+      'Accept': '*/*'
     };
 
-    // 1. Target Direct API endpoints used by Diskwala frontend
     const endpoints = [
       `https://www.diskwala.com/api/post/${fileId}`,
       `https://www.diskwala.com/api/v1/post/get?id=${fileId}`,
-      `https://www.diskwala.com/api/file/${fileId}`,
-      `https://diskwala.com/api/post/details/${fileId}`
+      `https://www.diskwala.com/api/file/${fileId}`
     ];
 
     for (const ep of endpoints) {
@@ -250,69 +246,28 @@ async function extractDiskwalaLink(diskwalaUrl) {
         const res = await axios.get(ep, { headers: reqHeaders, timeout: 6000 });
         const d = res.data;
         if (d) {
-          const direct = d.stream_url || d.video_url || d.url || d.download_url || d.file?.url || d.post?.video_url || d.post?.file_url;
+          const direct = d.stream_url || d.video_url || d.url || d.download_url || d.file?.url || d.post?.video_url;
           if (direct) {
-            return {
-              url: direct,
-              name: d.name || d.title || d.post?.title || 'Diskwala Video'
-            };
+            return { url: direct, name: d.name || d.title || d.post?.title || 'Diskwala Video' };
           }
         }
       } catch (e) {}
     }
 
-    // 2. Fetch Embed Route
-    const embedUrls = [
-      `https://www.diskwala.com/embed/${fileId}`,
-      `https://www.diskwala.com/watch/${fileId}`,
-      diskwalaUrl
-    ];
+    const pageRes = await axios.get(diskwalaUrl, { headers: reqHeaders, timeout: 10000 });
+    const html = typeof pageRes.data === 'string' ? pageRes.data : JSON.stringify(pageRes.data);
 
-    for (const u of embedUrls) {
-      try {
-        const pageRes = await axios.get(u, {
-          headers: {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-            'Referer': 'https://www.diskwala.com/'
-          },
-          timeout: 8000
-        });
+    const m = html.match(/(https?:\/\/[^\s"'<>]+\.(?:mp4|m3u8)[^\s"'<>]*)/i) ||
+              html.match(/source:\s*["']([^"']+)["']/i) ||
+              html.match(/file:\s*["']([^"']+)["']/i);
 
-        const html = typeof pageRes.data === 'string' ? pageRes.data : JSON.stringify(pageRes.data);
-
-        // Check JSON state
-        const nextMatch = html.match(/<script id="__NEXT_DATA__"[^>]*>([\s\S]*?)<\/script>/i);
-        if (nextMatch && nextMatch[1]) {
-          try {
-            const parsed = JSON.parse(nextMatch[1]);
-            const p = parsed?.props?.pageProps;
-            const post = p?.post || p?.file || p?.data || p?.video;
-            if (post) {
-              const stream = post.stream_url || post.url || post.video_url || post.download_url;
-              if (stream) {
-                return {
-                  url: stream,
-                  name: post.title || post.name || 'Diskwala Video'
-                };
-              }
-            }
-          } catch (err) {}
-        }
-
-        // Direct media regex match
-        const m = html.match(/(https?:\/\/[^\s"'<>]+\.(?:mp4|m3u8)[^\s"'<>]*)/i) ||
-                  html.match(/source:\s*["']([^"']+)["']/i) ||
-                  html.match(/file:\s*["']([^"']+)["']/i);
-
-        if (m && m[1]) {
-          const titleMatch = html.match(/<title>([^<]+)<\/title>/i);
-          const name = titleMatch ? titleMatch[1].replace(/-\s*Diskwala.*/i, '').trim() : 'Diskwala Video';
-          return { url: m[1], name };
-        }
-      } catch (err) {}
+    if (m && m[1]) {
+      const titleMatch = html.match(/<title>([^<]+)<\/title>/i);
+      const name = titleMatch ? titleMatch[1].replace(/-\s*Diskwala.*/i, '').trim() : 'Diskwala Video';
+      return { url: m[1], name };
     }
   } catch (err) {
-    console.error('[Diskwala Extractor Global Error]:', err.message);
+    console.error('[Diskwala Error]:', err.message);
   }
   return null;
 }
@@ -332,10 +287,7 @@ async function extractTeraboxLink(teraboxUrl) {
       const sharePageUrl = `https://www.terabox1024.com/sharing/link?surl=${surl}`;
 
       const pageRes = await axios.get(sharePageUrl, {
-        headers: {
-          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)',
-          'Cookie': cookie
-        },
+        headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)', 'Cookie': cookie },
         timeout: 10000
       });
 
@@ -345,11 +297,7 @@ async function extractTeraboxLink(teraboxUrl) {
 
       const listApi = `https://www.terabox1024.com/share/list?app_id=250528&shorturl=${surl}&root=1${jsToken ? `&jsToken=${jsToken}` : ''}`;
       const listRes = await axios.get(listApi, {
-        headers: {
-          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)',
-          'Cookie': cookie,
-          'Referer': sharePageUrl
-        },
+        headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)', 'Cookie': cookie, 'Referer': sharePageUrl },
         timeout: 10000
       });
 
@@ -383,12 +331,12 @@ async function extractTeraboxLink(teraboxUrl) {
 }
 
 // ───────────────────────────────────────────
-// C. COMMANDS
+// C. BOT COMMANDS
 // ───────────────────────────────────────────
 bot.onText(/\/start/, (msg) => {
   bot.sendMessage(msg.chat.id,
     `🎬 <b>Welcome to MayaJaal Converter Bot!</b>\n\n` +
-    `Bhejo koi bhi <b>Diskwala ya Terabox link</b> aur turant stream link pao.\n\n` +
+    `Bhejo koi bhi <b>Diskwala ya Terabox link</b> aur turant permanent stream link pao.\n\n` +
     `<b>Commands:</b>\n` +
     `/api - Matrix key link karein\n` +
     `/logout - Disconnect karein\n` +
@@ -449,7 +397,7 @@ bot.onText(/\/add_footer(?:\s+([\s\S]+))?/, async (msg, match) => {
 });
 
 // ═══════════════════════════════════════════
-// 3. MASTER HANDLER
+// 3. MASTER HANDLER (AUTO-BACKUP TO CHANNEL)
 // ═══════════════════════════════════════════
 bot.on('message', async (msg) => {
   const chatId = msg.chat.id;
@@ -457,7 +405,6 @@ bot.on('message', async (msg) => {
 
   if (!incomingContent || incomingContent.startsWith('/')) return;
 
-  // Extract URLs
   const urlRegex = /(https?:\/\/[^\s<>"']+)/gi;
   const matches = incomingContent.match(urlRegex) || [];
   
@@ -480,7 +427,7 @@ bot.on('message', async (msg) => {
 
   let statusMsg = null;
   try {
-    statusMsg = await bot.sendMessage(chatId, `🔄 <i>Converting Link to MayaJaal Stream...</i>`, { parse_mode: 'HTML' });
+    statusMsg = await bot.sendMessage(chatId, `🔄 <i>Extracting & Securing Video...</i>`, { parse_mode: 'HTML' });
   } catch (e) {}
 
   try {
@@ -498,9 +445,31 @@ bot.on('message', async (msg) => {
       return bot.sendMessage(chatId, `❌ <b>Link convert nahi ho saka (Link expired ya unsupported).</b>`, { parse_mode: 'HTML' });
     }
 
+    let finalPlayUrl = extracted.url;
+
+    // STORAGE BACKUP: Video ko Storage Channel mein upload karna
+    if (STORAGE_CHANNEL_ID) {
+      try {
+        console.log(`[Backup] Uploading video to storage channel: ${STORAGE_CHANNEL_ID}`);
+        const sentMsg = await bot.sendVideo(STORAGE_CHANNEL_ID, extracted.url, {
+          caption: `📁 <b>${escapeHtml(extracted.name)}</b>\n👤 Added by: ${uploaderName}\n🔗 Original: ${targetUrl}`,
+          parse_mode: 'HTML'
+        });
+
+        // Agar channel upload safal ho gaya, toh Telegram direct file link le lo
+        if (sentMsg?.video?.file_id) {
+          const directFile = await bot.getFileLink(sentMsg.video.file_id);
+          finalPlayUrl = directFile;
+          console.log(`[Backup] File permanently secured in Telegram channel!`);
+        }
+      } catch (uploadErr) {
+        console.warn(`[Backup Warning] Channel upload skipped/failed (${uploadErr.message}). Using direct source stream.`);
+      }
+    }
+
     const shortId = crypto.randomBytes(4).toString('hex');
     const payload = {
-      url: extracted.url,
+      url: finalPlayUrl,
       name: extracted.name,
       uploader: uploaderName,
     };
