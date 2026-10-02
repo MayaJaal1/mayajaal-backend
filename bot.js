@@ -9,6 +9,10 @@ const { TelegramClient, Api } = require('telegram');
 const { StringSession } = require('telegram/sessions');
 const { NewMessage } = require('telegram/events');
 
+// Crash Prevention Guards
+process.on('uncaughtException', (err) => console.error('[UncaughtException Caught]:', err.message));
+process.on('unhandledRejection', (reason) => console.error('[UnhandledRejection Caught]:', reason));
+
 // ═══════════════════════════════════════════
 // 0. CONFIG & REDIS
 // ═══════════════════════════════════════════
@@ -26,7 +30,7 @@ const BASE_URL = process.env.CUSTOM_DOMAIN
   : 'https://mayajaal.online';
 
 if (!BOT_TOKEN || !RAW_CHANNEL_ID) {
-  console.error('❌ BOT_TOKEN ya STORAGE_CHANNEL_ID missing!');
+  console.error('❌ BOT_TOKEN ya STORAGE_CHANNEL_ID missing hain!');
   process.exit(1);
 }
 
@@ -199,7 +203,6 @@ app.get('/stream/:id', async (req, res) => {
     }
 
     if (!meta || !meta.messageId) {
-      console.log(`[Stream] Metadata ya messageId missing for ID: ${id}`);
       return res.status(404).send('Video not found or expired');
     }
 
@@ -208,7 +211,6 @@ app.get('/stream/:id', async (req, res) => {
     const targetMsg = messages && messages.length ? messages[0] : null;
 
     if (!targetMsg || !targetMsg.media) {
-      console.log(`[Stream] Media missing in channel for messageId: ${meta.messageId}`);
       return res.status(404).send('Media not found on Telegram');
     }
 
@@ -265,7 +267,7 @@ app.get('/stream/:id', async (req, res) => {
     if (!res.writableEnded) res.end();
 
   } catch (err) {
-    console.error('[Stream] Streaming error:', err.message);
+    console.error('[Stream] Error:', err.message);
     if (!res.headersSent) res.status(500).send('Stream connection error');
   }
 });
@@ -275,10 +277,12 @@ app.listen(PORT, () => {
 });
 
 // ═══════════════════════════════════════════
-// 2. GRAMJS MTPROTO CLIENT (2GB ENGINE)
+// 2. GRAMJS MTPROTO CLIENT (FLOOD SAFE)
 // ═══════════════════════════════════════════
 const tgClient = new TelegramClient(new StringSession(''), API_ID, API_HASH, {
-  connectionRetries: 5,
+  connectionRetries: 10,
+  autoReconnect: true,
+  floodSleepThreshold: 300, // 300 seconds tak Telegram flood wait handle karega
   useWSS: false,
 });
 
@@ -403,7 +407,6 @@ tgClient.addEventHandler(async (event) => {
         fromPeer: chatId,
       });
 
-      // Safe Message ID Resolver
       let targetMessageId = null;
       if (Array.isArray(stored) && stored.length > 0) {
         targetMessageId = stored[0]?.id;
@@ -412,7 +415,7 @@ tgClient.addEventHandler(async (event) => {
       }
 
       if (!targetMessageId) {
-        throw new Error('Channel forward success, par Message ID retrieve nahi hui');
+        throw new Error('Message ID nahi mil saki');
       }
 
       const doc = message.media.document;
@@ -438,7 +441,7 @@ tgClient.addEventHandler(async (event) => {
       videoStore.set(shortId, payload);
       await redis.set(`video:${shortId}`, JSON.stringify(payload), { ex: 30 * 86400 });
 
-      console.log(`✅ Stored Video shortId: ${shortId} -> Channel Msg ID: ${targetMessageId}`);
+      console.log(`✅ Stored Video shortId: ${shortId} -> MsgID: ${targetMessageId}`);
 
       const playUrl = `${BASE_URL}/v/${shortId}`;
 
@@ -460,8 +463,12 @@ tgClient.addEventHandler(async (event) => {
 }, new NewMessage({ incoming: true }));
 
 (async () => {
-  await tgClient.start({
-    botAuthToken: BOT_TOKEN,
-  });
-  console.log('🚀 MayaJaal 2GB GramJS Engine successfully logged in and running!');
+  try {
+    await tgClient.start({
+      botAuthToken: BOT_TOKEN,
+    });
+    console.log('🚀 MayaJaal 2GB GramJS Engine successfully logged in and running!');
+  } catch (err) {
+    console.error('Telegram start error (waiting before retry):', err.message);
+  }
 })();
