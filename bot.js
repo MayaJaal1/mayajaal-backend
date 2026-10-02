@@ -220,82 +220,99 @@ function buildSuccessMessage(user, fileName, shortUrl) {
 }
 
 // ───────────────────────────────────────────
-// A. DISKWALA ADVANCED EXTRACTOR
+// A. DISKWALA COMPLETE MULTI-STAGE EXTRACTOR
 // ───────────────────────────────────────────
 async function extractDiskwalaLink(diskwalaUrl) {
   try {
+    console.log(`[Diskwala] Processing link: ${diskwalaUrl}`);
     const match = diskwalaUrl.match(/\/(app|view|file|p|post|d)\/([a-zA-Z0-9_-]+)/i) || diskwalaUrl.match(/diskwala\.com\/([a-zA-Z0-9_-]+)/i);
     const fileId = match ? (match[2] || match[1]) : null;
 
     if (!fileId) return null;
 
-    const baseHeaders = {
+    const reqHeaders = {
       'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
       'Referer': diskwalaUrl,
-      'Accept': '*/*'
+      'Origin': 'https://www.diskwala.com',
+      'Accept': 'application/json, text/plain, */*'
     };
 
-    // Strategy 1: Post API Endpoint
-    const apiEndpoints = [
+    // 1. Target Direct API endpoints used by Diskwala frontend
+    const endpoints = [
       `https://www.diskwala.com/api/post/${fileId}`,
-      `https://diskwala.com/api/post/${fileId}`,
+      `https://www.diskwala.com/api/v1/post/get?id=${fileId}`,
       `https://www.diskwala.com/api/file/${fileId}`,
-      `https://diskwala.com/api/v1/post/get?id=${fileId}`,
-      `https://diskwala.com/api/v1/files/${fileId}`
+      `https://diskwala.com/api/post/details/${fileId}`
     ];
 
-    for (const ep of apiEndpoints) {
+    for (const ep of endpoints) {
       try {
-        const apiRes = await axios.get(ep, { headers: baseHeaders, timeout: 7000 });
-        const d = apiRes.data;
+        const res = await axios.get(ep, { headers: reqHeaders, timeout: 6000 });
+        const d = res.data;
         if (d) {
-          const directUrl = d.stream_url || d.url || d.download_url || d.file?.url || d.post?.video_url || d.data?.url || d.data?.stream_url;
-          if (directUrl) {
+          const direct = d.stream_url || d.video_url || d.url || d.download_url || d.file?.url || d.post?.video_url || d.post?.file_url;
+          if (direct) {
             return {
-              url: directUrl,
-              name: d.name || d.title || d.post?.title || d.data?.title || 'Diskwala Video'
+              url: direct,
+              name: d.name || d.title || d.post?.title || 'Diskwala Video'
             };
           }
         }
       } catch (e) {}
     }
 
-    // Strategy 2: Web page scrape with Next.js state extraction
-    const pageRes = await axios.get(diskwalaUrl, { headers: baseHeaders, timeout: 10000 });
-    const html = typeof pageRes.data === 'string' ? pageRes.data : JSON.stringify(pageRes.data);
+    // 2. Fetch Embed Route
+    const embedUrls = [
+      `https://www.diskwala.com/embed/${fileId}`,
+      `https://www.diskwala.com/watch/${fileId}`,
+      diskwalaUrl
+    ];
 
-    // Look for embedded JSON payload or direct streams
-    const jsonMatch = html.match(/<script id="__NEXT_DATA__" type="application\/json">([\s\S]*?)<\/script>/i);
-    if (jsonMatch && jsonMatch[1]) {
+    for (const u of embedUrls) {
       try {
-        const nextData = JSON.parse(jsonMatch[1]);
-        const postData = nextData?.props?.pageProps?.post || nextData?.props?.pageProps?.file || nextData?.props?.pageProps?.data;
-        if (postData) {
-          const streamUrl = postData.stream_url || postData.url || postData.video_url || postData.download_url;
-          if (streamUrl) {
-            return {
-              url: streamUrl,
-              name: postData.title || postData.name || 'Diskwala Video'
-            };
-          }
+        const pageRes = await axios.get(u, {
+          headers: {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+            'Referer': 'https://www.diskwala.com/'
+          },
+          timeout: 8000
+        });
+
+        const html = typeof pageRes.data === 'string' ? pageRes.data : JSON.stringify(pageRes.data);
+
+        // Check JSON state
+        const nextMatch = html.match(/<script id="__NEXT_DATA__"[^>]*>([\s\S]*?)<\/script>/i);
+        if (nextMatch && nextMatch[1]) {
+          try {
+            const parsed = JSON.parse(nextMatch[1]);
+            const p = parsed?.props?.pageProps;
+            const post = p?.post || p?.file || p?.data || p?.video;
+            if (post) {
+              const stream = post.stream_url || post.url || post.video_url || post.download_url;
+              if (stream) {
+                return {
+                  url: stream,
+                  name: post.title || post.name || 'Diskwala Video'
+                };
+              }
+            }
+          } catch (err) {}
         }
-      } catch (e) {}
-    }
 
-    // Direct stream match (m3u8, mp4)
-    const mediaMatch = html.match(/source:\s*["']([^"']+)["']/i) ||
-                       html.match(/file:\s*["']([^"']+)["']/i) ||
-                       html.match(/<source[^>]+src=["']([^"']+)["']/i) ||
-                       html.match(/["'](https?:\/\/[^"']+\.(?:mp4|m3u8)[^"']*)["']/i);
+        // Direct media regex match
+        const m = html.match(/(https?:\/\/[^\s"'<>]+\.(?:mp4|m3u8)[^\s"'<>]*)/i) ||
+                  html.match(/source:\s*["']([^"']+)["']/i) ||
+                  html.match(/file:\s*["']([^"']+)["']/i);
 
-    const titleMatch = html.match(/<title>([^<]+)<\/title>/i);
-    const cleanTitle = titleMatch ? titleMatch[1].replace(/-\s*Diskwala.*/i, '').trim() : 'Diskwala Video';
-
-    if (mediaMatch && mediaMatch[1]) {
-      return { url: mediaMatch[1], name: cleanTitle };
+        if (m && m[1]) {
+          const titleMatch = html.match(/<title>([^<]+)<\/title>/i);
+          const name = titleMatch ? titleMatch[1].replace(/-\s*Diskwala.*/i, '').trim() : 'Diskwala Video';
+          return { url: m[1], name };
+        }
+      } catch (err) {}
     }
   } catch (err) {
-    console.error('[Diskwala Extractor Error]:', err.message);
+    console.error('[Diskwala Extractor Global Error]:', err.message);
   }
   return null;
 }
@@ -366,7 +383,7 @@ async function extractTeraboxLink(teraboxUrl) {
 }
 
 // ───────────────────────────────────────────
-// C. BOT COMMANDS
+// C. COMMANDS
 // ───────────────────────────────────────────
 bot.onText(/\/start/, (msg) => {
   bot.sendMessage(msg.chat.id,
