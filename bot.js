@@ -299,39 +299,46 @@ async function extractDiskwalaLink(diskwalaUrl) {
 }
 
 // ───────────────────────────────────────────
-// B. ROBUST TERABOX EXTRACTOR (All Domains & Surl Formats)
+// B. UNIVERSAL TERABOX EXTRACTOR (Redirect & Domain Auto-Fix)
 // ───────────────────────────────────────────
 async function extractTeraboxLink(teraboxUrl) {
   const rawCookie = process.env.TERABOX_COOKIE || 'ndus=Yzdpm64teHuiTpyF1tSZ-m4ANxhFN7shhUG1hMNu;';
   const cookie = rawCookie.includes('ndus=') ? rawCookie : `ndus=${rawCookie};`;
 
-  // 1. Resolve redirect to get canonical URL
-  let resolvedUrl = teraboxUrl;
+  // Step 1: Follow redirects to find the canonical 1024tera / terabox URL
+  let targetCleanUrl = teraboxUrl;
   try {
-    const headRes = await axios.get(teraboxUrl, {
+    const head = await axios.get(teraboxUrl, {
       maxRedirects: 5,
-      headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)' },
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36'
+      },
       timeout: 8000
     });
-    if (headRes.request?.res?.responseUrl) {
-      resolvedUrl = headRes.request.res.responseUrl;
+    if (head.request?.res?.responseUrl) {
+      targetCleanUrl = head.request.res.responseUrl;
     }
   } catch (e) {}
 
-  // 2. Extract surl key
-  const match = resolvedUrl.match(/(\/s\/|surl=)([a-zA-Z0-9_-]+)/) || teraboxUrl.match(/(\/s\/|surl=)([a-zA-Z0-9_-]+)/);
+  // Step 2: Extract Surl Key correctly
+  const match = targetCleanUrl.match(/(\/s\/|surl=)([a-zA-Z0-9_-]+)/) || teraboxUrl.match(/(\/s\/|surl=)([a-zA-Z0-9_-]+)/);
   if (match) {
-    let rawKey = match[2];
+    const rawCode = match[2];
+    // Test both full code and stripped leading-1 code
     const surlVariants = [
-      rawKey,
-      rawKey.startsWith('1') ? rawKey.substring(1) : `1${rawKey}`
+      rawCode.startsWith('1') ? rawCode.substring(1) : rawCode,
+      rawCode
     ];
 
     for (const surl of surlVariants) {
       try {
         const sharePageUrl = `https://www.terabox1024.com/sharing/link?surl=${surl}`;
         const pageRes = await axios.get(sharePageUrl, {
-          headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)', 'Cookie': cookie },
+          headers: {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+            'Cookie': cookie,
+            'Referer': 'https://www.terabox1024.com/'
+          },
           timeout: 10000
         });
 
@@ -341,13 +348,18 @@ async function extractTeraboxLink(teraboxUrl) {
 
         const listApi = `https://www.terabox1024.com/share/list?app_id=250528&shorturl=${surl}&root=1${jsToken ? `&jsToken=${jsToken}` : ''}`;
         const listRes = await axios.get(listApi, {
-          headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)', 'Cookie': cookie, 'Referer': sharePageUrl },
+          headers: {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)',
+            'Cookie': cookie,
+            'Referer': sharePageUrl
+          },
           timeout: 10000
         });
 
         if (listRes.data && listRes.data.errno === 0 && listRes.data.list && listRes.data.list.length > 0) {
           const file = listRes.data.list[0];
           if (file.dlink) {
+            console.log(`[Terabox Native] Extracted: ${file.server_filename}`);
             return { url: file.dlink, name: file.server_filename || 'Terabox Video' };
           }
         }
@@ -355,27 +367,30 @@ async function extractTeraboxLink(teraboxUrl) {
     }
   }
 
-  // 3. Fallback Multi-API Extractors
-  const fallbackApis = [
+  // Step 3: Reliable Multi-Gateway Fallbacks
+  const shortCode = match ? match[2] : '';
+  const fallbackUrls = [
     `https://terabox-api-direct.onrender.com/api?url=${encodeURIComponent(teraboxUrl)}`,
     `https://ytbvideolyrics.com/api/tb?url=${encodeURIComponent(teraboxUrl)}`,
-    `https://terabox-dl.qtcloud.workers.dev/api/get-info?shorturl=${match ? match[2] : ''}`
+    `https://terabox-dl.qtcloud.workers.dev/api/get-info?shorturl=${shortCode}`
   ];
 
-  for (const endpoint of fallbackApis) {
+  for (const endpoint of fallbackUrls) {
     try {
       const res = await axios.get(endpoint, { timeout: 10000 });
       const d = res.data;
-      const download = d?.download_url || d?.dlink || d?.direct_link || d?.downloadLink;
-      if (download) {
+      const direct = d?.download_url || d?.dlink || d?.direct_link || d?.downloadLink;
+      if (direct) {
+        console.log(`[Terabox Fallback] Extracted via gateway`);
         return {
-          url: download,
+          url: direct,
           name: d.file_name || d.title || d.fileName || 'Terabox Video'
         };
       }
     } catch (e) {}
   }
 
+  console.error('[Terabox Extractor] All extraction methods failed for:', teraboxUrl);
   return null;
 }
 
@@ -597,4 +612,4 @@ bot.on('message', async (msg) => {
     bot.sendMessage(chatId, `❌ <b>Error:</b> <code>${escapeHtml(err.message)}</code>`, { parse_mode: 'HTML' });
   }
 });
-  
+      
