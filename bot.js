@@ -13,7 +13,7 @@ const { NewMessage } = require('telegram/events');
 // 0. CONFIG & MEMORY + REDIS STORES
 // ═══════════════════════════════════════════
 const redis = Redis.fromEnv();
-const videoStore = new Map(); // Redis fail/delay hone par safe memory backup
+const videoStore = new Map();
 
 const API_ID = parseInt(process.env.TELEGRAM_API_ID || '35399167', 10);
 const API_HASH = process.env.TELEGRAM_API_HASH || '88a34526a5e73078110072770dd85e5b';
@@ -39,7 +39,7 @@ const PORT = process.env.PORT || 3000;
 app.use(express.json());
 app.use(express.static(__dirname));
 
-// Universal CORS headers for ExoPlayer / Web
+// Universal CORS & Streaming Headers
 app.use((req, res, next) => {
   res.header('Access-Control-Allow-Origin', '*');
   res.header('Access-Control-Allow-Headers', '*');
@@ -152,13 +152,17 @@ app.get('/v/:id', (req, res) => {
 app.get('/api/stream-info/:id', async (req, res) => {
   try {
     const id = req.params.id;
+    console.log(`[Stream-Info] Request for ID: ${id}`);
     let data = videoStore.get(id);
     if (!data) {
       const redisData = await redis.get(`video:${id}`);
       if (redisData) data = typeof redisData === 'string' ? JSON.parse(redisData) : redisData;
     }
 
-    if (!data) return res.status(404).json({ success: false, message: 'Stream not found' });
+    if (!data) {
+      console.log(`[Stream-Info] Video NOT FOUND for ID: ${id}`);
+      return res.status(404).json({ success: false, message: 'Stream not found' });
+    }
 
     res.json({
       success: true,
@@ -168,6 +172,7 @@ app.get('/api/stream-info/:id', async (req, res) => {
       id: id
     });
   } catch (err) {
+    console.error('[Stream-Info] Error:', err.message);
     res.status(500).json({ success: false, error: err.message });
   }
 });// Storage Peer Entity Resolver
@@ -192,21 +197,27 @@ async function getStorageEntity() {
 
 // 🌟 Reliable 2GB Streaming Endpoint for ExoPlayer & Web
 app.get('/stream/:id', async (req, res) => {
+  const id = req.params.id;
+  console.log(`[Stream] Incoming stream request for ID: ${id}, Range: ${req.headers.range || 'Full'}`);
+
   try {
-    const id = req.params.id;
     let meta = videoStore.get(id);
     if (!meta) {
       const rawData = await redis.get(`video:${id}`);
       if (rawData) meta = typeof rawData === 'string' ? JSON.parse(rawData) : rawData;
     }
 
-    if (!meta) return res.status(404).send('Video not found or expired');
+    if (!meta) {
+      console.log(`[Stream] Video meta not found for ID: ${id}`);
+      return res.status(404).send('Video not found or expired');
+    }
 
     const channelPeer = await getStorageEntity();
     const messages = await tgClient.getMessages(channelPeer, { ids: [Number(meta.messageId)] });
     const targetMsg = messages && messages.length ? messages[0] : null;
 
     if (!targetMsg || !targetMsg.media) {
+      console.log(`[Stream] Media missing in Telegram channel for messageId: ${meta.messageId}`);
       return res.status(404).send('Media not found on Telegram');
     }
 
@@ -248,7 +259,7 @@ app.get('/stream/:id', async (req, res) => {
       file: targetMsg.media,
       offset: BigInt(start),
       limit: requestedLimit,
-      requestSize: 1024 * 128, // 128KB fast initial buffer
+      requestSize: 1024 * 128,
     });
 
     req.on('close', () => {
@@ -261,9 +272,10 @@ app.get('/stream/:id', async (req, res) => {
     }
 
     if (!res.writableEnded) res.end();
+    console.log(`[Stream] Streamed successfully for ID: ${id}`);
 
   } catch (err) {
-    console.error('Streaming pipeline error:', err.message);
+    console.error('[Stream] Streaming pipeline error:', err.message);
     if (!res.headersSent) res.status(500).send('Stream connection error');
   }
 });
