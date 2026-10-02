@@ -9,9 +9,8 @@ const { TelegramClient, Api } = require('telegram');
 const { StringSession } = require('telegram/sessions');
 const { NewMessage } = require('telegram/events');
 
-// Crash Prevention Guards
-process.on('uncaughtException', (err) => console.error('[UncaughtException Caught]:', err.message));
-process.on('unhandledRejection', (reason) => console.error('[UnhandledRejection Caught]:', reason));
+process.on('uncaughtException', (err) => console.error('[UncaughtException]:', err.message));
+process.on('unhandledRejection', (reason) => console.error('[UnhandledRejection]:', reason));
 
 // ═══════════════════════════════════════════
 // 0. CONFIG & REDIS
@@ -282,7 +281,7 @@ app.listen(PORT, () => {
 const tgClient = new TelegramClient(new StringSession(''), API_ID, API_HASH, {
   connectionRetries: 10,
   autoReconnect: true,
-  floodSleepThreshold: 300, // 300 seconds tak Telegram flood wait handle karega
+  floodSleepThreshold: 300,
   useWSS: false,
 });
 
@@ -402,23 +401,22 @@ tgClient.addEventHandler(async (event) => {
     try {
       const channelPeer = await getStorageEntity();
 
-      const stored = await tgClient.forwardMessages(channelPeer, {
+      // Forward to channel
+      await tgClient.forwardMessages(channelPeer, {
         messages: [message.id],
         fromPeer: chatId,
       });
 
-      let targetMessageId = null;
-      if (Array.isArray(stored) && stored.length > 0) {
-        targetMessageId = stored[0]?.id;
-      } else if (stored && stored.id) {
-        targetMessageId = stored.id;
+      // 🌟 Direct & Bulletproof ID Resolver: Get the newly created message directly from channel
+      const channelMessages = await tgClient.getMessages(channelPeer, { limit: 1 });
+      const targetMessage = channelMessages && channelMessages.length ? channelMessages[0] : null;
+
+      if (!targetMessage || !targetMessage.id) {
+        throw new Error('Channel forward to hua par video retrieve nahi ho saki');
       }
 
-      if (!targetMessageId) {
-        throw new Error('Message ID nahi mil saki');
-      }
-
-      const doc = message.media.document;
+      const targetMessageId = targetMessage.id;
+      const doc = message.media.document || targetMessage.media?.document;
       const sizeBytes = doc ? Number(doc.size) : 0;
       const sizeMB = sizeBytes ? (sizeBytes / (1024 * 1024)).toFixed(2) : null;
 
@@ -441,7 +439,7 @@ tgClient.addEventHandler(async (event) => {
       videoStore.set(shortId, payload);
       await redis.set(`video:${shortId}`, JSON.stringify(payload), { ex: 30 * 86400 });
 
-      console.log(`✅ Stored Video shortId: ${shortId} -> MsgID: ${targetMessageId}`);
+      console.log(`✅ Stored Video shortId: ${shortId} -> Channel Msg ID: ${targetMessageId}`);
 
       const playUrl = `${BASE_URL}/v/${shortId}`;
 
@@ -469,6 +467,6 @@ tgClient.addEventHandler(async (event) => {
     });
     console.log('🚀 MayaJaal 2GB GramJS Engine successfully logged in and running!');
   } catch (err) {
-    console.error('Telegram start error (waiting before retry):', err.message);
+    console.error('Telegram start error:', err.message);
   }
 })();
