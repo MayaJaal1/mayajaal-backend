@@ -25,7 +25,7 @@ const BASE_URL = process.env.CUSTOM_DOMAIN
   : 'https://mayajaal.online';
 
 if (!BOT_TOKEN || !RAW_CHANNEL_ID) {
-  console.error('❌ BOT_TOKEN ya STORAGE_CHANNEL_ID environment variables missing hain!');
+  console.error('❌ BOT_TOKEN ya STORAGE_CHANNEL_ID missing hain!');
   process.exit(1);
 }
 
@@ -38,10 +38,10 @@ const PORT = process.env.PORT || 3000;
 app.use(express.json());
 app.use(express.static(__dirname));
 
-// CORS headers taaki mobile app stream reject na kare
+// Universal CORS & Streaming Headers
 app.use((req, res, next) => {
   res.header('Access-Control-Allow-Origin', '*');
-  res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Range');
+  res.header('Access-Control-Allow-Headers', '*');
   res.header('Access-Control-Allow-Methods', 'GET, POST, OPTIONS, HEAD');
   res.header('Access-Control-Expose-Headers', 'Content-Range, Accept-Ranges, Content-Length, Content-Type');
   if (req.method === 'OPTIONS') return res.sendStatus(200);
@@ -103,8 +103,7 @@ app.get('/verify-key/:key', async (req, res) => {
   } catch (err) {
     res.status(500).json({ valid: false, error: err.message });
   }
-});// History APIs
-app.post('/api/history/save', async (req, res) => {
+});app.post('/api/history/save', async (req, res) => {
   try {
     const { telegram_id, video } = req.body;
     if (!telegram_id || !video) return res.status(400).json({ success: false });
@@ -164,77 +163,97 @@ app.get('/api/stream-info/:id', async (req, res) => {
   }
 });
 
-// Fixed 2GB Telegram Video Stream Engine (Supports Range Request)
+// Robust Storage Peer Resolver
+let cachedTargetEntity = null;
+async function getStorageEntity() {
+  if (cachedTargetEntity) return cachedTargetEntity;
+  try {
+    let clean = RAW_CHANNEL_ID.trim();
+    if (clean.startsWith('-100')) {
+      clean = clean.substring(4);
+    } else if (clean.startsWith('-')) {
+      clean = clean.substring(1);
+    }
+    const channelIdBigInt = BigInt(clean);
+    cachedTargetEntity = await tgClient.getInputEntity(new Api.PeerChannel({ channelId: channelIdBigInt }));
+    return cachedTargetEntity;
+  } catch (e) {
+    cachedTargetEntity = await tgClient.getInputEntity(RAW_CHANNEL_ID);
+    return cachedTargetEntity;
+  }
+}
+
+// 🌟 Reliable 2GB Streaming Endpoint for ExoPlayer & Web
 app.get('/stream/:id', async (req, res) => {
   try {
     const rawData = await redis.get(`video:${req.params.id}`);
     if (!rawData) return res.status(404).send('Video not found or expired');
     const meta = typeof rawData === 'string' ? JSON.parse(rawData) : rawData;
 
-    let targetPeer;
-    try {
-      targetPeer = await tgClient.getInputEntity(RAW_CHANNEL_ID);
-    } catch (e) {
-      const cleanId = RAW_CHANNEL_ID.replace(/^-100/, '');
-      targetPeer = await tgClient.getInputEntity(cleanId);
-    }
-
-    const messages = await tgClient.getMessages(targetPeer, { ids: [Number(meta.messageId)] });
-    const targetMsg = messages ? messages[0] : null;
+    const channelPeer = await getStorageEntity();
+    const messages = await tgClient.getMessages(channelPeer, { ids: [Number(meta.messageId)] });
+    const targetMsg = messages && messages.length ? messages[0] : null;
 
     if (!targetMsg || !targetMsg.media) {
-      return res.status(404).send('Media message not found in Telegram storage channel');
+      return res.status(404).send('Media not found on Telegram');
     }
 
     const totalSize = Number(meta.size);
     const mimeType = meta.mimeType || 'video/mp4';
-    const range = req.headers.range;
+    const rangeHeader = req.headers.range;
 
-    if (range) {
-      const parts = range.replace(/bytes=/, '').split('-');
-      const start = parseInt(parts[0], 10);
-      const end = parts[1] ? parseInt(parts[1], 10) : totalSize - 1;
-      const chunksize = (end - start) + 1;
+    let start = 0;
+    let end = totalSize - 1;
+
+    if (rangeHeader) {
+      const parts = rangeHeader.replace(/bytes=/, '').split('-');
+      start = parseInt(parts[0], 10);
+      if (parts[1]) end = parseInt(parts[1], 10);
+
+      if (start >= totalSize || end >= totalSize) {
+        res.status(416).set('Content-Range', `bytes */${totalSize}`).end();
+        return;
+      }
 
       res.writeHead(206, {
         'Content-Range': `bytes ${start}-${end}/${totalSize}`,
         'Accept-Ranges': 'bytes',
-        'Content-Length': chunksize,
+        'Content-Length': (end - start) + 1,
         'Content-Type': mimeType,
+        'Cache-Control': 'no-cache',
       });
-
-      const streamIterator = tgClient.iterDownload({
-        file: targetMsg.media,
-        offset: BigInt(start),
-        limit: chunksize,
-        requestSize: 1024 * 256,
-      });
-
-      for await (const chunk of streamIterator) {
-        if (res.writableEnded) break;
-        res.write(chunk);
-      }
-      res.end();
     } else {
       res.writeHead(200, {
         'Content-Length': totalSize,
         'Content-Type': mimeType,
         'Accept-Ranges': 'bytes',
+        'Cache-Control': 'no-cache',
       });
-
-      const streamIterator = tgClient.iterDownload({
-        file: targetMsg.media,
-        requestSize: 1024 * 256,
-      });
-
-      for await (const chunk of streamIterator) {
-        if (res.writableEnded) break;
-        res.write(chunk);
-      }
-      res.end();
     }
+
+    const requestedLimit = (end - start) + 1;
+    const downloadIterator = tgClient.iterDownload({
+      file: targetMsg.media,
+      offset: BigInt(start),
+      limit: requestedLimit,
+      requestSize: 1024 * 128, // 128KB delivers instant first packet
+    });
+
+    req.on('close', () => {
+      if (downloadIterator && downloadIterator.return) {
+        downloadIterator.return();
+      }
+    });
+
+    for await (const chunk of downloadIterator) {
+      if (res.writableEnded || res.destroyed) break;
+      res.write(chunk);
+    }
+
+    if (!res.writableEnded) res.end();
+
   } catch (err) {
-    console.error('Stream playback error:', err.message);
+    console.error('Streaming pipeline error:', err.message);
     if (!res.headersSent) res.status(500).send('Stream connection error');
   }
 });
@@ -246,6 +265,7 @@ app.listen(PORT, () => {
 // ═══════════════════════════════════════════
 const tgClient = new TelegramClient(new StringSession(''), API_ID, API_HASH, {
   connectionRetries: 5,
+  useWSS: false,
 });
 
 async function getUser(chatId) {
@@ -362,15 +382,9 @@ tgClient.addEventHandler(async (event) => {
     });
 
     try {
-      let targetPeer;
-      try {
-        targetPeer = await tgClient.getInputEntity(RAW_CHANNEL_ID);
-      } catch (e) {
-        const cleanId = RAW_CHANNEL_ID.replace(/^-100/, '');
-        targetPeer = await tgClient.getInputEntity(cleanId);
-      }
+      const channelPeer = await getStorageEntity();
 
-      const stored = await tgClient.forwardMessages(targetPeer, {
+      const stored = await tgClient.forwardMessages(channelPeer, {
         messages: [message.id],
         fromPeer: chatId,
       });
