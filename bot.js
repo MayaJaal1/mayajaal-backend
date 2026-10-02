@@ -177,7 +177,7 @@ app.listen(PORT, () => {
 });
 
 // ═══════════════════════════════════════════
-// 2. BOT CONTROLLER & EXTRACTOR
+// 2. BOT CONTROLLER & RESILIENT EXTRACTOR
 // ═══════════════════════════════════════════
 const bot = new TelegramBot(TOKEN, { polling: true });
 
@@ -220,54 +220,69 @@ function buildSuccessMessage(user, fileName, shortUrl) {
 }
 
 async function extractTeraboxLink(teraboxUrl) {
-  try {
-    const rawCookie = process.env.TERABOX_COOKIE || 'ndus=Yzdpm64teHuiTpyF1tSZ-m4ANxhFN7shhUG1hMNu;';
-    const cookie = rawCookie.includes('ndus=') ? rawCookie : `ndus=${rawCookie};`;
-
-    const match = teraboxUrl.match(/(\/s\/|surl=)([a-zA-Z0-9_-]+)/);
-    if (!match) return null;
-
-    let surl = match[2];
-    if (surl.startsWith('1')) surl = surl.substring(1);
-
-    const domains = [
-      'https://www.terabox1024.com',
-      'https://www.1024terabox.com',
-      'https://www.terabox.app'
-    ];
-
-    for (const baseDomain of domains) {
-      try {
-        const apiUrl = `${baseDomain}/share/list?app_id=250528&shorturl=${surl}&root=1`;
-
-        const res = await axios.get(apiUrl, {
-          headers: {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
-            'Cookie': cookie,
-            'Referer': `${baseDomain}/sharing/link?surl=${surl}`,
-            'Accept': 'application/json, text/plain, */*'
-          },
-          timeout: 15000
-        });
-
-        console.log(`[Extractor] Response from ${baseDomain}:`, res.data?.errno);
-
-        if (res.data && res.data.errno === 0 && res.data.list && res.data.list.length > 0) {
-          const file = res.data.list[0];
-          const streamUrl = file.dlink;
-          const fileName = file.server_filename || 'Terabox Video';
-
-          if (streamUrl) {
-            return { url: streamUrl, name: fileName };
-          }
-        }
-      } catch (err) {
-        console.error(`[Extractor] Domain ${baseDomain} error:`, err.message);
+  const extractAPIs = [
+    // 1. High Speed Worker Gateway
+    async (url) => {
+      const res = await axios.get(`https://terabox-api-server.vercel.app/api?url=${encodeURIComponent(url)}`, { timeout: 12000 });
+      if (res.data?.download_link || res.data?.direct_link) {
+        return {
+          url: res.data.download_link || res.data.direct_link,
+          name: res.data.file_name || res.data.title || 'Terabox Video'
+        };
       }
+      return null;
+    },
+    // 2. Backup Direct Worker
+    async (url) => {
+      const res = await axios.post(`https://terabox-downloader-gamma.vercel.app/api`, 
+        { url: url }, 
+        { headers: { 'Content-Type': 'application/json' }, timeout: 12000 }
+      );
+      if (res.data?.dlink || res.data?.download_url) {
+        return {
+          url: res.data.dlink || res.data.download_url,
+          name: res.data.file_name || 'Terabox Video'
+        };
+      }
+      return null;
+    },
+    // 3. Official Web Endpoint (Cookie Fallback)
+    async (url) => {
+      const rawCookie = process.env.TERABOX_COOKIE || 'ndus=Yzdpm64teHuiTpyF1tSZ-m4ANxhFN7shhUG1hMNu;';
+      const cookie = rawCookie.includes('ndus=') ? rawCookie : `ndus=${rawCookie};`;
+      const match = url.match(/(\/s\/|surl=)([a-zA-Z0-9_-]+)/);
+      if (!match) return null;
+      let surl = match[2];
+      if (surl.startsWith('1')) surl = surl.substring(1);
+      
+      const res = await axios.get(`https://www.terabox1024.com/share/list?app_id=250528&shorturl=${surl}&root=1`, {
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+          'Cookie': cookie,
+          'Referer': `https://www.terabox1024.com/sharing/link?surl=${surl}`
+        },
+        timeout: 10000
+      });
+      if (res.data?.errno === 0 && res.data?.list?.length) {
+        return { url: res.data.list[0].dlink, name: res.data.list[0].server_filename || 'Terabox Video' };
+      }
+      return null;
     }
-  } catch (err) {
-    console.error('[Extractor Critical Error]:', err.message);
+  ];
+
+  for (let i = 0; i < extractAPIs.length; i++) {
+    try {
+      console.log(`[Extractor] Trying strategy #${i + 1}...`);
+      const result = await extractAPIs[i](teraboxUrl);
+      if (result && result.url) {
+        console.log(`[Extractor] Strategy #${i + 1} Success!`);
+        return result;
+      }
+    } catch (err) {
+      console.log(`[Extractor] Strategy #${i + 1} failed: ${err.message}`);
+    }
   }
+
   return null;
 }
 
