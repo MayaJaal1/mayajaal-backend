@@ -242,13 +242,12 @@ function buildSuccessMessage(user, fileName, shortUrl, backedUp = false) {
 }
 
 // ───────────────────────────────────────────
-// A. DISKWALA STREAM EXTRACTOR
+// A. DISKWALA EXTRACTOR
 // ───────────────────────────────────────────
 async function extractDiskwalaLink(diskwalaUrl) {
   try {
     const match = diskwalaUrl.match(/\/(app|view|file|p|post|d)\/([a-zA-Z0-9_-]+)/i) || diskwalaUrl.match(/diskwala\.com\/([a-zA-Z0-9_-]+)/i);
     const fileId = match ? (match[2] || match[1]) : null;
-
     if (!fileId) return null;
 
     const baseHeaders = {
@@ -273,25 +272,6 @@ async function extractDiskwalaLink(diskwalaUrl) {
         }
       } catch (e) {}
     }
-
-    const targetPages = [`https://www.diskwala.com/embed/${fileId}`, diskwalaUrl];
-    for (const pUrl of targetPages) {
-      try {
-        const page = await axios.get(pUrl, { headers: baseHeaders, timeout: 8000 });
-        const html = typeof page.data === 'string' ? page.data : JSON.stringify(page.data);
-
-        const m = html.match(/(https?:\/\/[^\s"'<>]+\.(?:m3u8|mp4)[^\s"'<>]*)/i) ||
-                  html.match(/src:\s*["']([^"']+)["']/i) ||
-                  html.match(/source:\s*["']([^"']+)["']/i) ||
-                  html.match(/file:\s*["']([^"']+)["']/i);
-
-        if (m && m[1]) {
-          const titleM = html.match(/<title>([^<]+)<\/title>/i);
-          const name = titleM ? titleM[1].replace(/-\s*Diskwala.*/i, '').trim() : 'Diskwala Video';
-          return { url: m[1], name };
-        }
-      } catch (err) {}
-    }
   } catch (err) {
     console.error('[Diskwala Global Error]:', err.message);
   }
@@ -299,98 +279,72 @@ async function extractDiskwalaLink(diskwalaUrl) {
 }
 
 // ───────────────────────────────────────────
-// B. UNIVERSAL TERABOX EXTRACTOR (Redirect & Domain Auto-Fix)
+// B. ROBUST TERABOX EXTRACTOR
 // ───────────────────────────────────────────
 async function extractTeraboxLink(teraboxUrl) {
   const rawCookie = process.env.TERABOX_COOKIE || 'ndus=Yzdpm64teHuiTpyF1tSZ-m4ANxhFN7shhUG1hMNu;';
   const cookie = rawCookie.includes('ndus=') ? rawCookie : `ndus=${rawCookie};`;
 
-  // Step 1: Follow redirects to find the canonical 1024tera / terabox URL
-  let targetCleanUrl = teraboxUrl;
   try {
-    const head = await axios.get(teraboxUrl, {
-      maxRedirects: 5,
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36'
-      },
-      timeout: 8000
-    });
-    if (head.request?.res?.responseUrl) {
-      targetCleanUrl = head.request.res.responseUrl;
-    }
-  } catch (e) {}
+    const match = teraboxUrl.match(/(\/s\/|surl=)([a-zA-Z0-9_-]+)/);
+    if (match) {
+      let rawKey = match[2];
+      const surl = rawKey.startsWith('1') ? rawKey.substring(1) : rawKey;
+      const sharePageUrl = `https://www.terabox1024.com/sharing/link?surl=${surl}`;
 
-  // Step 2: Extract Surl Key correctly
-  const match = targetCleanUrl.match(/(\/s\/|surl=)([a-zA-Z0-9_-]+)/) || teraboxUrl.match(/(\/s\/|surl=)([a-zA-Z0-9_-]+)/);
-  if (match) {
-    const rawCode = match[2];
-    // Test both full code and stripped leading-1 code
-    const surlVariants = [
-      rawCode.startsWith('1') ? rawCode.substring(1) : rawCode,
-      rawCode
-    ];
+      const pageRes = await axios.get(sharePageUrl, {
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+          'Cookie': cookie,
+          'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8'
+        },
+        timeout: 12000
+      });
 
-    for (const surl of surlVariants) {
-      try {
-        const sharePageUrl = `https://www.terabox1024.com/sharing/link?surl=${surl}`;
-        const pageRes = await axios.get(sharePageUrl, {
-          headers: {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
-            'Cookie': cookie,
-            'Referer': 'https://www.terabox1024.com/'
-          },
-          timeout: 10000
-        });
+      const pageHtml = pageRes.data || '';
+      const jsTokenMatch = pageHtml.match(/fn%28%22(.*?)%22%29/) || pageHtml.match(/jsToken":"(.*?)"/) || pageHtml.match(/jsToken = "(.*?)"/);
+      const jsToken = jsTokenMatch ? jsTokenMatch[1] : '';
 
-        const pageHtml = pageRes.data || '';
-        const jsTokenMatch = pageHtml.match(/fn%28%22(.*?)%22%29/) || pageHtml.match(/jsToken":"(.*?)"/) || pageHtml.match(/jsToken = "(.*?)"/);
-        const jsToken = jsTokenMatch ? jsTokenMatch[1] : '';
+      const listApi = `https://www.terabox1024.com/share/list?app_id=250528&shorturl=${surl}&root=1${jsToken ? `&jsToken=${jsToken}` : ''}`;
+      const listRes = await axios.get(listApi, {
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+          'Cookie': cookie,
+          'Referer': sharePageUrl
+        },
+        timeout: 12000
+      });
 
-        const listApi = `https://www.terabox1024.com/share/list?app_id=250528&shorturl=${surl}&root=1${jsToken ? `&jsToken=${jsToken}` : ''}`;
-        const listRes = await axios.get(listApi, {
-          headers: {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)',
-            'Cookie': cookie,
-            'Referer': sharePageUrl
-          },
-          timeout: 10000
-        });
-
-        if (listRes.data && listRes.data.errno === 0 && listRes.data.list && listRes.data.list.length > 0) {
-          const file = listRes.data.list[0];
-          if (file.dlink) {
-            console.log(`[Terabox Native] Extracted: ${file.server_filename}`);
-            return { url: file.dlink, name: file.server_filename || 'Terabox Video' };
-          }
+      if (listRes.data && listRes.data.errno === 0 && listRes.data.list && listRes.data.list.length > 0) {
+        const file = listRes.data.list[0];
+        if (file.dlink) {
+          console.log(`[Terabox Native] Extracted: ${file.server_filename}`);
+          return { url: file.dlink, name: file.server_filename || 'Terabox Video' };
         }
-      } catch (err) {}
+      }
     }
+  } catch (err) {
+    console.error('[Extractor Native Error]:', err.message);
   }
 
-  // Step 3: Reliable Multi-Gateway Fallbacks
-  const shortCode = match ? match[2] : '';
-  const fallbackUrls = [
+  // Fallback direct APIs
+  const fallbackApis = [
     `https://terabox-api-direct.onrender.com/api?url=${encodeURIComponent(teraboxUrl)}`,
-    `https://ytbvideolyrics.com/api/tb?url=${encodeURIComponent(teraboxUrl)}`,
-    `https://terabox-dl.qtcloud.workers.dev/api/get-info?shorturl=${shortCode}`
+    `https://ytbvideolyrics.com/api/tb?url=${encodeURIComponent(teraboxUrl)}`
   ];
 
-  for (const endpoint of fallbackUrls) {
+  for (const endpoint of fallbackApis) {
     try {
       const res = await axios.get(endpoint, { timeout: 10000 });
-      const d = res.data;
-      const direct = d?.download_url || d?.dlink || d?.direct_link || d?.downloadLink;
-      if (direct) {
-        console.log(`[Terabox Fallback] Extracted via gateway`);
+      if (res.data?.download_url || res.data?.dlink || res.data?.direct_link) {
         return {
-          url: direct,
-          name: d.file_name || d.title || d.fileName || 'Terabox Video'
+          url: res.data.download_url || res.data.dlink || res.data.direct_link,
+          name: res.data.file_name || res.data.title || 'Terabox Video'
         };
       }
     } catch (e) {}
   }
 
-  console.error('[Terabox Extractor] All extraction methods failed for:', teraboxUrl);
   return null;
 }
 
@@ -404,17 +358,25 @@ async function uploadToStorageChannel2GB(videoUrl, fileName, caption) {
   const rawCookie = process.env.TERABOX_COOKIE || 'ndus=Yzdpm64teHuiTpyF1tSZ-m4ANxhFN7shhUG1hMNu;';
   const cookie = rawCookie.includes('ndus=') ? rawCookie : `ndus=${rawCookie};`;
 
+  const headers = {
+    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+    'Referer': 'https://www.terabox1024.com/',
+    'Cookie': cookie,
+    'Accept': '*/*',
+    'Connection': 'keep-alive'
+  };
+
   try {
     console.log(`[Vault] 1. Downloading direct stream to disk...`);
     const writer = fs.createWriteStream(tempFilePath);
 
+    // 403 Forbidden Fix: follow cross-domain redirects while keeping headers intact
     const streamRes = await axios.get(videoUrl, {
       responseType: 'stream',
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
-        'Referer': 'https://www.terabox1024.com/',
-        'Cookie': cookie,
-        'Accept': '*/*'
+      headers: headers,
+      maxRedirects: 10,
+      beforeRedirect: (options) => {
+        options.headers = { ...options.headers, ...headers };
       },
       timeout: 180000
     });
