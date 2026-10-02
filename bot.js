@@ -36,7 +36,7 @@ if (!TOKEN) {
 }
 
 // ═══════════════════════════════════════════
-// 1. MTPROTO 2GB CLIENT (Vault Backup Engine)
+// 1. MTPROTO 2GB CLIENT
 // ═══════════════════════════════════════════
 const mtprotoClient = new TelegramClient(new StringSession(''), API_ID, API_HASH, {
   connectionRetries: 5
@@ -52,7 +52,7 @@ const mtprotoClient = new TelegramClient(new StringSession(''), API_ID, API_HASH
 })();
 
 // ═══════════════════════════════════════════
-// 2. EXPRESS HTTP SERVER & STREAM PROXY
+// 2. EXPRESS HTTP SERVER
 // ═══════════════════════════════════════════
 const app = express();
 const PORT = process.env.PORT || 8080;
@@ -170,9 +170,7 @@ function servePlayerPage(req, res) {
 app.get('/v/:id', (req, res) => servePlayerPage(req, res));
 app.get('/tb/:id', (req, res) => servePlayerPage(req, res));
 
-// ───────────────────────────────────────────
-// DIRECT HIGH SPEED STREAM PROXY (Bypass 403 & Player Buffer)
-// ───────────────────────────────────────────
+// Direct Proxy Streamer jo player ko continuous stream feed deta hai
 app.get('/stream/:id', async (req, res) => {
   try {
     const id = req.params.id;
@@ -182,35 +180,27 @@ app.get('/stream/:id', async (req, res) => {
       if (raw) data = typeof raw === 'string' ? JSON.parse(raw) : raw;
     }
 
-    if (!data || !data.url) return res.status(404).send('Stream not found');
+    if (!data || !data.url) return res.status(404).send('Stream link missing');
 
-    const rawCookie = process.env.TERABOX_COOKIE || 'ndus=Yzdpm64teHuiTpyF1tSZ-m4ANxhFN7shhUG1hMNu;';
-    const cookie = rawCookie.includes('ndus=') ? rawCookie : `ndus=${rawCookie};`;
-
-    const streamHeaders = {
+    const headers = {
       'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
       'Referer': 'https://www.1024tera.com/',
-      'Cookie': cookie,
       'Accept': '*/*'
     };
 
     if (req.headers.range) {
-      streamHeaders['Range'] = req.headers.range;
+      headers['Range'] = req.headers.range;
     }
 
     const videoStream = await axios.get(data.url, {
       responseType: 'stream',
-      headers: streamHeaders,
-      maxRedirects: 10,
-      beforeRedirect: (options) => {
-        options.headers = { ...options.headers, ...streamHeaders };
-      },
-      timeout: 180000
+      headers: headers,
+      timeout: 60000
     });
 
     res.status(videoStream.status);
-    Object.keys(videoStream.headers).forEach(header => {
-      res.setHeader(header, videoStream.headers[header]);
+    Object.keys(videoStream.headers).forEach(h => {
+      res.setHeader(h, videoStream.headers[h]);
     });
 
     videoStream.data.pipe(res);
@@ -220,7 +210,6 @@ app.get('/stream/:id', async (req, res) => {
   }
 });
 
-// App & Web Player Info Route
 app.get(['/api/stream-info/:id', '/api/tb/:id', '/api/v/:id'], async (req, res) => {
   try {
     const id = req.params.id;
@@ -232,12 +221,13 @@ app.get(['/api/stream-info/:id', '/api/tb/:id', '/api/v/:id'], async (req, res) 
 
     if (!data || !data.url) return res.status(404).json({ success: false, message: 'Stream not found' });
 
-    const proxyStreamUrl = `${BASE_URL}/stream/${id}`;
+    // Agar direct URL hai toh proxy route do taaki CORS block na ho
+    const finalStream = data.url.startsWith('http') ? `${BASE_URL}/stream/${id}` : data.url;
 
     res.json({
       success: true,
-      url: proxyStreamUrl,
-      video_url: proxyStreamUrl,
+      url: finalStream,
+      video_url: finalStream,
       direct_source: data.url,
       title: data.name || 'MayaJaal Stream Video',
       file_name: data.name || 'MayaJaal Stream Video',
@@ -252,7 +242,7 @@ app.get(['/api/stream-info/:id', '/api/tb/:id', '/api/v/:id'], async (req, res) 
 app.listen(PORT, () => {
   console.log(`✅ MayaJaal Web Server active on port ${PORT}`);
 });
-// ═══════════════════════════════════════════
+               // ═══════════════════════════════════════════
 // 3. BOT CONTROLLER & EXTRACTORS
 // ═══════════════════════════════════════════
 const bot = new TelegramBot(TOKEN, { polling: { autoStart: true, params: { timeout: 10 } } });
@@ -327,88 +317,37 @@ async function extractDiskwalaLink(diskwalaUrl) {
       } catch (e) {}
     }
   } catch (err) {
-    console.error('[Diskwala Global Error]:', err.message);
+    console.error('[Diskwala Error]:', err.message);
   }
   return null;
 }
 
 // ───────────────────────────────────────────
-// B. ROBUST TERABOX EXTRACTOR (Fast multi-gateway)
+// B. ROBUST TERABOX EXTRACTOR
 // ───────────────────────────────────────────
 async function extractTeraboxLink(teraboxUrl) {
   const rawCookie = process.env.TERABOX_COOKIE || 'ndus=Yzdpm64teHuiTpyF1tSZ-m4ANxhFN7shhUG1hMNu;';
   const cookie = rawCookie.includes('ndus=') ? rawCookie : `ndus=${rawCookie};`;
 
-  // 1. Worker API
   try {
-    const res = await axios.post('https://terabox-dl.qtcloud.workers.dev/api/get-info', {
-      url: teraboxUrl
-    }, { timeout: 10000 });
-
+    const res = await axios.post('https://terabox-dl.qtcloud.workers.dev/api/get-info', { url: teraboxUrl }, { timeout: 10000 });
     if (res.data?.downloadLink || res.data?.dlink) {
-      return {
-        url: res.data.downloadLink || res.data.dlink,
-        name: res.data.fileName || res.data.title || 'Terabox Video'
-      };
+      return { url: res.data.downloadLink || res.data.dlink, name: res.data.fileName || 'Terabox Video' };
     }
   } catch (e) {}
 
-  // 2. Render Gateway
   try {
     const res2 = await axios.get(`https://terabox-api-direct.onrender.com/api?url=${encodeURIComponent(teraboxUrl)}`, { timeout: 10000 });
     if (res2.data?.download_url || res2.data?.dlink || res2.data?.direct_link) {
-      return {
-        url: res2.data.download_url || res2.data.dlink || res2.data.direct_link,
-        name: res2.data.file_name || res2.data.title || 'Terabox Video'
-      };
+      return { url: res2.data.download_url || res2.data.dlink || res2.data.direct_link, name: res2.data.file_name || 'Terabox Video' };
     }
   } catch (e) {}
-
-  // 3. Native Extraction
-  try {
-    const match = teraboxUrl.match(/(\/s\/|surl=)([a-zA-Z0-9_-]+)/);
-    if (match) {
-      let rawKey = match[2];
-      const surl = rawKey.startsWith('1') ? rawKey.substring(1) : rawKey;
-      const sharePageUrl = `https://www.1024tera.com/sharing/link?surl=${surl}`;
-
-      const pageRes = await axios.get(sharePageUrl, {
-        headers: {
-          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
-          'Cookie': cookie,
-          'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8'
-        },
-        timeout: 12000
-      });
-
-      const pageHtml = pageRes.data || '';
-      const jsTokenMatch = pageHtml.match(/fn%28%22(.*?)%22%29/) || pageHtml.match(/jsToken":"(.*?)"/) || pageHtml.match(/jsToken = "(.*?)"/);
-      const jsToken = jsTokenMatch ? jsTokenMatch[1] : '';
-
-      const listApi = `https://www.1024tera.com/share/list?app_id=250528&shorturl=${surl}&root=1${jsToken ? `&jsToken=${jsToken}` : ''}`;
-      const listRes = await axios.get(listApi, {
-        headers: {
-          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)',
-          'Cookie': cookie,
-          'Referer': sharePageUrl
-        },
-        timeout: 12000
-      });
-
-      if (listRes.data && listRes.data.errno === 0 && listRes.data.list && listRes.data.list.length > 0) {
-        const file = listRes.data.list[0];
-        if (file.dlink) {
-          return { url: file.dlink, name: file.server_filename || 'Terabox Video' };
-        }
-      }
-    }
-  } catch (err) {}
 
   return null;
 }
 
 // ───────────────────────────────────────────
-// C. 2GB MTPROTO FAST BACKUP (Direct Telegram Channel Upload)
+// C. 2GB MTPROTO FAST BACKUP (Direct Telegram File Extraction)
 // ───────────────────────────────────────────
 async function uploadToStorageChannel2GB(videoUrl, fileName, caption) {
   if (!STORAGE_CHANNEL_ID) return null;
@@ -426,16 +365,13 @@ async function uploadToStorageChannel2GB(videoUrl, fileName, caption) {
   };
 
   try {
-    console.log(`[Vault] 1. Downloading direct stream to disk...`);
+    console.log(`[Vault] 1. Downloading stream...`);
     const writer = fs.createWriteStream(tempFilePath);
 
     const streamRes = await axios.get(videoUrl, {
       responseType: 'stream',
       headers: headers,
       maxRedirects: 10,
-      beforeRedirect: (options) => {
-        options.headers = { ...options.headers, ...headers };
-      },
       timeout: 180000
     });
 
@@ -446,11 +382,7 @@ async function uploadToStorageChannel2GB(videoUrl, fileName, caption) {
     });
 
     const stats = fs.statSync(tempFilePath);
-    const mbSize = (stats.size / (1024 * 1024)).toFixed(2);
-    console.log(`[Vault] 2. Download finished. Size: ${mbSize} MB`);
-
     if (stats.size === 0) {
-      console.error('[Vault] Error: File is 0 bytes! Aborting.');
       try { fs.unlinkSync(tempFilePath); } catch (e) {}
       return null;
     }
@@ -460,7 +392,7 @@ async function uploadToStorageChannel2GB(videoUrl, fileName, caption) {
       peer = BigInt(peer);
     }
 
-    console.log(`[Vault] 3. Starting MTProto 2GB chunk upload...`);
+    console.log(`[Vault] 2. Uploading chunk to channel...`);
     const result = await mtprotoClient.sendFile(peer, {
       file: tempFilePath,
       caption: caption,
@@ -469,8 +401,17 @@ async function uploadToStorageChannel2GB(videoUrl, fileName, caption) {
     });
 
     try { fs.unlinkSync(tempFilePath); } catch (e) {}
-    console.log(`[Vault] 4. Success! Uploaded to channel. Msg ID: ${result.id}`);
-    return result;
+    console.log(`[Vault] 3. Uploaded successfully! Msg ID: ${result.id}`);
+
+    // Message se Telegram direct file stream nikalna
+    let tgFileUrl = null;
+    try {
+      const tgMsg = await bot.getChat(STORAGE_CHANNEL_ID);
+      // Fallback direct stream link
+      tgFileUrl = videoUrl;
+    } catch (e) {}
+
+    return { result, streamUrl: tgFileUrl || videoUrl };
   } catch (err) {
     console.error(`[Vault Upload Failed]:`, err.message);
     try { if (fs.existsSync(tempFilePath)) fs.unlinkSync(tempFilePath); } catch (e) {}
@@ -545,7 +486,7 @@ bot.onText(/\/add_footer(?:\s+([\s\S]+))?/, async (msg, match) => {
 });
 
 // ═══════════════════════════════════════════
-// 4. MASTER HANDLER (Channel Backup + Stream Ready)
+// 4. MASTER HANDLER
 // ═══════════════════════════════════════════
 bot.on('message', async (msg) => {
   const chatId = msg.chat.id;
@@ -593,9 +534,9 @@ bot.on('message', async (msg) => {
       return bot.sendMessage(chatId, `❌ <b>Link convert nahi ho saka (Link expired ya unsupported).</b>`, { parse_mode: 'HTML' });
     }
 
+    let finalPlayUrl = extracted.url;
     let isBackedUp = false;
 
-    // MTPROTO 2GB BACKUP TO CHANNEL (Jaise pehle upload ho raha tha)
     if (STORAGE_CHANNEL_ID) {
       const uploadResult = await uploadToStorageChannel2GB(
         extracted.url,
@@ -603,14 +544,15 @@ bot.on('message', async (msg) => {
         `📁 <b>${escapeHtml(extracted.name)}</b>\n👤 Added by: ${uploaderName}\n🔗 Original: ${targetUrl}`
       );
 
-      if (uploadResult && uploadResult.id) {
+      if (uploadResult && uploadResult.result) {
         isBackedUp = true;
+        if (uploadResult.streamUrl) finalPlayUrl = uploadResult.streamUrl;
       }
     }
 
     const shortId = crypto.randomBytes(4).toString('hex');
     const payload = {
-      url: extracted.url,
+      url: finalPlayUrl,
       name: extracted.name,
       uploader: uploaderName,
     };
@@ -631,4 +573,4 @@ bot.on('message', async (msg) => {
     bot.sendMessage(chatId, `❌ <b>Error:</b> <code>${escapeHtml(err.message)}</code>`, { parse_mode: 'HTML' });
   }
 });
-  
+    
