@@ -45,7 +45,7 @@ app.use((req, res, next) => {
   next();
 });
 
-app.get('/', (req, res) => res.send('MayaJaal Terabox Fast Engine is Active!'));
+app.get('/', (req, res) => res.send('MayaJaal Stream Engine is Active!'));
 app.get('/health', (req, res) => res.json({ status: 'ok', uptime: process.uptime() }));
 
 app.get(['/version.json', '/check-update', '/api/check-update'], (req, res) => {
@@ -55,7 +55,7 @@ app.get(['/version.json', '/check-update', '/api/check-update'], (req, res) => {
     latestVersionName: "v1.1.0",
     updateUrl: "https://mayajaal.online/download.html",
     forceUpdate: false,
-    changelog: "⚡ Fast player and Terabox streaming active!"
+    changelog: "⚡ Fast player, Terabox & Diskwala streaming active!"
   });
 });
 
@@ -177,7 +177,7 @@ app.listen(PORT, () => {
 });
 
 // ═══════════════════════════════════════════
-// 2. BOT CONTROLLER & ADVANCED EXTRACTOR
+// 2. BOT CONTROLLER & EXTRACTORS
 // ═══════════════════════════════════════════
 const bot = new TelegramBot(TOKEN, { polling: true });
 
@@ -219,11 +219,49 @@ function buildSuccessMessage(user, fileName, shortUrl) {
   return parts.join('\n');
 }
 
+// ───────────────────────────────────────────
+// A. DISKWALA EXTRACTOR (No Cookie Needed)
+// ───────────────────────────────────────────
+async function extractDiskwalaLink(diskwalaUrl) {
+  try {
+    console.log(`[Diskwala] Fetching: ${diskwalaUrl}`);
+    const res = await axios.get(diskwalaUrl, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+        'Referer': 'https://diskwala.com/'
+      },
+      timeout: 12000
+    });
+
+    const html = typeof res.data === 'string' ? res.data : JSON.stringify(res.data);
+
+    // Source ya m3u8 / mp4 URL nikalna
+    const match = html.match(/<source[^>]+src=["']([^"']+)["']/i) ||
+                  html.match(/file:\s*["']([^"']+)["']/i) ||
+                  html.match(/(https?:\/\/[^\s"']+\.(?:mp4|m3u8)[^\s"']*)/i);
+
+    const titleMatch = html.match(/<title>([^<]+)<\/title>/i);
+    const fileName = titleMatch ? titleMatch[1].replace(/-\s*Diskwala/i, '').trim() : 'Diskwala Video';
+
+    if (match && match[1]) {
+      return {
+        url: match[1],
+        name: fileName
+      };
+    }
+  } catch (err) {
+    console.error('[Diskwala Extractor Error]:', err.message);
+  }
+  return null;
+}
+
+// ───────────────────────────────────────────
+// B. TERABOX EXTRACTOR
+// ───────────────────────────────────────────
 async function extractTeraboxLink(teraboxUrl) {
   const rawCookie = process.env.TERABOX_COOKIE || 'ndus=Yzdpm64teHuiTpyF1tSZ-m4ANxhFN7shhUG1hMNu;';
   const cookie = rawCookie.includes('ndus=') ? rawCookie : `ndus=${rawCookie};`;
 
-  // 1. Dynamic Extraction via Web Session Page
   try {
     const match = teraboxUrl.match(/(\/s\/|surl=)([a-zA-Z0-9_-]+)/);
     if (match) {
@@ -262,10 +300,10 @@ async function extractTeraboxLink(teraboxUrl) {
       }
     }
   } catch (err) {
-    console.error('[Extractor Native]', err.message);
+    console.error('[Extractor Native Error]:', err.message);
   }
 
-  // 2. Direct Fallback Gateways
+  // Backup fallback gateways
   const fallbackApis = [
     `https://terabox-api-direct.onrender.com/api?url=${encodeURIComponent(teraboxUrl)}`,
     `https://ytbvideolyrics.com/api/tb?url=${encodeURIComponent(teraboxUrl)}`
@@ -286,10 +324,13 @@ async function extractTeraboxLink(teraboxUrl) {
   return null;
 }
 
+// ───────────────────────────────────────────
+// C. BOT COMMANDS
+// ───────────────────────────────────────────
 bot.onText(/\/start/, (msg) => {
   bot.sendMessage(msg.chat.id,
     `🎬 <b>Welcome to MayaJaal Converter Bot!</b>\n\n` +
-    `Bhejo koi bhi <b>Terabox link</b> ya <b>Terabox post</b> aur turant stream link pao.\n\n` +
+    `Bhejo koi bhi <b>Terabox ya Diskwala link</b> aur turant stream link pao.\n\n` +
     `<b>Commands:</b>\n` +
     `/api - Matrix key link karein\n` +
     `/logout - Disconnect karein\n` +
@@ -350,7 +391,7 @@ bot.onText(/\/add_footer(?:\s+([\s\S]+))?/, async (msg, match) => {
 });
 
 // ═══════════════════════════════════════════
-// 3. MASTER HANDLER (AAPKA CODE)
+// 3. MASTER HANDLER (TERABOX + DISKWALA)
 // ═══════════════════════════════════════════
 bot.on('message', async (msg) => {
   const chatId = msg.chat.id;
@@ -359,15 +400,15 @@ bot.on('message', async (msg) => {
   // Ignore commands like /start, /api
   if (!incomingContent || incomingContent.startsWith('/')) return;
 
-  // 1. Extract any URL containing common Terabox keywords
+  // 1. Extract any URL containing Terabox ya Diskwala keywords
   const urlRegex = /(https?:\/\/[^\s<>"']+)/gi;
   const matches = incomingContent.match(urlRegex) || [];
   
-  const teraboxUrl = matches.find(url => 
-    /(terabox|terasharefile|1024tera|teraboxapp|teraboxshare|teraboxlink|tibibox|momerybox|mirrorbox|4funbox|dubox|freeterabox)/i.test(url)
+  const targetUrl = matches.find(url => 
+    /(terabox|terasharefile|1024tera|teraboxapp|teraboxshare|teraboxlink|tibibox|momerybox|mirrorbox|4funbox|dubox|freeterabox|diskwala)/i.test(url)
   );
 
-  if (!teraboxUrl) {
+  if (!targetUrl) {
     return;
   }
 
@@ -386,18 +427,24 @@ bot.on('message', async (msg) => {
   // 3. Immediate Feedback
   let statusMsg;
   try {
-    statusMsg = await bot.sendMessage(chatId, `🔄 <i>Converting Terabox to MayaJaal Stream...</i>`, { parse_mode: 'HTML' });
+    statusMsg = await bot.sendMessage(chatId, `🔄 <i>Converting Link to MayaJaal Stream...</i>`, { parse_mode: 'HTML' });
   } catch (e) {
     console.error('Status message send error:', e.message);
   }
 
   try {
-    console.log(`[Bot] Processing link: ${teraboxUrl} for chat ${chatId}`);
-    const extracted = await extractTeraboxLink(teraboxUrl);
+    console.log(`[Bot] Processing link: ${targetUrl} for chat ${chatId}`);
+
+    let extracted = null;
+    if (/diskwala/i.test(targetUrl)) {
+      extracted = await extractDiskwalaLink(targetUrl);
+    } else {
+      extracted = await extractTeraboxLink(targetUrl);
+    }
 
     if (!extracted || !extracted.url) {
       if (statusMsg) await bot.deleteMessage(chatId, statusMsg.message_id).catch(() => {});
-      return bot.sendMessage(chatId, `❌ <b>Link convert nahi ho saka (Terabox API down ya link expired).</b>`, { parse_mode: 'HTML' });
+      return bot.sendMessage(chatId, `❌ <b>Link convert nahi ho saka (Link expired ya server down).</b>`, { parse_mode: 'HTML' });
     }
 
     const shortId = crypto.randomBytes(4).toString('hex');
