@@ -17,14 +17,14 @@ const redis = Redis.fromEnv();
 const API_ID = parseInt(process.env.TELEGRAM_API_ID || '35399167', 10);
 const API_HASH = process.env.TELEGRAM_API_HASH || '88a34526a5e73078110072770dd85e5b';
 const BOT_TOKEN = process.env.BOT_TOKEN;
-const STORAGE_CHANNEL_ID = process.env.STORAGE_CHANNEL_ID;
+const RAW_CHANNEL_ID = String(process.env.STORAGE_CHANNEL_ID || '').trim();
 
 const WEB_PAGE_URL = process.env.WEB_PAGE_URL || 'https://mayajaal.online/key';
 const BASE_URL = process.env.CUSTOM_DOMAIN 
   ? (process.env.CUSTOM_DOMAIN.startsWith('http') ? process.env.CUSTOM_DOMAIN : `https://${process.env.CUSTOM_DOMAIN}`)
   : 'https://mayajaal.online';
 
-if (!BOT_TOKEN || !STORAGE_CHANNEL_ID) {
+if (!BOT_TOKEN || !RAW_CHANNEL_ID) {
   console.error('❌ BOT_TOKEN ya STORAGE_CHANNEL_ID environment variables missing hain!');
   process.exit(1);
 }
@@ -37,6 +37,16 @@ const PORT = process.env.PORT || 3000;
 
 app.use(express.json());
 app.use(express.static(__dirname));
+
+// CORS headers taaki mobile app stream reject na kare
+app.use((req, res, next) => {
+  res.header('Access-Control-Allow-Origin', '*');
+  res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Range');
+  res.header('Access-Control-Allow-Methods', 'GET, POST, OPTIONS, HEAD');
+  res.header('Access-Control-Expose-Headers', 'Content-Range, Accept-Ranges, Content-Length, Content-Type');
+  if (req.method === 'OPTIONS') return res.sendStatus(200);
+  next();
+});
 
 app.get('/', (req, res) => res.send('MayaJaal 2GB MTProto Engine is Active!'));
 app.get('/health', (req, res) => res.json({ status: 'ok', uptime: process.uptime() }));
@@ -61,7 +71,6 @@ app.get(['/download', '/download.html'], (req, res) => {
   res.status(404).send('download.html not found');
 });
 
-// App Verification
 app.get('/.well-known/assetlinks.json', (req, res) => {
   res.set('Content-Type', 'application/json');
   res.json([{
@@ -76,7 +85,6 @@ app.get('/.well-known/assetlinks.json', (req, res) => {
   }]);
 });
 
-// Key Management APIs
 app.post('/save-key', async (req, res) => {
   try {
     const { telegram_id, key } = req.body;
@@ -126,7 +134,6 @@ app.get('/api/history/:telegram_id', async (req, res) => {
   }
 });
 
-// Web Player Page
 app.get('/v/:id', (req, res) => {
   const playerFile = path.join(__dirname, 'player.html');
   if (fs.existsSync(playerFile)) return res.sendFile(playerFile);
@@ -157,18 +164,27 @@ app.get('/api/stream-info/:id', async (req, res) => {
   }
 });
 
-// Direct HTTP Range Streaming from Telegram Cloud
+// Fixed 2GB Telegram Video Stream Engine (Supports Range Request)
 app.get('/stream/:id', async (req, res) => {
   try {
     const rawData = await redis.get(`video:${req.params.id}`);
     if (!rawData) return res.status(404).send('Video not found or expired');
     const meta = typeof rawData === 'string' ? JSON.parse(rawData) : rawData;
 
-    const channelPeer = await tgClient.getInputEntity(STORAGE_CHANNEL_ID);
-    const messages = await tgClient.getMessages(channelPeer, { ids: [meta.messageId] });
-    const targetMsg = messages[0];
+    let targetPeer;
+    try {
+      targetPeer = await tgClient.getInputEntity(RAW_CHANNEL_ID);
+    } catch (e) {
+      const cleanId = RAW_CHANNEL_ID.replace(/^-100/, '');
+      targetPeer = await tgClient.getInputEntity(cleanId);
+    }
 
-    if (!targetMsg || !targetMsg.media) return res.status(404).send('Media not found on Telegram Storage');
+    const messages = await tgClient.getMessages(targetPeer, { ids: [Number(meta.messageId)] });
+    const targetMsg = messages ? messages[0] : null;
+
+    if (!targetMsg || !targetMsg.media) {
+      return res.status(404).send('Media message not found in Telegram storage channel');
+    }
 
     const totalSize = Number(meta.size);
     const mimeType = meta.mimeType || 'video/mp4';
@@ -178,7 +194,7 @@ app.get('/stream/:id', async (req, res) => {
       const parts = range.replace(/bytes=/, '').split('-');
       const start = parseInt(parts[0], 10);
       const end = parts[1] ? parseInt(parts[1], 10) : totalSize - 1;
-      const chunksize = end - start + 1;
+      const chunksize = (end - start) + 1;
 
       res.writeHead(206, {
         'Content-Range': `bytes ${start}-${end}/${totalSize}`,
@@ -191,10 +207,11 @@ app.get('/stream/:id', async (req, res) => {
         file: targetMsg.media,
         offset: BigInt(start),
         limit: chunksize,
-        requestSize: 1024 * 512,
+        requestSize: 1024 * 256,
       });
 
       for await (const chunk of streamIterator) {
+        if (res.writableEnded) break;
         res.write(chunk);
       }
       res.end();
@@ -207,17 +224,18 @@ app.get('/stream/:id', async (req, res) => {
 
       const streamIterator = tgClient.iterDownload({
         file: targetMsg.media,
-        requestSize: 1024 * 512,
+        requestSize: 1024 * 256,
       });
 
       for await (const chunk of streamIterator) {
+        if (res.writableEnded) break;
         res.write(chunk);
       }
       res.end();
     }
   } catch (err) {
-    console.error('Streaming error:', err.message);
-    if (!res.headersSent) res.status(500).send('Stream error');
+    console.error('Stream playback error:', err.message);
+    if (!res.headersSent) res.status(500).send('Stream connection error');
   }
 });
 
@@ -279,12 +297,11 @@ tgClient.addEventHandler(async (event) => {
   const uploaderName = sender?.username ? `@${sender.username}` : (sender?.firstName || 'User');
   const user = await getUser(chatId);
 
-  // Command: /start
   if (text === '/start') {
     return tgClient.sendMessage(chatId, {
       message: `🎬 <b>Welcome to MayaJaal 2GB Cloud Bot!</b>\n\n` +
-               `Aap direct <b>2GB tak ki video ya document</b> bhej sakte hain.\n\n` +
-               `Saari files Telegram cloud mein safe store hongi aur instant play link milega.\n\n` +
+               `Direct <b>2GB tak ki video ya document</b> bhej sakte hain.\n\n` +
+               `Files Telegram cloud mein save hongi aur instant play link milega.\n\n` +
                `<b>Commands:</b>\n` +
                `/api - Matrix key link karein\n` +
                `/logout - Disconnect karein\n` +
@@ -294,12 +311,11 @@ tgClient.addEventHandler(async (event) => {
     });
   }
 
-  // Command: /api
   if (text.startsWith('/api')) {
     const token = text.replace('/api', '').trim();
     if (!token) {
       return tgClient.sendMessage(chatId, {
-        message: `🔐 <b>Matrix Key Linking</b>\n\nApni key verify karne ke liye bhein:\n<code>/api YOUR_KEY</code>\n\nKey lene ke liye: ${WEB_PAGE_URL}?tg=${chatId}`,
+        message: `🔐 <b>Matrix Key Linking</b>\n\nApni key verify karne ke liye bhejein:\n<code>/api YOUR_KEY</code>\n\nKey lene ke liye: ${WEB_PAGE_URL}?tg=${chatId}`,
         parseMode: 'html',
       });
     }
@@ -312,14 +328,12 @@ tgClient.addEventHandler(async (event) => {
     return tgClient.sendMessage(chatId, { message: `✅ Matrix Key successfully linked!`, parseMode: 'html' });
   }
 
-  // Command: /logout
   if (text === '/logout') {
     user.apiToken = null;
     await saveUser(chatId, user);
     return tgClient.sendMessage(chatId, { message: `👋 Logged out successfully!`, parseMode: 'html' });
   }
 
-  // Command: /add_header
   if (text.startsWith('/add_header')) {
     const header = text.replace('/add_header', '').trim();
     user.header = header || null;
@@ -327,7 +341,6 @@ tgClient.addEventHandler(async (event) => {
     return tgClient.sendMessage(chatId, { message: `✅ Header updated!`, parseMode: 'html' });
   }
 
-  // Command: /add_footer
   if (text.startsWith('/add_footer')) {
     const footer = text.replace('/add_footer', '').trim();
     user.footer = footer || null;
@@ -335,7 +348,6 @@ tgClient.addEventHandler(async (event) => {
     return tgClient.sendMessage(chatId, { message: `✅ Footer updated!`, parseMode: 'html' });
   }
 
-  // 2GB File Processing
   if (message.media) {
     if (!user.apiToken) {
       return tgClient.sendMessage(chatId, {
@@ -350,8 +362,15 @@ tgClient.addEventHandler(async (event) => {
     });
 
     try {
-      // Forward file directly to Private Channel
-      const stored = await tgClient.forwardMessages(STORAGE_CHANNEL_ID, {
+      let targetPeer;
+      try {
+        targetPeer = await tgClient.getInputEntity(RAW_CHANNEL_ID);
+      } catch (e) {
+        const cleanId = RAW_CHANNEL_ID.replace(/^-100/, '');
+        targetPeer = await tgClient.getInputEntity(cleanId);
+      }
+
+      const stored = await tgClient.forwardMessages(targetPeer, {
         messages: [message.id],
         fromPeer: chatId,
       });
