@@ -186,8 +186,8 @@ app.get('/stream/:id', async (req, res) => {
     const cookie = rawCookie.includes('ndus=') ? rawCookie : `ndus=${rawCookie};`;
 
     const headers = {
-      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
-      'Referer': 'https://www.1024tera.com/',
+      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36',
+      'Referer': data.url.includes('terabox') || data.url.includes('1024tera') ? 'https://www.1024tera.com/' : 'https://diskwala.com/',
       'Cookie': cookie,
       'Accept': '*/*'
     };
@@ -250,7 +250,7 @@ app.listen(PORT, () => {
   console.log(`✅ MayaJaal Web Server active on port ${PORT}`);
 });
 // ═══════════════════════════════════════════
-// 3. BOT CONTROLLER & EXTRACTORS
+// 3. BOT CONTROLLER & ADVANCED EXTRACTORS
 // ═══════════════════════════════════════════
 const bot = new TelegramBot(TOKEN, { polling: { autoStart: true, params: { timeout: 10 } } });
 
@@ -293,7 +293,7 @@ function buildSuccessMessage(user, fileName, shortUrl, backedUp = false) {
 }
 
 // ───────────────────────────────────────────
-// A. DISKWALA EXTRACTOR
+// A. DISKWALA EXTRACTOR (Page Scraper + APIs)
 // ───────────────────────────────────────────
 async function extractDiskwalaLink(diskwalaUrl) {
   try {
@@ -302,24 +302,47 @@ async function extractDiskwalaLink(diskwalaUrl) {
     if (!fileId) return null;
 
     const baseHeaders = {
-      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
-      'Referer': 'https://diskwala.com/'
+      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36',
+      'Referer': 'https://diskwala.com/',
+      'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8'
     };
+
+    try {
+      const pageRes = await axios.get(diskwalaUrl, { headers: baseHeaders, timeout: 8000 });
+      const html = pageRes.data;
+      if (typeof html === 'string') {
+        const streamMatch = html.match(/"(https?:\/\/[^"]+\.(mp4|m3u8)[^"]*)"/i) || 
+                            html.match(/src=["'](https?:\/\/[^"']+)["']/i) ||
+                            html.match(/file:\s*["'](https?:\/\/[^"']+)["']/i);
+        
+        const titleMatch = html.match(/<title>([^<]+)<\/title>/i);
+        const pageTitle = titleMatch ? titleMatch[1].replace(/ - DiskWala.*/i, '').trim() : 'Diskwala Video';
+
+        if (streamMatch && streamMatch[1]) {
+          return { url: streamMatch[1], name: pageTitle };
+        }
+      }
+    } catch (e) {}
 
     const apis = [
       `https://www.diskwala.com/api/post/${fileId}`,
-      `https://diskwala.com/api/post/stream/${fileId}`,
-      `https://diskwala.com/api/file/${fileId}`,
-      `https://diskwala.com/api/v1/post/get?id=${fileId}`
+      `https://www.diskwala.com/api/file/${fileId}`,
+      `https://diskwala.com/api/v1/post/get?id=${fileId}`,
+      `https://diskwala.com/api/post/stream/${fileId}`
     ];
 
     for (const ep of apis) {
       try {
-        const res = await axios.get(ep, { headers: baseHeaders, timeout: 6000 });
+        const res = await axios.get(ep, { 
+          headers: { ...baseHeaders, 'Accept': 'application/json' }, 
+          timeout: 6000 
+        });
         const d = res.data;
         if (d) {
           const direct = d.stream_url || d.video_url || d.url || d.download_url || d.file?.url || d.post?.video_url;
-          if (direct) return { url: direct, name: d.name || d.title || d.post?.title || 'Diskwala Video' };
+          if (direct) {
+            return { url: direct, name: d.name || d.title || d.post?.title || 'Diskwala Video' };
+          }
         }
       } catch (e) {}
     }
@@ -330,20 +353,48 @@ async function extractDiskwalaLink(diskwalaUrl) {
 }
 
 // ───────────────────────────────────────────
-// B. TERABOX EXTRACTOR
+// B. MULTI-ENGINE TERABOX EXTRACTOR
 // ───────────────────────────────────────────
 async function extractTeraboxLink(teraboxUrl) {
+  const match = teraboxUrl.match(/\/s\/([a-zA-Z0-9_-]+)/i);
+  const surl = match ? match[1] : '';
+
+  // Engine 1: Terabox Direct SURL Resolver
+  if (surl) {
+    try {
+      const res = await axios.get(`https://terabox.hnn.workers.dev/api/get-info?shorturl=${surl}`, { timeout: 12000 });
+      if (res.data && res.data.downloadLink) {
+        return { 
+          url: res.data.downloadLink, 
+          name: res.data.fileName || res.data.title || 'Terabox Video' 
+        };
+      }
+    } catch (e) {}
+  }
+
+  // Engine 2: Alternative Worker API
   try {
-    const res = await axios.post('https://terabox-dl.qtcloud.workers.dev/api/get-info', { url: teraboxUrl }, { timeout: 10000 });
-    if (res.data?.downloadLink || res.data?.dlink) {
-      return { url: res.data.downloadLink || res.data.dlink, name: res.data.fileName || 'Terabox Video' };
+    const res = await axios.post('https://terabox-downloader.ashlynn.workers.dev/api', 
+      { url: teraboxUrl }, 
+      { headers: { 'Content-Type': 'application/json' }, timeout: 12000 }
+    );
+    if (res.data?.downloadUrl || res.data?.url || res.data?.dlink) {
+      return { 
+        url: res.data.downloadUrl || res.data.url || res.data.dlink, 
+        name: res.data.fileName || 'Terabox Video' 
+      };
     }
   } catch (e) {}
 
+  // Engine 3: Rapid Worker Gateway
   try {
-    const res2 = await axios.get(`https://terabox-api-direct.onrender.com/api?url=${encodeURIComponent(teraboxUrl)}`, { timeout: 10000 });
-    if (res2.data?.download_url || res2.data?.dlink || res2.data?.direct_link) {
-      return { url: res2.data.download_url || res2.data.dlink || res2.data.direct_link, name: res2.data.file_name || 'Terabox Video' };
+    const res = await axios.get(`https://terabox-api-five.vercel.app/api?url=${encodeURIComponent(teraboxUrl)}`, { timeout: 10000 });
+    const direct = res.data?.download_url || res.data?.dlink || res.data?.direct_link;
+    if (direct) {
+      return { 
+        url: direct, 
+        name: res.data.file_name || 'Terabox Video' 
+      };
     }
   } catch (e) {}
 
@@ -351,7 +402,7 @@ async function extractTeraboxLink(teraboxUrl) {
 }
 
 // ───────────────────────────────────────────
-// C. 2GB MTPROTO FAST BACKUP (Direct Telegram Storage)
+// C. 2GB MTPROTO FAST BACKUP (Direct Storage Channel)
 // ───────────────────────────────────────────
 async function uploadToStorageChannel2GB(videoUrl, fileName, caption) {
   if (!STORAGE_CHANNEL_ID) return null;
@@ -361,7 +412,7 @@ async function uploadToStorageChannel2GB(videoUrl, fileName, caption) {
   const cookie = rawCookie.includes('ndus=') ? rawCookie : `ndus=${rawCookie};`;
 
   const headers = {
-    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36',
     'Referer': 'https://www.1024tera.com/',
     'Cookie': cookie,
     'Accept': '*/*',
@@ -537,7 +588,7 @@ bot.on('message', async (msg) => {
 
     let isBackedUp = false;
 
-    // MTPROTO 2GB BACKUP TO CHANNEL
+    // MTPROTO 2GB BACKUP TO TELEGRAM CHANNEL
     if (STORAGE_CHANNEL_ID) {
       const uploadResult = await uploadToStorageChannel2GB(
         extracted.url,
@@ -557,7 +608,7 @@ bot.on('message', async (msg) => {
       uploader: uploaderName,
     };
 
-    // Save in Memory & Upstash Redis Cloud
+    // Save in Memory & Cloud Redis
     linkStore.set(shortId, payload);
     await redis.set(`terabox:${shortId}`, JSON.stringify(payload), { ex: 30 * 86400 });
 
@@ -575,4 +626,3 @@ bot.on('message', async (msg) => {
     bot.sendMessage(chatId, `❌ <b>Error:</b> <code>${escapeHtml(err.message)}</code>`, { parse_mode: 'HTML' });
   }
 });
-    
