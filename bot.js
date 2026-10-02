@@ -19,8 +19,6 @@ const linkStore = new Map();
 
 const TOKEN = process.env.BOT_TOKEN;
 const WEB_PAGE_URL = process.env.WEB_PAGE_URL || 'https://mayajaal.online/key';
-const BACKEND_URL = process.env.BACKEND_URL || 'https://mayajaal.online';
-const TERABOX_API = process.env.TERABOX_API || 'https://terabox.hnn.workers.dev/api';
 const BASE_URL = process.env.CUSTOM_DOMAIN 
   ? (process.env.CUSTOM_DOMAIN.startsWith('http') ? process.env.CUSTOM_DOMAIN : `https://${process.env.CUSTOM_DOMAIN}`)
   : 'https://mayajaal.online';
@@ -31,10 +29,10 @@ if (!TOKEN) {
 }
 
 // ═══════════════════════════════════════════
-// 1. EXPRESS HTTP SERVER (APP & WEB PLAYER)
+// 1. EXPRESS HTTP SERVER
 // ═══════════════════════════════════════════
 const app = express();
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.PORT || 8080;
 
 app.use(express.json());
 app.use(express.static(__dirname));
@@ -149,7 +147,6 @@ function servePlayerPage(req, res) {
 app.get('/v/:id', (req, res) => servePlayerPage(req, res));
 app.get('/tb/:id', (req, res) => servePlayerPage(req, res));
 
-// App stream info fetcher for ExoPlayer
 app.get(['/api/stream-info/:id', '/api/tb/:id', '/api/v/:id'], async (req, res) => {
   try {
     const id = req.params.id;
@@ -222,21 +219,42 @@ function buildSuccessMessage(user, fileName, shortUrl) {
   return parts.join('\n');
 }
 
+// Multi-Source Resilient Extractor
 async function extractTeraboxLink(teraboxUrl) {
-  try {
-    const res = await axios.get(TERABOX_API, {
-      params: { url: teraboxUrl },
-      timeout: 45000,
-    });
-    if (!res.data || !res.data.success || !res.data.files || !res.data.files.length) return null;
-    const file = res.data.files[0];
-    const streamUrl = file.streaming_url || file.download_url;
-    if (!streamUrl) return null;
-    return { url: streamUrl, name: file.file_name || 'Terabox Video' };
-  } catch (err) {
-    console.error('Terabox extract error:', err.message);
-    return null;
+  const endpoints = [
+    `https://terabox-dl.qtcloud.workers.dev/api?url=${encodeURIComponent(teraboxUrl)}`,
+    `https://tb-api.ytbvideolyrics.com/api?url=${encodeURIComponent(teraboxUrl)}`,
+    `https://terabox.hnn.workers.dev/api?url=${encodeURIComponent(teraboxUrl)}`
+  ];
+
+  for (const endpoint of endpoints) {
+    try {
+      console.log(`[Extractor] Trying endpoint: ${endpoint}`);
+      const res = await axios.get(endpoint, {
+        headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)' },
+        timeout: 12000
+      });
+
+      if (res.data) {
+        // Format A: standard list
+        if (res.data.files && res.data.files.length) {
+          const file = res.data.files[0];
+          const streamUrl = file.streaming_url || file.download_url || file.dlink;
+          if (streamUrl) return { url: streamUrl, name: file.file_name || file.filename || 'Terabox Video' };
+        }
+        // Format B: direct response
+        if (res.data.download_url || res.data.direct_link || res.data.url) {
+          return {
+            url: res.data.download_url || res.data.direct_link || res.data.url,
+            name: res.data.file_name || res.data.title || 'Terabox Video'
+          };
+        }
+      }
+    } catch (e) {
+      console.error(`[Extractor] Endpoint failed (${endpoint}):`, e.message);
+    }
   }
+  return null;
 }
 
 bot.onText(/\/start/, (msg) => {
@@ -302,7 +320,6 @@ bot.onText(/\/add_footer(?:\s+([\s\S]+))?/, async (msg, match) => {
   bot.sendMessage(chatId, `✅ Footer updated!`, { parse_mode: 'HTML' });
 });
 
-// Master Handler for Text + Photo Captions
 bot.on('message', async (msg) => {
   const chatId = msg.chat.id;
   const incomingContent = msg.text || msg.caption || '';
@@ -316,22 +333,25 @@ bot.on('message', async (msg) => {
     );
   }
 
-  // Regex to extract Terabox links from raw text or photo caption
-  const urlRegex = /(https?:\/\/[^\s]+(?:terabox|terasharefile|1024tera|teraboxapp|teraboxshare|teraboxlink|tibibox|momerybox|mirrorbox|4funbox|dubox|freeterabox)[^\s]*)/i;
-  const match = incomingContent.match(urlRegex);
+  // Robust URL extraction regex
+  const urlRegex = /(https?:\/\/[^\s<>"']+)/gi;
+  const foundUrls = incomingContent.match(urlRegex) || [];
+  const teraboxUrl = foundUrls.find(u => /(terabox|terasharefile|1024tera|teraboxapp|teraboxshare|teraboxlink|tibibox|momerybox|mirrorbox|4funbox|dubox|freeterabox)/i.test(u));
 
-  if (!match) return;
+  if (!teraboxUrl) return;
 
-  const teraboxUrl = match[0];
   const uploaderName = msg.from?.username ? `@${msg.from.username}` : (msg.from?.first_name || 'Matrix User');
 
-  const statusMsg = await bot.sendMessage(chatId, `🔄 <i>Converting Terabox to MayaJaal Stream...</i>`, { parse_mode: 'HTML' });
+  let statusMsg = null;
+  try {
+    statusMsg = await bot.sendMessage(chatId, `🔄 <i>Converting Terabox to MayaJaal Stream...</i>`, { parse_mode: 'HTML' });
+  } catch (e) {}
 
   try {
     const extracted = await extractTeraboxLink(teraboxUrl);
     if (!extracted || !extracted.url) {
-      await bot.deleteMessage(chatId, statusMsg.message_id).catch(() => {});
-      return bot.sendMessage(chatId, `❌ <b>Link convert nahi ho saka (Terabox API error).</b>`, { parse_mode: 'HTML' });
+      if (statusMsg) await bot.deleteMessage(chatId, statusMsg.message_id).catch(() => {});
+      return bot.sendMessage(chatId, `❌ <b>Link convert nahi ho saka (Terabox API down ya link expired).</b>`, { parse_mode: 'HTML' });
     }
 
     const shortId = crypto.randomBytes(4).toString('hex');
@@ -345,7 +365,7 @@ bot.on('message', async (msg) => {
     await redis.set(`terabox:${shortId}`, JSON.stringify(payload), { ex: 30 * 86400 });
 
     const playUrl = `${BASE_URL}/tb/${shortId}`;
-    await bot.deleteMessage(chatId, statusMsg.message_id).catch(() => {});
+    if (statusMsg) await bot.deleteMessage(chatId, statusMsg.message_id).catch(() => {});
     await bot.sendMessage(chatId, buildSuccessMessage(user, extracted.name, playUrl), {
       parse_mode: 'HTML',
       disable_web_page_preview: true,
