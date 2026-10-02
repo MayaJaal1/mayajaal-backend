@@ -1,7 +1,7 @@
 {
   "name": "mayajaal-bot",
-  "version": "1.0.0",
-  "description": "MayaJaal Terabox Converter Bot",
+  "version": "2.0.0",
+  "description": "MayaJaal Fast Terabox Converter Bot",
   "main": "bot.js",
   "scripts": {
     "start": "node bot.js"
