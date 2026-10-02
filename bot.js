@@ -251,10 +251,18 @@ app.get(['/api/stream-info/:id', '/api/tb/:id', '/api/v/:id'], async (req, res) 
 app.listen(PORT, () => {
   console.log(`✅ MayaJaal Web Server active on port ${PORT}`);
 });
-        // ═══════════════════════════════════════════
+// ═══════════════════════════════════════════
 // 3. BOT CONTROLLER & ADVANCED EXTRACTORS
 // ═══════════════════════════════════════════
 const bot = new TelegramBot(TOKEN, { polling: { autoStart: true, params: { timeout: 10 } } });
+
+bot.on('polling_error', (error) => {
+  if (error.message && error.message.includes('409 Conflict')) {
+    console.error('⚠️ [409 Conflict]: Duplicate bot instance detected. Make sure only one deployment is active.');
+  } else {
+    console.error('[Polling Error]:', error.message);
+  }
+});
 
 async function getUser(chatId) {
   try {
@@ -355,7 +363,7 @@ async function extractDiskwalaLink(diskwalaUrl) {
 }
 
 // ───────────────────────────────────────────
-// B. DIRECT COOKIE-BASED TERABOX EXTRACTOR
+// B. DIRECT COOKIE-BASED TERABOX EXTRACTOR (Dual-Key Support)
 // ───────────────────────────────────────────
 async function extractTeraboxLink(teraboxUrl) {
   const rawCookie = process.env.TERABOX_COOKIE || 'ndus=Yzdpm64teHuiTpyF1tSZ-m4ANxhFN7shhUG1hMNu;';
@@ -363,7 +371,9 @@ async function extractTeraboxLink(teraboxUrl) {
 
   const match = teraboxUrl.match(/\/s\/([a-zA-Z0-9_-]+)/i);
   let shorturl = match ? match[1] : '';
-  if (shorturl.startsWith('1')) shorturl = shorturl.substring(1);
+  if (!shorturl) return null;
+
+  const shorturlAlt = shorturl.startsWith('1') ? shorturl.substring(1) : shorturl;
 
   const baseHeaders = {
     'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36',
@@ -372,12 +382,15 @@ async function extractTeraboxLink(teraboxUrl) {
     'Accept': 'application/json, text/plain, */*'
   };
 
-  // 1. Direct Terabox Official Share List API using Railway Cookie
-  if (shorturl) {
+  const tryKeys = [shorturl, shorturlAlt];
+
+  for (const key of tryKeys) {
+    // 1. Direct Terabox Official Share List API
     try {
-      const apiUrl = `https://www.1024tera.com/share/list?app_id=250528&shorturl=${shorturl}&root=1`;
+      const apiUrl = `https://www.1024tera.com/share/list?app_id=250528&shorturl=${key}&root=1`;
       const res = await axios.get(apiUrl, { headers: baseHeaders, timeout: 15000 });
-      
+      console.log(`[Terabox API] checking key: ${key}, errno:`, res.data?.errno);
+
       if (res.data?.errno === 0 && res.data?.list?.length > 0) {
         const file = res.data.list[0];
         const streamUrl = file.dlink || file.direct_link || file.url;
@@ -389,12 +402,12 @@ async function extractTeraboxLink(teraboxUrl) {
         }
       }
     } catch (err) {
-      console.error('[Terabox Official API Error]:', err.message);
+      console.error('[Terabox API Error]:', err.message);
     }
 
     // 2. ShortURL Info Fallback API
     try {
-      const infoUrl = `https://www.1024tera.com/api/shorturlinfo?shorturl=${shorturl}&app_id=250528`;
+      const infoUrl = `https://www.1024tera.com/api/shorturlinfo?shorturl=${key}&app_id=250528`;
       const infoRes = await axios.get(infoUrl, { headers: baseHeaders, timeout: 12000 });
       if (infoRes.data?.list?.length > 0) {
         const item = infoRes.data.list[0];
@@ -408,7 +421,7 @@ async function extractTeraboxLink(teraboxUrl) {
     } catch (e) {}
   }
 
-  // 3. Fallback Worker API (agar direct API par captcha ya rate limit ho)
+  // 3. Fallback Worker API
   try {
     const res = await axios.post('https://terabox-downloader.ashlynn.workers.dev/api', 
       { url: teraboxUrl }, 
@@ -650,4 +663,4 @@ bot.on('message', async (msg) => {
     bot.sendMessage(chatId, `❌ <b>Error:</b> <code>${escapeHtml(err.message)}</code>`, { parse_mode: 'HTML' });
   }
 });
-             
+  
