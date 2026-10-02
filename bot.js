@@ -191,7 +191,7 @@ async function getStorageEntity() {
   }
 }
 
-// Reliable Streaming Range Endpoint
+// 🌟 Reliable 2GB Streaming Endpoint for ExoPlayer & Web
 app.get('/stream/:id', async (req, res) => {
   const id = req.params.id;
   try {
@@ -276,7 +276,7 @@ app.listen(PORT, () => {
 });
 
 // ═══════════════════════════════════════════
-// 2. GRAMJS MTPROTO CLIENT (BULLETPROOF)
+// 2. GRAMJS MTPROTO CLIENT (BULLETPROOF STORAGE)
 // ═══════════════════════════════════════════
 const tgClient = new TelegramClient(new StringSession(''), API_ID, API_HASH, {
   connectionRetries: 10,
