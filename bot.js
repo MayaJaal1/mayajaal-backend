@@ -177,7 +177,7 @@ app.listen(PORT, () => {
 });
 
 // ═══════════════════════════════════════════
-// 2. BOT CONTROLLER & RESILIENT EXTRACTOR
+// 2. BOT CONTROLLER & ADVANCED EXTRACTOR
 // ═══════════════════════════════════════════
 const bot = new TelegramBot(TOKEN, { polling: true });
 
@@ -220,67 +220,67 @@ function buildSuccessMessage(user, fileName, shortUrl) {
 }
 
 async function extractTeraboxLink(teraboxUrl) {
-  const extractAPIs = [
-    // 1. High Speed Worker Gateway
-    async (url) => {
-      const res = await axios.get(`https://terabox-api-server.vercel.app/api?url=${encodeURIComponent(url)}`, { timeout: 12000 });
-      if (res.data?.download_link || res.data?.direct_link) {
-        return {
-          url: res.data.download_link || res.data.direct_link,
-          name: res.data.file_name || res.data.title || 'Terabox Video'
-        };
-      }
-      return null;
-    },
-    // 2. Backup Direct Worker
-    async (url) => {
-      const res = await axios.post(`https://terabox-downloader-gamma.vercel.app/api`, 
-        { url: url }, 
-        { headers: { 'Content-Type': 'application/json' }, timeout: 12000 }
-      );
-      if (res.data?.dlink || res.data?.download_url) {
-        return {
-          url: res.data.dlink || res.data.download_url,
-          name: res.data.file_name || 'Terabox Video'
-        };
-      }
-      return null;
-    },
-    // 3. Official Web Endpoint (Cookie Fallback)
-    async (url) => {
-      const rawCookie = process.env.TERABOX_COOKIE || 'ndus=Yzdpm64teHuiTpyF1tSZ-m4ANxhFN7shhUG1hMNu;';
-      const cookie = rawCookie.includes('ndus=') ? rawCookie : `ndus=${rawCookie};`;
-      const match = url.match(/(\/s\/|surl=)([a-zA-Z0-9_-]+)/);
-      if (!match) return null;
-      let surl = match[2];
-      if (surl.startsWith('1')) surl = surl.substring(1);
-      
-      const res = await axios.get(`https://www.terabox1024.com/share/list?app_id=250528&shorturl=${surl}&root=1`, {
+  const rawCookie = process.env.TERABOX_COOKIE || 'ndus=Yzdpm64teHuiTpyF1tSZ-m4ANxhFN7shhUG1hMNu;';
+  const cookie = rawCookie.includes('ndus=') ? rawCookie : `ndus=${rawCookie};`;
+
+  // 1. Dynamic Extraction via Web Session Page
+  try {
+    const match = teraboxUrl.match(/(\/s\/|surl=)([a-zA-Z0-9_-]+)/);
+    if (match) {
+      let rawKey = match[2];
+      const surl = rawKey.startsWith('1') ? rawKey.substring(1) : rawKey;
+      const sharePageUrl = `https://www.terabox1024.com/sharing/link?surl=${surl}`;
+
+      const pageRes = await axios.get(sharePageUrl, {
         headers: {
           'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
           'Cookie': cookie,
-          'Referer': `https://www.terabox1024.com/sharing/link?surl=${surl}`
+          'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8'
         },
         timeout: 10000
       });
-      if (res.data?.errno === 0 && res.data?.list?.length) {
-        return { url: res.data.list[0].dlink, name: res.data.list[0].server_filename || 'Terabox Video' };
+
+      const pageHtml = pageRes.data || '';
+      const jsTokenMatch = pageHtml.match(/fn%28%22(.*?)%22%29/) || pageHtml.match(/jsToken":"(.*?)"/) || pageHtml.match(/jsToken = "(.*?)"/);
+      const jsToken = jsTokenMatch ? jsTokenMatch[1] : '';
+
+      const listApi = `https://www.terabox1024.com/share/list?app_id=250528&shorturl=${surl}&root=1${jsToken ? `&jsToken=${jsToken}` : ''}`;
+      const listRes = await axios.get(listApi, {
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+          'Cookie': cookie,
+          'Referer': sharePageUrl
+        },
+        timeout: 10000
+      });
+
+      if (listRes.data && listRes.data.errno === 0 && listRes.data.list && listRes.data.list.length > 0) {
+        const file = listRes.data.list[0];
+        if (file.dlink) {
+          return { url: file.dlink, name: file.server_filename || 'Terabox Video' };
+        }
       }
-      return null;
     }
+  } catch (err) {
+    console.error('[Extractor Native]', err.message);
+  }
+
+  // 2. Direct Fallback Gateways
+  const fallbackApis = [
+    `https://terabox-api-direct.onrender.com/api?url=${encodeURIComponent(teraboxUrl)}`,
+    `https://ytbvideolyrics.com/api/tb?url=${encodeURIComponent(teraboxUrl)}`
   ];
 
-  for (let i = 0; i < extractAPIs.length; i++) {
+  for (const endpoint of fallbackApis) {
     try {
-      console.log(`[Extractor] Trying strategy #${i + 1}...`);
-      const result = await extractAPIs[i](teraboxUrl);
-      if (result && result.url) {
-        console.log(`[Extractor] Strategy #${i + 1} Success!`);
-        return result;
+      const res = await axios.get(endpoint, { timeout: 10000 });
+      if (res.data?.download_url || res.data?.dlink || res.data?.direct_link) {
+        return {
+          url: res.data.download_url || res.data.dlink || res.data.direct_link,
+          name: res.data.file_name || res.data.title || 'Terabox Video'
+        };
       }
-    } catch (err) {
-      console.log(`[Extractor] Strategy #${i + 1} failed: ${err.message}`);
-    }
+    } catch (e) {}
   }
 
   return null;
@@ -368,7 +368,6 @@ bot.on('message', async (msg) => {
   );
 
   if (!teraboxUrl) {
-    // Agar link TeraBox ka nahi mila toh user ko inform karein
     return;
   }
 
