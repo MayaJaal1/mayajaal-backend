@@ -177,7 +177,7 @@ app.listen(PORT, () => {
 });
 
 // ═══════════════════════════════════════════
-// 2. BOT CONTROLLER & TERABOX EXTRACTOR
+// 2. BOT CONTROLLER & MULTI-API EXTRACTOR
 // ═══════════════════════════════════════════
 const bot = new TelegramBot(TOKEN, { polling: true });
 
@@ -219,7 +219,6 @@ function buildSuccessMessage(user, fileName, shortUrl) {
   return parts.join('\n');
 }
 
-// Multi-Source Resilient Extractor
 async function extractTeraboxLink(teraboxUrl) {
   const endpoints = [
     `https://terabox-dl.qtcloud.workers.dev/api?url=${encodeURIComponent(teraboxUrl)}`,
@@ -232,17 +231,15 @@ async function extractTeraboxLink(teraboxUrl) {
       console.log(`[Extractor] Trying endpoint: ${endpoint}`);
       const res = await axios.get(endpoint, {
         headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)' },
-        timeout: 12000
+        timeout: 10000
       });
 
       if (res.data) {
-        // Format A: standard list
         if (res.data.files && res.data.files.length) {
           const file = res.data.files[0];
           const streamUrl = file.streaming_url || file.download_url || file.dlink;
           if (streamUrl) return { url: streamUrl, name: file.file_name || file.filename || 'Terabox Video' };
         }
-        // Format B: direct response
         if (res.data.download_url || res.data.direct_link || res.data.url) {
           return {
             url: res.data.download_url || res.data.direct_link || res.data.url,
@@ -320,6 +317,7 @@ bot.onText(/\/add_footer(?:\s+([\s\S]+))?/, async (msg, match) => {
   bot.sendMessage(chatId, `✅ Footer updated!`, { parse_mode: 'HTML' });
 });
 
+// Master Handler
 bot.on('message', async (msg) => {
   const chatId = msg.chat.id;
   const incomingContent = msg.text || msg.caption || '';
@@ -333,7 +331,6 @@ bot.on('message', async (msg) => {
     );
   }
 
-  // Robust URL extraction regex
   const urlRegex = /(https?:\/\/[^\s<>"']+)/gi;
   const foundUrls = incomingContent.match(urlRegex) || [];
   const teraboxUrl = foundUrls.find(u => /(terabox|terasharefile|1024tera|teraboxapp|teraboxshare|teraboxlink|tibibox|momerybox|mirrorbox|4funbox|dubox|freeterabox)/i.test(u));
