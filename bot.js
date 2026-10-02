@@ -52,7 +52,7 @@ const mtprotoClient = new TelegramClient(new StringSession(''), API_ID, API_HASH
 })();
 
 // ═══════════════════════════════════════════
-// 2. EXPRESS HTTP SERVER
+// 2. EXPRESS HTTP SERVER & STREAM PROXY (Range 206 Enabled)
 // ═══════════════════════════════════════════
 const app = express();
 const PORT = process.env.PORT || 8080;
@@ -170,7 +170,9 @@ function servePlayerPage(req, res) {
 app.get('/v/:id', (req, res) => servePlayerPage(req, res));
 app.get('/tb/:id', (req, res) => servePlayerPage(req, res));
 
-// Direct Proxy Streamer jo player ko continuous stream feed deta hai
+// ───────────────────────────────────────────
+// DIRECT STREAM ENGINE (Player Fast Streaming)
+// ───────────────────────────────────────────
 app.get('/stream/:id', async (req, res) => {
   try {
     const id = req.params.id;
@@ -182,9 +184,13 @@ app.get('/stream/:id', async (req, res) => {
 
     if (!data || !data.url) return res.status(404).send('Stream link missing');
 
+    const rawCookie = process.env.TERABOX_COOKIE || 'ndus=Yzdpm64teHuiTpyF1tSZ-m4ANxhFN7shhUG1hMNu;';
+    const cookie = rawCookie.includes('ndus=') ? rawCookie : `ndus=${rawCookie};`;
+
     const headers = {
       'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
       'Referer': 'https://www.1024tera.com/',
+      'Cookie': cookie,
       'Accept': '*/*'
     };
 
@@ -195,17 +201,22 @@ app.get('/stream/:id', async (req, res) => {
     const videoStream = await axios.get(data.url, {
       responseType: 'stream',
       headers: headers,
-      timeout: 60000
+      maxRedirects: 10,
+      beforeRedirect: (options) => {
+        options.headers = { ...options.headers, ...headers };
+      },
+      timeout: 180000
     });
 
     res.status(videoStream.status);
-    Object.keys(videoStream.headers).forEach(h => {
-      res.setHeader(h, videoStream.headers[h]);
-    });
+    res.setHeader('Content-Type', videoStream.headers['content-type'] || 'video/mp4');
+    res.setHeader('Accept-Ranges', 'bytes');
+    if (videoStream.headers['content-range']) res.setHeader('Content-Range', videoStream.headers['content-range']);
+    if (videoStream.headers['content-length']) res.setHeader('Content-Length', videoStream.headers['content-length']);
 
     videoStream.data.pipe(res);
   } catch (err) {
-    console.error('[Stream Proxy Error]:', err.message);
+    console.error('[Stream Error]:', err.message);
     if (!res.headersSent) res.status(500).send('Streaming error');
   }
 });
@@ -221,14 +232,12 @@ app.get(['/api/stream-info/:id', '/api/tb/:id', '/api/v/:id'], async (req, res) 
 
     if (!data || !data.url) return res.status(404).json({ success: false, message: 'Stream not found' });
 
-    // Agar direct URL hai toh proxy route do taaki CORS block na ho
-    const finalStream = data.url.startsWith('http') ? `${BASE_URL}/stream/${id}` : data.url;
+    const directStreamUrl = `${BASE_URL}/stream/${id}`;
 
     res.json({
       success: true,
-      url: finalStream,
-      video_url: finalStream,
-      direct_source: data.url,
+      url: directStreamUrl,
+      video_url: directStreamUrl,
       title: data.name || 'MayaJaal Stream Video',
       file_name: data.name || 'MayaJaal Stream Video',
       uploader: data.uploader || 'Matrix Ghost Node',
@@ -242,7 +251,7 @@ app.get(['/api/stream-info/:id', '/api/tb/:id', '/api/v/:id'], async (req, res) 
 app.listen(PORT, () => {
   console.log(`✅ MayaJaal Web Server active on port ${PORT}`);
 });
-               // ═══════════════════════════════════════════
+// ═══════════════════════════════════════════
 // 3. BOT CONTROLLER & EXTRACTORS
 // ═══════════════════════════════════════════
 const bot = new TelegramBot(TOKEN, { polling: { autoStart: true, params: { timeout: 10 } } });
@@ -347,7 +356,7 @@ async function extractTeraboxLink(teraboxUrl) {
 }
 
 // ───────────────────────────────────────────
-// C. 2GB MTPROTO FAST BACKUP (Direct Telegram File Extraction)
+// C. 2GB MTPROTO FAST BACKUP (Direct Channel Vault Upload)
 // ───────────────────────────────────────────
 async function uploadToStorageChannel2GB(videoUrl, fileName, caption) {
   if (!STORAGE_CHANNEL_ID) return null;
@@ -365,13 +374,16 @@ async function uploadToStorageChannel2GB(videoUrl, fileName, caption) {
   };
 
   try {
-    console.log(`[Vault] 1. Downloading stream...`);
+    console.log(`[Vault] 1. Downloading direct stream to disk...`);
     const writer = fs.createWriteStream(tempFilePath);
 
     const streamRes = await axios.get(videoUrl, {
       responseType: 'stream',
       headers: headers,
       maxRedirects: 10,
+      beforeRedirect: (options) => {
+        options.headers = { ...options.headers, ...headers };
+      },
       timeout: 180000
     });
 
@@ -382,6 +394,9 @@ async function uploadToStorageChannel2GB(videoUrl, fileName, caption) {
     });
 
     const stats = fs.statSync(tempFilePath);
+    const mbSize = (stats.size / (1024 * 1024)).toFixed(2);
+    console.log(`[Vault] 2. Download finished. Size: ${mbSize} MB`);
+
     if (stats.size === 0) {
       try { fs.unlinkSync(tempFilePath); } catch (e) {}
       return null;
@@ -392,7 +407,7 @@ async function uploadToStorageChannel2GB(videoUrl, fileName, caption) {
       peer = BigInt(peer);
     }
 
-    console.log(`[Vault] 2. Uploading chunk to channel...`);
+    console.log(`[Vault] 3. Starting MTProto 2GB chunk upload...`);
     const result = await mtprotoClient.sendFile(peer, {
       file: tempFilePath,
       caption: caption,
@@ -401,17 +416,8 @@ async function uploadToStorageChannel2GB(videoUrl, fileName, caption) {
     });
 
     try { fs.unlinkSync(tempFilePath); } catch (e) {}
-    console.log(`[Vault] 3. Uploaded successfully! Msg ID: ${result.id}`);
-
-    // Message se Telegram direct file stream nikalna
-    let tgFileUrl = null;
-    try {
-      const tgMsg = await bot.getChat(STORAGE_CHANNEL_ID);
-      // Fallback direct stream link
-      tgFileUrl = videoUrl;
-    } catch (e) {}
-
-    return { result, streamUrl: tgFileUrl || videoUrl };
+    console.log(`[Vault] 4. Success! Uploaded to channel. Msg ID: ${result.id}`);
+    return result;
   } catch (err) {
     console.error(`[Vault Upload Failed]:`, err.message);
     try { if (fs.existsSync(tempFilePath)) fs.unlinkSync(tempFilePath); } catch (e) {}
@@ -486,7 +492,7 @@ bot.onText(/\/add_footer(?:\s+([\s\S]+))?/, async (msg, match) => {
 });
 
 // ═══════════════════════════════════════════
-// 4. MASTER HANDLER
+// 4. MASTER HANDLER (2GB SECURE BACKUP)
 // ═══════════════════════════════════════════
 bot.on('message', async (msg) => {
   const chatId = msg.chat.id;
@@ -534,9 +540,9 @@ bot.on('message', async (msg) => {
       return bot.sendMessage(chatId, `❌ <b>Link convert nahi ho saka (Link expired ya unsupported).</b>`, { parse_mode: 'HTML' });
     }
 
-    let finalPlayUrl = extracted.url;
     let isBackedUp = false;
 
+    // MTPROTO 2GB BACKUP TO CHANNEL
     if (STORAGE_CHANNEL_ID) {
       const uploadResult = await uploadToStorageChannel2GB(
         extracted.url,
@@ -544,15 +550,14 @@ bot.on('message', async (msg) => {
         `📁 <b>${escapeHtml(extracted.name)}</b>\n👤 Added by: ${uploaderName}\n🔗 Original: ${targetUrl}`
       );
 
-      if (uploadResult && uploadResult.result) {
+      if (uploadResult && uploadResult.id) {
         isBackedUp = true;
-        if (uploadResult.streamUrl) finalPlayUrl = uploadResult.streamUrl;
       }
     }
 
     const shortId = crypto.randomBytes(4).toString('hex');
     const payload = {
-      url: finalPlayUrl,
+      url: extracted.url,
       name: extracted.name,
       uploader: uploaderName,
     };
@@ -573,4 +578,4 @@ bot.on('message', async (msg) => {
     bot.sendMessage(chatId, `❌ <b>Error:</b> <code>${escapeHtml(err.message)}</code>`, { parse_mode: 'HTML' });
   }
 });
-    
+               
