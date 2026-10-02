@@ -20,10 +20,13 @@ const redis = Redis.fromEnv();
 const linkStore = new Map();
 
 const TOKEN = process.env.BOT_TOKEN;
-const API_ID = parseInt(process.env.TELEGRAM_API_ID || '0', 10);
-const API_HASH = process.env.TELEGRAM_API_HASH || '';
-const STRING_SESSION = process.env.TELEGRAM_STRING_SESSION || '';
-const STORAGE_CHANNEL_ID = process.env.STORAGE_CHANNEL_ID || '';
+
+// Auto-detect variable names (aliases support)
+const rawApiId = process.env.TELEGRAM_API_ID || process.env.API_ID || '';
+const API_ID = parseInt(String(rawApiId).trim(), 10);
+const API_HASH = String(process.env.TELEGRAM_API_HASH || process.env.API_HASH || '').trim();
+const STRING_SESSION = String(process.env.TELEGRAM_STRING_SESSION || process.env.SESSION_STRING || process.env.STRING_SESSION || '').trim();
+const STORAGE_CHANNEL_ID = String(process.env.STORAGE_CHANNEL_ID || process.env.CHANNEL_ID || '').trim();
 
 const BASE_URL = process.env.CUSTOM_DOMAIN 
   ? (process.env.CUSTOM_DOMAIN.startsWith('http') ? process.env.CUSTOM_DOMAIN : `https://${process.env.CUSTOM_DOMAIN}`)
@@ -37,25 +40,31 @@ if (!TOKEN) {
 // ═══════════════════════════════════════════
 // 1. GRAMJS MTPROTO CLIENT (2GB Streaming Engine)
 // ═══════════════════════════════════════════
-const tgClient = new TelegramClient(
-  new StringSession(STRING_SESSION),
-  API_ID,
-  API_HASH,
-  { connectionRetries: 5 }
-);
+let tgClient = null;
 
-(async () => {
-  if (API_ID && API_HASH && STRING_SESSION) {
+if (!isNaN(API_ID) && API_ID > 0 && API_HASH && STRING_SESSION) {
+  tgClient = new TelegramClient(
+    new StringSession(STRING_SESSION),
+    API_ID,
+    API_HASH,
+    { connectionRetries: 5 }
+  );
+
+  (async () => {
     try {
       await tgClient.connect();
-      console.log('✅ GramJS MTProto Client connected (2GB Streaming Enabled)!');
+      console.log('✅ GramJS MTProto Client connected successfully (2GB Vault Stream Active)!');
     } catch (e) {
-      console.error('⚠️ GramJS Connection Error:', e.message);
+      console.error('❌ GramJS Connection Failed:', e.message);
     }
-  } else {
-    console.warn('⚠️ TELEGRAM_API_ID / HASH / STRING_SESSION missing. GramJS stream fallback mode mein chalega.');
-  }
-})();
+  })();
+} else {
+  console.warn('⚠️ Credentials check details:', {
+    hasApiId: !isNaN(API_ID) && API_ID > 0,
+    hasApiHash: Boolean(API_HASH),
+    hasSession: Boolean(STRING_SESSION)
+  });
+}
 
 // ═══════════════════════════════════════════
 // 2. EXPRESS HTTP SERVER
@@ -141,7 +150,7 @@ function servePlayerPage(req, res) {
     </head>
     <body>
       <div class="card">
-        <span class="badge">⚡ 2GB ZERO-BUFFER CLOUD STREAM</span>
+        <span class="badge">⚡ 2GB ZERO-BUFFER CLOUDFLARE EDGE STREAM</span>
         <video id="player" controls autoplay playsinline preload="auto">
           <source src="/stream/${id}" type="video/mp4">
         </video>
@@ -162,7 +171,7 @@ app.get('/v/:id', (req, res) => servePlayerPage(req, res));
 app.get('/tb/:id', (req, res) => servePlayerPage(req, res));
 
 // ───────────────────────────────────────────
-// 3. ZERO-BUFFER RANGE 206 STREAMING ENGINE (MTProto + External)
+// 3. ZERO-BUFFER RANGE 206 STREAMING ENGINE (CLOUDFLARE BACKED)
 // ───────────────────────────────────────────
 app.get('/stream/:id', async (req, res) => {
   try {
@@ -176,10 +185,15 @@ app.get('/stream/:id', async (req, res) => {
 
     if (!data) return res.status(404).send('Stream unavailable');
 
+    // Headers for Cloudflare Edge Optimization
+    res.setHeader('Cache-Control', 'public, max-age=86400');
+    res.setHeader('Accept-Ranges', 'bytes');
+
     // Case 1: Telegram Channel 2GB MTProto Chunk Streamer
-    if (data.channel_id && data.msg_id && tgClient.connected) {
+    if (data.channel_id && data.msg_id && tgClient && tgClient.connected) {
       try {
-        const messages = await tgClient.getMessages(data.channel_id, { ids: [data.msg_id] });
+        const channelPeer = isNaN(data.channel_id) ? data.channel_id : parseInt(data.channel_id, 10);
+        const messages = await tgClient.getMessages(channelPeer, { ids: [parseInt(data.msg_id, 10)] });
         const targetMsg = messages && messages[0];
         const media = targetMsg?.media;
 
@@ -202,9 +216,9 @@ app.get('/stream/:id', async (req, res) => {
             'Accept-Ranges': 'bytes',
             'Content-Length': chunkSize,
             'Content-Type': media.document.mimeType || 'video/mp4',
+            'Cache-Control': 'public, max-age=86400'
           });
 
-          // Fast direct chunk pipe from Telegram Data Center
           for await (const chunk of tgClient.iterDownload({
             file: media.document,
             offset: BigInt(start),
@@ -222,14 +236,10 @@ app.get('/stream/:id', async (req, res) => {
       }
     }
 
-    // Case 2: External HTTP Stream (Terabox / Diskwala / CDN fallback)
+    // Case 2: External Link Stream (Diskwala / Terabox / Web Stream)
     if (!data.url) return res.status(404).send('Stream expired');
 
     const targetUrl = data.url;
-    if (targetUrl.includes('api.telegram.org')) {
-      return res.redirect(302, targetUrl);
-    }
-
     const rawCookie = process.env.TERABOX_COOKIE || 'ndus=Yzdpm64teHuiTpyF1tSZ-m4ANxhFN7shhUG1hMNu;';
     const cookie = rawCookie.includes('ndus=') ? rawCookie : `ndus=${rawCookie};`;
     const isTerabox = targetUrl.includes('terabox') || targetUrl.includes('1024tera') || targetUrl.includes('baidupcs');
@@ -287,9 +297,9 @@ app.get(['/api/stream-info/:id', '/api/tb/:id', '/api/v/:id'], async (req, res) 
   }
 });
 
-app.listen(PORT, () => console.log(`✅ MayaJaal Web Server active on port ${PORT}`));
+app.listen(PORT, () => console.log(`✅ MayaJaal Cloudflare-Backed Web Server active on port ${PORT}`));
 // ═══════════════════════════════════════════
-// 4. BOT CONTROLLER (Channel Storage + Parallel Resolvers)
+// 4. BOT CONTROLLER & ADVANCED RESOLVERS
 // ═══════════════════════════════════════════
 const bot = new TelegramBot(TOKEN, {
   polling: {
@@ -323,7 +333,7 @@ function escapeHtml(str = '') {
 }
 
 // ───────────────────────────────────────────
-// A. EXTRACTORS (Terabox Redirects & API Resolvers)
+// A. EXTRACTORS (Auto-Redirects & Fast Endpoints)
 // ───────────────────────────────────────────
 async function extractTeraboxLink(rawUrl) {
   try {
@@ -452,12 +462,12 @@ async function extractMayaJaalLink(mayaUrl) {
 }
 
 // ───────────────────────────────────────────
-// B. BOT COMMANDS
+// B. BOT COMMANDS & CONNECT API
 // ───────────────────────────────────────────
 bot.onText(/\/start/, (msg) => {
   bot.sendMessage(msg.chat.id,
-    `🎬 <b>MayaJaal 2GB Cloud Streamer</b>\n\n` +
-    `• <b>2GB Video Upload:</b> Telegram Channel Storage Vault + Fast Player\n` +
+    `🎬 <b>MayaJaal 2GB Cloudflare Streamer</b>\n\n` +
+    `• <b>2GB Video Upload:</b> Telegram Channel Storage Vault + Cloudflare CDN Player\n` +
     `• <b>Bulk Links:</b> Teraboxlink, Terabox, Diskwala ke multiple links bhejein\n` +
     `• <b>API Setup:</b> <code>/api</code> se connect karein`,
     { parse_mode: 'HTML' }
@@ -485,7 +495,7 @@ bot.onText(/\/api(?:\s+(.+))?/, async (msg, match) => {
 });
 
 // ───────────────────────────────────────────
-// C. MESSAGE HANDLER (2GB Channel Vault + Parallel Processing)
+// C. MESSAGE HANDLER (Channel Vault Storage + Parallel Resolvers)
 // ───────────────────────────────────────────
 bot.on('message', async (msg) => {
   const chatId = msg.chat.id;
@@ -532,7 +542,7 @@ bot.on('message', async (msg) => {
 
       let reply = `✨ <b>MayaJaal 2GB Stream Ready!</b>\n\n`;
       if (user.header && user.enableText) reply = `<b>${escapeHtml(user.header)}</b>\n\n` + reply;
-      reply += `📌 <b>File:</b> ${escapeHtml(fileName)}\n\n🔗 <b>Player Link:</b>\n${playUrl}\n\n⚡ <i>Telegram Vault Saved & Zero-Buffer Playback Active!</i>`;
+      reply += `📌 <b>File:</b> ${escapeHtml(fileName)}\n\n🔗 <b>Cloudflare Player Link:</b>\n${playUrl}\n\n⚡ <i>Telegram Vault Saved & Zero-Buffer Playback Active!</i>`;
       if (user.footer && user.enableText) reply += `\n\n<b>${escapeHtml(user.footer)}</b>`;
 
       return bot.sendMessage(chatId, reply, { parse_mode: 'HTML', disable_web_page_preview: false });
@@ -608,4 +618,4 @@ bot.on('message', async (msg) => {
     bot.sendMessage(chatId, `❌ <b>Error:</b> <code>${escapeHtml(err.message)}</code>`, { parse_mode: 'HTML' });
   }
 });
-           
+        
