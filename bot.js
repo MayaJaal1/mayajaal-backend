@@ -8,7 +8,6 @@ const { Redis } = require('@upstash/redis');
 const path = require('path');
 const fs = require('fs');
 
-// MTProto 2GB Native Uploader Client
 const { TelegramClient } = require('telegram');
 const { StringSession } = require('telegram/sessions');
 
@@ -37,7 +36,7 @@ if (!TOKEN) {
 }
 
 // ═══════════════════════════════════════════
-// 1. MTPROTO 2GB CLIENT (No 20MB/50MB Limit)
+// 1. MTPROTO 2GB CLIENT
 // ═══════════════════════════════════════════
 const mtprotoClient = new TelegramClient(new StringSession(''), API_ID, API_HASH, {
   connectionRetries: 5
@@ -202,7 +201,7 @@ app.listen(PORT, () => {
 // ═══════════════════════════════════════════
 // 3. BOT CONTROLLER & EXTRACTORS
 // ═══════════════════════════════════════════
-const bot = new TelegramBot(TOKEN, { polling: true });
+const bot = new TelegramBot(TOKEN, { polling: { autoStart: true, params: { timeout: 10 } } });
 
 async function getUser(chatId) {
   try {
@@ -228,7 +227,7 @@ function buildSuccessMessage(user, fileName, shortUrl, backedUp = false) {
     parts.push(user.bold ? `<b>${escapeHtml(user.header)}</b>` : escapeHtml(user.header));
     parts.push('');
   }
-  parts.push(backedUp ? `✨ <b>MayaJaal Stream Ready (Channel Vault Backup)!</b>` : `✨ <b>MayaJaal Stream Ready!</b>`);
+  parts.push(backedUp ? `✨ <b>MayaJaal Stream Ready (Vault Backup)!</b>` : `✨ <b>MayaJaal Stream Ready!</b>`);
   parts.push('');
   parts.push(`📌 <b>File:</b> ${escapeHtml(fileName)}`);
   parts.push('');
@@ -259,7 +258,7 @@ async function extractDiskwalaLink(diskwalaUrl) {
 
     const apis = [
       `https://www.diskwala.com/api/post/${fileId}`,
-      `https://diskwala.com/api/post/stream/${fileId}`,
+      `https://www.diskwala.com/api/post/stream/${fileId}`,
       `https://www.diskwala.com/api/file/${fileId}`,
       `https://diskwala.com/api/v1/post/get?id=${fileId}`
     ];
@@ -360,27 +359,29 @@ async function extractTeraboxLink(teraboxUrl) {
 }
 
 // ───────────────────────────────────────────
-// C. 2GB MTPROTO FAST BACKUP ENGINE
+// C. 2GB MTPROTO FAST BACKUP (403 BYPASS)
 // ───────────────────────────────────────────
 async function uploadToStorageChannel2GB(videoUrl, fileName, caption) {
-  if (!STORAGE_CHANNEL_ID) {
-    console.warn('[Vault] STORAGE_CHANNEL_ID not set!');
-    return null;
-  }
+  if (!STORAGE_CHANNEL_ID) return null;
 
   const tempFilePath = path.join('/tmp', `${Date.now()}_clean.mp4`);
+  const rawCookie = process.env.TERABOX_COOKIE || 'ndus=Yzdpm64teHuiTpyF1tSZ-m4ANxhFN7shhUG1hMNu;';
+  const cookie = rawCookie.includes('ndus=') ? rawCookie : `ndus=${rawCookie};`;
 
   try {
     console.log(`[Vault] 1. Downloading direct stream to disk...`);
     const writer = fs.createWriteStream(tempFilePath);
-    
+
+    // Headers jo 403 Forbidden ko bypass karte hain
     const streamRes = await axios.get(videoUrl, {
       responseType: 'stream',
       headers: {
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
-        'Referer': 'https://www.terabox1024.com/'
+        'Referer': 'https://www.terabox1024.com/',
+        'Cookie': cookie,
+        'Accept': '*/*'
       },
-      timeout: 120000
+      timeout: 180000
     });
 
     await new Promise((resolve, reject) => {
@@ -399,7 +400,6 @@ async function uploadToStorageChannel2GB(videoUrl, fileName, caption) {
       return null;
     }
 
-    // Resolve Channel ID to BigInt
     let peer = STORAGE_CHANNEL_ID.trim();
     if (/^-100\d+$/.test(peer)) {
       peer = BigInt(peer);
@@ -577,4 +577,4 @@ bot.on('message', async (msg) => {
     bot.sendMessage(chatId, `❌ <b>Error:</b> <code>${escapeHtml(err.message)}</code>`, { parse_mode: 'HTML' });
   }
 });
-                             
+      
