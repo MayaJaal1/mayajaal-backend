@@ -10,9 +10,10 @@ const { StringSession } = require('telegram/sessions');
 const { NewMessage } = require('telegram/events');
 
 // ═══════════════════════════════════════════
-// 0. CONFIG & REDIS
+// 0. CONFIG & MEMORY + REDIS STORES
 // ═══════════════════════════════════════════
 const redis = Redis.fromEnv();
+const videoStore = new Map(); // Redis fail/delay hone par safe memory backup
 
 const API_ID = parseInt(process.env.TELEGRAM_API_ID || '35399167', 10);
 const API_HASH = process.env.TELEGRAM_API_HASH || '88a34526a5e73078110072770dd85e5b';
@@ -30,7 +31,7 @@ if (!BOT_TOKEN || !RAW_CHANNEL_ID) {
 }
 
 // ═══════════════════════════════════════════
-// 1. EXPRESS HTTP SERVER (STREAMING ENGINE)
+// 1. EXPRESS HTTP SERVER (STREAM ENGINE)
 // ═══════════════════════════════════════════
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -38,7 +39,7 @@ const PORT = process.env.PORT || 3000;
 app.use(express.json());
 app.use(express.static(__dirname));
 
-// Universal CORS & Streaming Headers
+// Universal CORS headers for ExoPlayer / Web
 app.use((req, res, next) => {
   res.header('Access-Control-Allow-Origin', '*');
   res.header('Access-Control-Allow-Headers', '*');
@@ -103,7 +104,9 @@ app.get('/verify-key/:key', async (req, res) => {
   } catch (err) {
     res.status(500).json({ valid: false, error: err.message });
   }
-});app.post('/api/history/save', async (req, res) => {
+});
+
+app.post('/api/history/save', async (req, res) => {
   try {
     const { telegram_id, video } = req.body;
     if (!telegram_id || !video) return res.status(400).json({ success: false });
@@ -148,22 +151,26 @@ app.get('/v/:id', (req, res) => {
 
 app.get('/api/stream-info/:id', async (req, res) => {
   try {
-    const data = await redis.get(`video:${req.params.id}`);
+    const id = req.params.id;
+    let data = videoStore.get(id);
+    if (!data) {
+      const redisData = await redis.get(`video:${id}`);
+      if (redisData) data = typeof redisData === 'string' ? JSON.parse(redisData) : redisData;
+    }
+
     if (!data) return res.status(404).json({ success: false, message: 'Stream not found' });
-    const parsed = typeof data === 'string' ? JSON.parse(data) : data;
+
     res.json({
       success: true,
-      url: `${BASE_URL}/stream/${req.params.id}`,
-      title: parsed.name || 'MayaJaal Video',
-      uploader: parsed.uploader || 'Matrix Node',
-      id: req.params.id
+      url: `${BASE_URL}/stream/${id}`,
+      title: data.name || 'MayaJaal Video',
+      uploader: data.uploader || 'Matrix Node',
+      id: id
     });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
   }
-});
-
-// Robust Storage Peer Resolver
+});// Storage Peer Entity Resolver
 let cachedTargetEntity = null;
 async function getStorageEntity() {
   if (cachedTargetEntity) return cachedTargetEntity;
@@ -186,9 +193,14 @@ async function getStorageEntity() {
 // 🌟 Reliable 2GB Streaming Endpoint for ExoPlayer & Web
 app.get('/stream/:id', async (req, res) => {
   try {
-    const rawData = await redis.get(`video:${req.params.id}`);
-    if (!rawData) return res.status(404).send('Video not found or expired');
-    const meta = typeof rawData === 'string' ? JSON.parse(rawData) : rawData;
+    const id = req.params.id;
+    let meta = videoStore.get(id);
+    if (!meta) {
+      const rawData = await redis.get(`video:${id}`);
+      if (rawData) meta = typeof rawData === 'string' ? JSON.parse(rawData) : rawData;
+    }
+
+    if (!meta) return res.status(404).send('Video not found or expired');
 
     const channelPeer = await getStorageEntity();
     const messages = await tgClient.getMessages(channelPeer, { ids: [Number(meta.messageId)] });
@@ -236,13 +248,11 @@ app.get('/stream/:id', async (req, res) => {
       file: targetMsg.media,
       offset: BigInt(start),
       limit: requestedLimit,
-      requestSize: 1024 * 128, // 128KB delivers instant first packet
+      requestSize: 1024 * 128, // 128KB fast initial buffer
     });
 
     req.on('close', () => {
-      if (downloadIterator && downloadIterator.return) {
-        downloadIterator.return();
-      }
+      if (downloadIterator && downloadIterator.return) downloadIterator.return();
     });
 
     for await (const chunk of downloadIterator) {
@@ -260,7 +270,9 @@ app.get('/stream/:id', async (req, res) => {
 
 app.listen(PORT, () => {
   console.log(`✅ Web Server active on port ${PORT}`);
-});// ═══════════════════════════════════════════
+});
+
+// ═══════════════════════════════════════════
 // 2. GRAMJS MTPROTO CLIENT (2GB ENGINE)
 // ═══════════════════════════════════════════
 const tgClient = new TelegramClient(new StringSession(''), API_ID, API_HASH, {
@@ -402,13 +414,19 @@ tgClient.addEventHandler(async (event) => {
       }
 
       const shortId = crypto.randomBytes(4).toString('hex');
-      await redis.set(`video:${shortId}`, JSON.stringify({
+      const payload = {
         messageId: storedMsg.id,
         size: sizeBytes,
         mimeType: doc?.mimeType || 'video/mp4',
         name: fileName,
         uploader: uploaderName,
-      }), { ex: 30 * 86400 });
+      };
+
+      // 1. Memory Store (Instant Fallback)
+      videoStore.set(shortId, payload);
+
+      // 2. Redis Store (Persistent for 30 days)
+      await redis.set(`video:${shortId}`, JSON.stringify(payload), { ex: 30 * 86400 });
 
       const playUrl = `${BASE_URL}/v/${shortId}`;
 
