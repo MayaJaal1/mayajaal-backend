@@ -177,7 +177,7 @@ app.listen(PORT, () => {
 });
 
 // ═══════════════════════════════════════════
-// 2. BOT CONTROLLER & EXTRACTORS
+// 2. BOT CONTROLLER & ADVANCED EXTRACTORS
 // ═══════════════════════════════════════════
 const bot = new TelegramBot(TOKEN, { polling: true });
 
@@ -220,34 +220,58 @@ function buildSuccessMessage(user, fileName, shortUrl) {
 }
 
 // ───────────────────────────────────────────
-// A. DISKWALA EXTRACTOR (No Cookie Needed)
+// A. DISKWALA ADVANCED EXTRACTOR
 // ───────────────────────────────────────────
 async function extractDiskwalaLink(diskwalaUrl) {
   try {
-    console.log(`[Diskwala] Fetching: ${diskwalaUrl}`);
+    console.log(`[Diskwala] Extracting: ${diskwalaUrl}`);
+    
+    // ID nikaalo URL se (/app/ID ya /view/ID ya direct ID)
+    const idMatch = diskwalaUrl.match(/\/(app|view|file|p)\/([a-zA-Z0-9_-]+)/i) || diskwalaUrl.match(/diskwala\.com\/([a-zA-Z0-9_-]+)/i);
+    const fileId = idMatch ? (idMatch[2] || idMatch[1]) : null;
+
+    if (fileId && fileId !== 'app' && fileId !== 'view') {
+      // 1. Direct Diskwala JSON API hit
+      try {
+        const apiRes = await axios.get(`https://www.diskwala.com/api/file/${fileId}`, {
+          headers: {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+            'Referer': diskwalaUrl
+          },
+          timeout: 8000
+        });
+
+        if (apiRes.data && (apiRes.data.stream_url || apiRes.data.url || apiRes.data.download_url)) {
+          return {
+            url: apiRes.data.stream_url || apiRes.data.url || apiRes.data.download_url,
+            name: apiRes.data.name || apiRes.data.title || 'Diskwala Video'
+          };
+        }
+      } catch (e) {}
+    }
+
+    // 2. Web Page Scraping
     const res = await axios.get(diskwalaUrl, {
       headers: {
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
-        'Referer': 'https://diskwala.com/'
+        'Referer': 'https://www.diskwala.com/'
       },
-      timeout: 12000
+      timeout: 10000
     });
 
     const html = typeof res.data === 'string' ? res.data : JSON.stringify(res.data);
 
-    // Source ya m3u8 / mp4 URL nikalna
-    const match = html.match(/<source[^>]+src=["']([^"']+)["']/i) ||
+    // Matches: m3u8, mp4, player source
+    const match = html.match(/source:\s*["']([^"']+)["']/i) ||
                   html.match(/file:\s*["']([^"']+)["']/i) ||
-                  html.match(/(https?:\/\/[^\s"']+\.(?:mp4|m3u8)[^\s"']*)/i);
+                  html.match(/<source[^>]+src=["']([^"']+)["']/i) ||
+                  html.match(/["'](https?:\/\/[^"']+\.(?:mp4|m3u8)[^"']*)["']/i);
 
     const titleMatch = html.match(/<title>([^<]+)<\/title>/i);
-    const fileName = titleMatch ? titleMatch[1].replace(/-\s*Diskwala/i, '').trim() : 'Diskwala Video';
+    const fileName = titleMatch ? titleMatch[1].replace(/-\s*Diskwala.*/i, '').trim() : 'Diskwala Video';
 
     if (match && match[1]) {
-      return {
-        url: match[1],
-        name: fileName
-      };
+      return { url: match[1], name: fileName };
     }
   } catch (err) {
     console.error('[Diskwala Extractor Error]:', err.message);
@@ -271,9 +295,8 @@ async function extractTeraboxLink(teraboxUrl) {
 
       const pageRes = await axios.get(sharePageUrl, {
         headers: {
-          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
-          'Cookie': cookie,
-          'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8'
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+          'Cookie': cookie
         },
         timeout: 10000
       });
@@ -285,7 +308,7 @@ async function extractTeraboxLink(teraboxUrl) {
       const listApi = `https://www.terabox1024.com/share/list?app_id=250528&shorturl=${surl}&root=1${jsToken ? `&jsToken=${jsToken}` : ''}`;
       const listRes = await axios.get(listApi, {
         headers: {
-          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)',
           'Cookie': cookie,
           'Referer': sharePageUrl
         },
@@ -294,16 +317,13 @@ async function extractTeraboxLink(teraboxUrl) {
 
       if (listRes.data && listRes.data.errno === 0 && listRes.data.list && listRes.data.list.length > 0) {
         const file = listRes.data.list[0];
-        if (file.dlink) {
-          return { url: file.dlink, name: file.server_filename || 'Terabox Video' };
-        }
+        if (file.dlink) return { url: file.dlink, name: file.server_filename || 'Terabox Video' };
       }
     }
   } catch (err) {
-    console.error('[Extractor Native Error]:', err.message);
+    console.error('[Extractor Native]', err.message);
   }
 
-  // Backup fallback gateways
   const fallbackApis = [
     `https://terabox-api-direct.onrender.com/api?url=${encodeURIComponent(teraboxUrl)}`,
     `https://ytbvideolyrics.com/api/tb?url=${encodeURIComponent(teraboxUrl)}`
@@ -325,12 +345,12 @@ async function extractTeraboxLink(teraboxUrl) {
 }
 
 // ───────────────────────────────────────────
-// C. BOT COMMANDS
+// C. COMMANDS
 // ───────────────────────────────────────────
 bot.onText(/\/start/, (msg) => {
   bot.sendMessage(msg.chat.id,
     `🎬 <b>Welcome to MayaJaal Converter Bot!</b>\n\n` +
-    `Bhejo koi bhi <b>Terabox ya Diskwala link</b> aur turant stream link pao.\n\n` +
+    `Bhejo koi bhi <b>Diskwala ya Terabox link</b> aur turant stream link pao.\n\n` +
     `<b>Commands:</b>\n` +
     `/api - Matrix key link karein\n` +
     `/logout - Disconnect karein\n` +
@@ -391,28 +411,24 @@ bot.onText(/\/add_footer(?:\s+([\s\S]+))?/, async (msg, match) => {
 });
 
 // ═══════════════════════════════════════════
-// 3. MASTER HANDLER (TERABOX + DISKWALA)
+// 3. MASTER HANDLER
 // ═══════════════════════════════════════════
 bot.on('message', async (msg) => {
   const chatId = msg.chat.id;
   const incomingContent = (msg.text || msg.caption || '').trim();
 
-  // Ignore commands like /start, /api
   if (!incomingContent || incomingContent.startsWith('/')) return;
 
-  // 1. Extract any URL containing Terabox ya Diskwala keywords
+  // URL find karein
   const urlRegex = /(https?:\/\/[^\s<>"']+)/gi;
   const matches = incomingContent.match(urlRegex) || [];
   
   const targetUrl = matches.find(url => 
-    /(terabox|terasharefile|1024tera|teraboxapp|teraboxshare|teraboxlink|tibibox|momerybox|mirrorbox|4funbox|dubox|freeterabox|diskwala)/i.test(url)
+    /(diskwala|terabox|terasharefile|1024tera|teraboxapp|teraboxshare|teraboxlink|tibibox|momerybox|mirrorbox|4funbox|dubox|freeterabox)/i.test(url)
   );
 
-  if (!targetUrl) {
-    return;
-  }
+  if (!targetUrl) return;
 
-  // 2. User Key Verification
   const user = await getUser(chatId);
   if (!user || !user.apiToken) {
     return bot.sendMessage(
@@ -424,16 +440,13 @@ bot.on('message', async (msg) => {
 
   const uploaderName = msg.from?.username ? `@${msg.from.username}` : (msg.from?.first_name || 'Matrix User');
 
-  // 3. Immediate Feedback
   let statusMsg;
   try {
     statusMsg = await bot.sendMessage(chatId, `🔄 <i>Converting Link to MayaJaal Stream...</i>`, { parse_mode: 'HTML' });
-  } catch (e) {
-    console.error('Status message send error:', e.message);
-  }
+  } catch (e) {}
 
   try {
-    console.log(`[Bot] Processing link: ${targetUrl} for chat ${chatId}`);
+    console.log(`[Bot] Incoming targetUrl: ${targetUrl}`);
 
     let extracted = null;
     if (/diskwala/i.test(targetUrl)) {
@@ -444,7 +457,7 @@ bot.on('message', async (msg) => {
 
     if (!extracted || !extracted.url) {
       if (statusMsg) await bot.deleteMessage(chatId, statusMsg.message_id).catch(() => {});
-      return bot.sendMessage(chatId, `❌ <b>Link convert nahi ho saka (Link expired ya server down).</b>`, { parse_mode: 'HTML' });
+      return bot.sendMessage(chatId, `❌ <b>Link convert nahi ho saka (Link expired ya unsupported).</b>`, { parse_mode: 'HTML' });
     }
 
     const shortId = crypto.randomBytes(4).toString('hex');
