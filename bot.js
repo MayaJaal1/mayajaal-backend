@@ -177,7 +177,7 @@ app.listen(PORT, () => {
 });
 
 // ═══════════════════════════════════════════
-// 2. BOT CONTROLLER & ADVANCED EXTRACTORS
+// 2. BOT CONTROLLER & EXTRACTORS
 // ═══════════════════════════════════════════
 const bot = new TelegramBot(TOKEN, { polling: true });
 
@@ -201,7 +201,7 @@ function escapeHtml(str = '') {
 
 function buildSuccessMessage(user, fileName, shortUrl) {
   const parts = [];
-  if (user.enableText && user.header) {
+  if (user && user.enableText && user.header) {
     parts.push(user.bold ? `<b>${escapeHtml(user.header)}</b>` : escapeHtml(user.header));
     parts.push('');
   }
@@ -210,7 +210,7 @@ function buildSuccessMessage(user, fileName, shortUrl) {
   parts.push(`📌 <b>File:</b> ${escapeHtml(fileName)}`);
   parts.push('');
   parts.push(`🔗 <b>Stream Link:</b>\n${shortUrl}`);
-  if (user.enableText && user.footer) {
+  if (user && user.enableText && user.footer) {
     parts.push('');
     parts.push(user.bold ? `<b>${escapeHtml(user.footer)}</b>` : escapeHtml(user.footer));
   }
@@ -220,48 +220,45 @@ function buildSuccessMessage(user, fileName, shortUrl) {
 }
 
 // ───────────────────────────────────────────
-// A. DISKWALA ADVANCED EXTRACTOR
+// A. DISKWALA FAST EXTRACTOR
 // ───────────────────────────────────────────
 async function extractDiskwalaLink(diskwalaUrl) {
   try {
-    console.log(`[Diskwala] Extracting: ${diskwalaUrl}`);
-    
-    // ID nikaalo URL se (/app/ID ya /view/ID ya direct ID)
-    const idMatch = diskwalaUrl.match(/\/(app|view|file|p)\/([a-zA-Z0-9_-]+)/i) || diskwalaUrl.match(/diskwala\.com\/([a-zA-Z0-9_-]+)/i);
+    const idMatch = diskwalaUrl.match(/\/(app|view|file|p|post)\/([a-zA-Z0-9_-]+)/i) || diskwalaUrl.match(/diskwala\.com\/([a-zA-Z0-9_-]+)/i);
     const fileId = idMatch ? (idMatch[2] || idMatch[1]) : null;
 
-    if (fileId && fileId !== 'app' && fileId !== 'view') {
-      // 1. Direct Diskwala JSON API hit
-      try {
-        const apiRes = await axios.get(`https://www.diskwala.com/api/file/${fileId}`, {
-          headers: {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-            'Referer': diskwalaUrl
-          },
-          timeout: 8000
-        });
+    const headers = {
+      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+      'Referer': diskwalaUrl,
+      'Accept': 'application/json, text/plain, */*'
+    };
 
-        if (apiRes.data && (apiRes.data.stream_url || apiRes.data.url || apiRes.data.download_url)) {
-          return {
-            url: apiRes.data.stream_url || apiRes.data.url || apiRes.data.download_url,
-            name: apiRes.data.name || apiRes.data.title || 'Diskwala Video'
-          };
-        }
-      } catch (e) {}
+    if (fileId && !['app', 'view', 'file'].includes(fileId.toLowerCase())) {
+      const endpoints = [
+        `https://www.diskwala.com/api/post/${fileId}`,
+        `https://www.diskwala.com/api/file/${fileId}`,
+        `https://diskwala.com/api/v1/post/get?id=${fileId}`
+      ];
+
+      for (const ep of endpoints) {
+        try {
+          const apiRes = await axios.get(ep, { headers, timeout: 6000 });
+          const d = apiRes.data;
+          const streamUrl = d?.url || d?.stream_url || d?.download_url || d?.file?.url || d?.post?.video_url;
+          if (streamUrl) {
+            return {
+              url: streamUrl,
+              name: d?.name || d?.title || d?.post?.title || 'Diskwala Video'
+            };
+          }
+        } catch (e) {}
+      }
     }
 
-    // 2. Web Page Scraping
-    const res = await axios.get(diskwalaUrl, {
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
-        'Referer': 'https://www.diskwala.com/'
-      },
-      timeout: 10000
-    });
-
+    // Direct HTML Page Parser Fallback
+    const res = await axios.get(diskwalaUrl, { headers, timeout: 10000 });
     const html = typeof res.data === 'string' ? res.data : JSON.stringify(res.data);
 
-    // Matches: m3u8, mp4, player source
     const match = html.match(/source:\s*["']([^"']+)["']/i) ||
                   html.match(/file:\s*["']([^"']+)["']/i) ||
                   html.match(/<source[^>]+src=["']([^"']+)["']/i) ||
@@ -295,7 +292,7 @@ async function extractTeraboxLink(teraboxUrl) {
 
       const pageRes = await axios.get(sharePageUrl, {
         headers: {
-          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)',
           'Cookie': cookie
         },
         timeout: 10000
@@ -345,7 +342,7 @@ async function extractTeraboxLink(teraboxUrl) {
 }
 
 // ───────────────────────────────────────────
-// C. COMMANDS
+// C. BOT COMMANDS
 // ───────────────────────────────────────────
 bot.onText(/\/start/, (msg) => {
   bot.sendMessage(msg.chat.id,
@@ -419,7 +416,7 @@ bot.on('message', async (msg) => {
 
   if (!incomingContent || incomingContent.startsWith('/')) return;
 
-  // URL find karein
+  // Extract URLs
   const urlRegex = /(https?:\/\/[^\s<>"']+)/gi;
   const matches = incomingContent.match(urlRegex) || [];
   
@@ -440,7 +437,7 @@ bot.on('message', async (msg) => {
 
   const uploaderName = msg.from?.username ? `@${msg.from.username}` : (msg.from?.first_name || 'Matrix User');
 
-  let statusMsg;
+  let statusMsg = null;
   try {
     statusMsg = await bot.sendMessage(chatId, `🔄 <i>Converting Link to MayaJaal Stream...</i>`, { parse_mode: 'HTML' });
   } catch (e) {}
