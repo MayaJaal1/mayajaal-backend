@@ -191,7 +191,7 @@ async function getStorageEntity() {
   }
 }
 
-// 🌟 Reliable 2GB Streaming Endpoint for ExoPlayer & Web
+// Reliable Streaming Range Endpoint
 app.get('/stream/:id', async (req, res) => {
   const id = req.params.id;
   try {
@@ -276,7 +276,7 @@ app.listen(PORT, () => {
 });
 
 // ═══════════════════════════════════════════
-// 2. GRAMJS MTPROTO CLIENT (FLOOD SAFE)
+// 2. GRAMJS MTPROTO CLIENT (BULLETPROOF)
 // ═══════════════════════════════════════════
 const tgClient = new TelegramClient(new StringSession(''), API_ID, API_HASH, {
   connectionRetries: 10,
@@ -401,22 +401,18 @@ tgClient.addEventHandler(async (event) => {
     try {
       const channelPeer = await getStorageEntity();
 
-      // Forward to channel
-      await tgClient.forwardMessages(channelPeer, {
-        messages: [message.id],
-        fromPeer: chatId,
+      // Direct file sending to guarantee the actual returned Message object with valid ID
+      const savedMsg = await tgClient.sendFile(channelPeer, {
+        file: message.media,
+        caption: `Storage Node File: ${Date.now()}`
       });
 
-      // 🌟 Direct & Bulletproof ID Resolver: Get the newly created message directly from channel
-      const channelMessages = await tgClient.getMessages(channelPeer, { limit: 1 });
-      const targetMessage = channelMessages && channelMessages.length ? channelMessages[0] : null;
-
-      if (!targetMessage || !targetMessage.id) {
-        throw new Error('Channel forward to hua par video retrieve nahi ho saki');
+      if (!savedMsg || !savedMsg.id) {
+        throw new Error('Telegram storage failed to return valid Message ID');
       }
 
-      const targetMessageId = targetMessage.id;
-      const doc = message.media.document || targetMessage.media?.document;
+      const targetMessageId = savedMsg.id;
+      const doc = message.media.document || savedMsg.media?.document;
       const sizeBytes = doc ? Number(doc.size) : 0;
       const sizeMB = sizeBytes ? (sizeBytes / (1024 * 1024)).toFixed(2) : null;
 
@@ -439,7 +435,7 @@ tgClient.addEventHandler(async (event) => {
       videoStore.set(shortId, payload);
       await redis.set(`video:${shortId}`, JSON.stringify(payload), { ex: 30 * 86400 });
 
-      console.log(`✅ Stored Video shortId: ${shortId} -> Channel Msg ID: ${targetMessageId}`);
+      console.log(`✅ Successfully Stored: ID ${shortId} -> Channel Msg ID: ${targetMessageId}`);
 
       const playUrl = `${BASE_URL}/v/${shortId}`;
 
