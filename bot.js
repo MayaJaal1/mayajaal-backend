@@ -13,7 +13,7 @@ const { Upload } = require('@aws-sdk/lib-storage');
 process.on('uncaughtException', (err) => console.error('[UncaughtException]:', err.message));
 process.on('unhandledRejection', (reason) => console.error('[UnhandledRejection]:', reason));
 
-// 1. Initial Storage Setup
+// 1. Storage Setup
 let redis;
 try {
   redis = Redis.fromEnv();
@@ -64,7 +64,7 @@ app.use((req, res, next) => {
 app.get('/', (req, res) => res.send('Stream Engine Online'));
 app.get('/health', (req, res) => res.json({ status: 'ok', uptime: process.uptime() }));
 
-// Web Player Route (Hybrid: R2 MP4 Stream + Terabox Live Embed)
+// Web Player Route (Direct HTML5 Player + Client Resolver)
 app.get('/v/:id', async (req, res) => {
   try {
     const id = req.params.id;
@@ -78,36 +78,10 @@ app.get('/v/:id', async (req, res) => {
     if (!data) return res.status(404).send('Video not found or link expired');
 
     const videoTitle = data.name || 'Video Player';
+    const isR2 = Boolean(data.r2Key);
+    const r2StreamUrl = `${BASE_URL}/stream/${id}`;
+    const teraboxKey = data.teraboxKey || '';
 
-    // Scenario A: Terabox Direct Stream Embed Link
-    if (data.isEmbed && data.embedUrl) {
-      return res.send(`
-        <!DOCTYPE html>
-        <html lang="hi">
-        <head>
-          <meta charset="UTF-8">
-          <meta name="viewport" content="width=device-width, initial-scale=1.0">
-          <title>${videoTitle}</title>
-          <style>
-            * { box-sizing: border-box; margin: 0; padding: 0; }
-            body { background: #000; color: #fff; font-family: sans-serif; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; overflow: hidden; }
-            .player-container { width: 100%; max-width: 950px; height: 85vh; padding: 10px; display: flex; flex-direction: column; }
-            iframe { width: 100%; height: 100%; border: none; border-radius: 12px; background: #111; box-shadow: 0 10px 30px rgba(0,0,0,0.9); }
-            .title { padding: 12px 5px; font-size: 1rem; color: #00ff88; word-break: break-all; }
-          </style>
-        </head>
-        <body>
-          <div class="player-container">
-            <iframe src="${data.embedUrl}" allowfullscreen allow="autoplay; encrypted-media; fullscreen"></iframe>
-            <div class="title">🎬 ${videoTitle}</div>
-          </div>
-        </body>
-        </html>
-      `);
-    }
-
-    // Scenario B: R2 Hosted MP4 Video Stream
-    const streamUrl = `${BASE_URL}/stream/${id}`;
     res.send(`
       <!DOCTYPE html>
       <html lang="hi">
@@ -117,20 +91,58 @@ app.get('/v/:id', async (req, res) => {
         <title>${videoTitle}</title>
         <style>
           * { box-sizing: border-box; margin: 0; padding: 0; }
-          body { background: #000; color: #fff; font-family: sans-serif; display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 100vh; }
-          .player-box { width: 100%; max-width: 900px; padding: 16px; }
-          video { width: 100%; max-height: 80vh; border-radius: 12px; background: #111; outline: none; box-shadow: 0 10px 30px rgba(0,0,0,0.8); }
-          .title { margin-top: 15px; font-size: 1.1rem; color: #00ff88; word-break: break-all; }
+          body { background: #0b0c10; color: #fff; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 100vh; padding: 15px; }
+          .player-wrapper { width: 100%; max-width: 960px; background: #1f2833; border-radius: 16px; overflow: hidden; box-shadow: 0 12px 40px rgba(0,0,0,0.8); }
+          .video-container { position: relative; width: 100%; padding-top: 56.25%; background: #000; }
+          video, iframe { position: absolute; top: 0; left: 0; width: 100%; height: 100%; border: none; outline: none; }
+          .info-bar { padding: 16px 20px; display: flex; flex-direction: column; gap: 8px; }
+          .title { font-size: 1.1rem; font-weight: 600; color: #66fcf1; word-break: break-all; }
+          .loading-text { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); color: #66fcf1; font-size: 14px; font-weight: 500; }
         </style>
       </head>
       <body>
-        <div class="player-box">
-          <video controls autoplay playsinline preload="metadata">
-            <source src="${streamUrl}" type="video/mp4">
-            Aapka browser HTML5 video support nahi karta.
-          </video>
-          <div class="title">🎬 ${videoTitle}</div>
+        <div class="player-wrapper">
+          <div class="video-container" id="playerContainer">
+            ${isR2 ? `
+              <video controls autoplay playsinline preload="metadata">
+                <source src="${r2StreamUrl}" type="video/mp4">
+              </video>
+            ` : `
+              <div class="loading-text" id="loadStatus">Video load ho rahi hai...</div>
+              <iframe id="streamFrame" allowfullscreen allow="autoplay; fullscreen"></iframe>
+            `}
+          </div>
+          <div class="info-bar">
+            <div class="title">🎬 ${videoTitle}</div>
+          </div>
         </div>
+
+        ${!isR2 ? `
+        <script>
+          const key = "${teraboxKey}";
+          const frame = document.getElementById('streamFrame');
+          const status = document.getElementById('loadStatus');
+
+          // Multi-proxy auto player loader
+          const playUrls = [
+            'https://yt-video-production.up.railway.app/player?surl=' + key,
+            'https://www.1024tera.com/sharing/embed?surl=' + key,
+            'https://terabox.app/sharing/embed?surl=' + key
+          ];
+
+          let curr = 0;
+          function tryNext() {
+            if (curr < playUrls.length) {
+              frame.src = playUrls[curr++];
+            } else {
+              status.innerText = "Video load nahi ho saki. Kripya reload karein.";
+            }
+          }
+          frame.onload = () => { status.style.display = 'none'; };
+          frame.onerror = tryNext;
+          tryNext();
+        </script>
+        ` : ''}
       </body>
       </html>
     `);
@@ -139,7 +151,7 @@ app.get('/v/:id', async (req, res) => {
   }
 });
 
-// Domain Streaming Route
+// Domain Streaming Route (For R2 Files)
 app.get('/stream/:id', async (req, res) => {
   try {
     const id = req.params.id;
@@ -174,48 +186,26 @@ app.get('/stream/:id', async (req, res) => {
 });
 
 app.listen(PORT, () => console.log(`🚀 Server running on port ${PORT}`));
-// 4. Terabox Embed Link Builder & Extraction
-async function getTeraboxStreamData(rawUrl) {
+// 4. Accurate Terabox Key Extractor
+function parseTeraboxKey(rawUrl) {
   let target = rawUrl.trim();
 
-  // 1. Follow short link redirect (e.g. terasharefile -> 1024terabox)
-  try {
-    const headResp = await axios.get(target, {
-      maxRedirects: 10,
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36'
-      },
-      timeout: 10000
-    });
-    if (headResp.request?.res?.responseUrl) {
-      target = headResp.request.res.responseUrl;
-    }
-  } catch (e) {}
+  // Sabhi standard Terabox domains aur short format match karein
+  const match = target.match(/\/s\/1?([a-zA-Z0-9_-]+)/i) ||
+                target.match(/[?&]surl=1?([a-zA-Z0-9_-]+)/i) ||
+                target.match(/\/(?:s|sharing\/link\?surl=)1?([a-zA-Z0-9_-]+)/i);
 
-  // 2. Extract unique file surl key
-  const match = target.match(/\/(?:s|sharing\/link\?surl=)([a-zA-Z0-9_-]+)/i) || 
-                target.match(/[?&]surl=([a-zA-Z0-9_-]+)/i) ||
-                rawUrl.match(/\/(?:s|sharing\/link\?surl=)([a-zA-Z0-9_-]+)/i) ||
-                rawUrl.match(/[?&]surl=([a-zA-Z0-9_-]+)/i);
-
-  let shorturl = match ? match[1] : '';
-  if (!shorturl && target.includes('/s/')) {
-    const parts = target.split('/s/')[1];
-    if (parts) shorturl = parts.split(/[?&#/]/)[0];
+  if (match && match[1]) {
+    return match[1];
   }
 
-  if (!shorturl) return null;
+  if (target.includes('/s/')) {
+    let part = target.split('/s/')[1].split(/[?&#/]/)[0];
+    if (part.startsWith('1')) part = part.substring(1);
+    return part;
+  }
 
-  const keyClean = shorturl.startsWith('1') ? shorturl.substring(1) : shorturl;
-
-  // Direct High-Speed Embed Engine (Works with all Terabox domains without block)
-  const embedPlayerUrl = `https://www.terabox.app/sharing/embed?surl=${keyClean}`;
-
-  return {
-    isEmbed: true,
-    embedUrl: embedPlayerUrl,
-    name: `Terabox Video (${keyClean})`
-  };
+  return null;
 }
 
 // 5. Telegram Bot Handlers
@@ -234,13 +224,13 @@ function escapeHtml(str = '') {
 bot.onText(/\/start/, (msg) => {
   bot.sendMessage(msg.chat.id,
     `🎬 <b>Stream Converter Bot</b>\n\n` +
-    `• <b>Direct Video:</b> File bhejein, Cloudflare R2 par host hokar direct chalegi.\n` +
-    `• <b>Terabox Link:</b> Koi bhi Terabox / Terasharefile link bhejein, aapke custom domain player me live chalegi.`,
+    `• <b>Video File:</b> File bhejein, direct aapke Cloudflare R2 se fast stream hogi.\n` +
+    `• <b>Terabox Link:</b> Terabox / Terasharefile link bhejein, aapke custom domain player me turant open hogi.`,
     { parse_mode: 'HTML' }
   );
 });
 
-// Direct Video file Cloudflare R2 Upload
+// Video direct Cloudflare R2 Upload
 bot.on('message', async (msg) => {
   const chatId = msg.chat.id;
   const uploaderName = msg.from?.username ? `@${msg.from.username}` : (msg.from?.first_name || 'User');
@@ -273,7 +263,7 @@ bot.on('message', async (msg) => {
       await parallelUpload.done();
 
       const shortId = crypto.randomBytes(4).toString('hex');
-      const payload = { name: fileName, r2Key: r2Key, isEmbed: false, uploader: uploaderName };
+      const payload = { name: fileName, r2Key: r2Key, uploader: uploaderName };
       
       linkStore.set(shortId, payload);
       await redis.set(`video:${shortId}`, JSON.stringify(payload), { ex: 30 * 86400 });
@@ -293,7 +283,7 @@ bot.on('message', async (msg) => {
     }
   }
 
-  // Link Receive & Convert
+  // Link Receive
   const incomingText = (msg.text || '').trim();
   if (!incomingText || incomingText.startsWith('/')) return;
 
@@ -305,18 +295,17 @@ bot.on('message', async (msg) => {
 
   try {
     const targetUrl = urls[0];
-    const streamData = await getTeraboxStreamData(targetUrl);
+    const extractedKey = parseTeraboxKey(targetUrl);
 
-    if (!streamData) {
+    if (!extractedKey) {
       await bot.deleteMessage(chatId, statusMsg.message_id).catch(() => {});
-      return bot.sendMessage(chatId, `❌ <b>Error:</b> Invalid link. Link me surl key nahi mili.`, { parse_mode: 'HTML' });
+      return bot.sendMessage(chatId, `❌ <b>Error:</b> Terabox link format pehchaan nahi paaya. Link check karein.`, { parse_mode: 'HTML' });
     }
 
     const shortId = crypto.randomBytes(4).toString('hex');
     const payload = {
-      name: streamData.name,
-      isEmbed: true,
-      embedUrl: streamData.embedUrl,
+      name: `Terabox Video`,
+      teraboxKey: extractedKey,
       uploader: uploaderName
     };
 
