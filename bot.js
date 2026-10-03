@@ -13,7 +13,7 @@ const { NewMessage } = require('telegram/events');
 process.on('uncaughtException', (err) => console.error('[UncaughtException]:', err.message));
 process.on('unhandledRejection', (reason) => console.error('[UnhandledRejection]:', reason));
 
-// 1. Redis Cache
+// 1. In-Memory & Redis Cache
 let redis;
 try {
   redis = Redis.fromEnv();
@@ -26,7 +26,7 @@ const BASE_URL = process.env.CUSTOM_DOMAIN
   ? (process.env.CUSTOM_DOMAIN.startsWith('http') ? process.env.CUSTOM_DOMAIN : `https://${process.env.CUSTOM_DOMAIN}`)
   : 'https://mayajaal.online';
 
-// 2. Cloudflare R2 Setup
+// 2. Cloudflare R2 Credentials Setup
 const R2_ACCOUNT_ID = String(process.env.R2_ACCOUNT_ID || '9a17e6f8a4af372b6b0ab1ad1cdb982d').trim();
 const R2_ACCESS_KEY_ID = String(process.env.R2_ACCESS_KEY_ID || 'fe0370e7a3f380c0dee831d6c37fd851').trim();
 const R2_SECRET_ACCESS_KEY = String(process.env.R2_SECRET_ACCESS_KEY || '').trim();
@@ -42,7 +42,7 @@ const r2Client = new S3Client({
   forcePathStyle: true,
 });
 
-console.log('✅ Cloudflare R2 Initialized');
+console.log('✅ Cloudflare R2 Storage Connected');
 
 // 3. Express Web Engine
 const app = express();
@@ -111,7 +111,7 @@ app.get('/v/:id', async (req, res) => {
   }
 });
 
-// Domain Streaming Range Route
+// Domain Range Streaming Route
 app.get('/stream/:id', async (req, res) => {
   try {
     const id = req.params.id;
@@ -146,7 +146,7 @@ app.get('/stream/:id', async (req, res) => {
 });
 
 app.listen(PORT, () => console.log(`🚀 Web Server running on port ${PORT}`));
-// 4. Telegram MTProto Client Setup (2GB Bypass Engine)
+// 4. Telegram MTProto Client Setup (2GB File Support)
 const apiId = parseInt(process.env.TELEGRAM_API_ID || '35399167');
 const apiHash = String(process.env.TELEGRAM_API_HASH || '8a34526a5e73078110072770dd85e5b').trim();
 const botToken = String(process.env.BOT_TOKEN || '').trim();
@@ -161,14 +161,14 @@ function escapeHtml(str = '') {
 
 async function initBot() {
   if (!botToken) {
-    console.error('❌ BOT_TOKEN missing in variables!');
+    console.error('❌ BOT_TOKEN environment variable me missing hai!');
     return;
   }
 
   await client.start({
     botAuthToken: botToken,
   });
-  console.log('✅ GramJS 2GB MTProto Bot Client Connected Safely!');
+  console.log('✅ GramJS 2GB MTProto Bot Client Successfully Connected!');
 
   client.addEventHandler(async (event) => {
     const message = event.message;
@@ -178,9 +178,9 @@ async function initBot() {
 
     if (message.message && message.message.startsWith('/start')) {
       return client.sendMessage(chatId, {
-        message: `🎬 <b>Stream Converter Bot (2GB File Limit)</b>\n\n` +
+        message: `🎬 <b>Stream Converter Bot (2GB Active)</b>\n\n` +
                  `Ab 20MB wali koi limit nahi hai!\n` +
-                 `Seedha <b>500MB, 1GB ya 2GB tak ki video file</b> yahan send karein, woh direct Cloudflare R2 par upload hokar play link banegi.`,
+                 `Aap <b>100MB, 500MB ya 2GB tak</b> ki koi bhi video file bhejein, woh direct Cloudflare R2 par upload hokar play link banegi.`,
         parseMode: 'html',
       });
     }
@@ -196,7 +196,7 @@ async function initBot() {
       }
 
       const statusMsg = await client.sendMessage(chatId, {
-        message: `⚡ <i>Video fetch hokar Cloudflare R2 par upload ho rahi hai... (2GB Tak Supported)</i>`,
+        message: `⚡ <i>Video fetch hokar Cloudflare R2 par upload ho rahi hai... (2GB Tak Allowed)</i>`,
         parseMode: 'html',
       });
 
@@ -256,4 +256,3 @@ async function initBot() {
 }
 
 initBot().catch((e) => console.error('[Bot Init Error]:', e.message));
-          
