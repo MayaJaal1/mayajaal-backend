@@ -25,14 +25,14 @@ const BASE_URL = process.env.CUSTOM_DOMAIN
   ? (process.env.CUSTOM_DOMAIN.startsWith('http') ? process.env.CUSTOM_DOMAIN : `https://${process.env.CUSTOM_DOMAIN}`)
   : 'https://mayajaal.online';
 
-// Pehle wala working credentials aur forcePathStyle config
 const R2_ACCOUNT_ID = String(process.env.R2_ACCOUNT_ID || '9a17e6f8a4af372b6b0ab1ad1cdb982d').trim();
 const R2_ACCESS_KEY_ID = String(process.env.R2_ACCESS_KEY_ID || 'fe0370e7a3f380c0dee831d6c37fd851').trim();
 const R2_SECRET_ACCESS_KEY = String(process.env.R2_SECRET_ACCESS_KEY || '').trim();
 const R2_BUCKET_NAME = String(process.env.R2_BUCKET_NAME || '').trim();
 
+// Cloudflare R2 SigV4 Fixed Config
 const r2Client = new S3Client({
-  region: 'auto',
+  region: 'us-east-1', // R2 SigV4 signature compatibility
   endpoint: `https://${R2_ACCOUNT_ID}.r2.cloudflarestorage.com`,
   credentials: {
     accessKeyId: R2_ACCESS_KEY_ID,
@@ -41,7 +41,7 @@ const r2Client = new S3Client({
   forcePathStyle: true,
 });
 
-console.log('✅ Cloudflare R2 Initialized (Working Config)');
+console.log('✅ Cloudflare R2 Initialized');
 
 const app = express();
 const PORT = process.env.PORT || 8080;
@@ -143,7 +143,6 @@ app.get('/stream/:id', async (req, res) => {
 });
 
 app.listen(PORT, () => console.log(`🚀 Web Server running on port ${PORT}`));
-// Render Local Bot API Server URL (Unlocks 2GB)
 const LOCAL_API_URL = (process.env.LOCAL_BOT_API_URL || 'https://tg-local-api-gxrv.onrender.com').trim().replace(/\/$/, '');
 
 const bot = new TelegramBot(TOKEN, {
@@ -163,8 +162,8 @@ function escapeHtml(str = '') {
 
 bot.onText(/\/start/, (msg) => {
   bot.sendMessage(msg.chat.id,
-    `🎬 <b>MayaJaal Stream Converter Bot (2GB Active)</b>\n\n` +
-    `⚡ Video bhejte hi Cloudflare R2 link ban jayegi!`,
+    `🎬 <b>MayaJaal Stream Converter Bot</b>\n\n` +
+    `⚡ Direct file send karein, streaming link ban jayegi!`,
     { parse_mode: 'HTML' }
   );
 });
@@ -187,21 +186,40 @@ bot.on('message', async (msg) => {
       }
 
       let filePath = fileInfo.file_path;
-      // Agar path me pura disk path (/var/lib/telegram-bot-api/...) hai toh sanitize karein
       if (filePath.includes(TOKEN)) {
         filePath = filePath.substring(filePath.indexOf(TOKEN) + TOKEN.length);
       }
       filePath = filePath.replace(/^\/+/, '');
 
-      // Local API download endpoint
-      const downloadUrl = `${LOCAL_API_URL}/file/bot${TOKEN}/${filePath}`;
-      console.log(`[Media Download]: Streaming from -> ${downloadUrl}`);
+      // Official Telegram URL aur Render Local URL dono options
+      const urlsToTry = [
+        `https://api.telegram.org/file/bot${TOKEN}/${filePath}`,
+        `${LOCAL_API_URL}/file/bot${TOKEN}/${filePath}`
+      ];
 
-      const videoDownloadStream = await axios.get(downloadUrl, {
-        responseType: 'stream',
-        maxContentLength: Infinity,
-        maxBodyLength: Infinity,
-      });
+      let videoDownloadStream = null;
+      let lastErr = null;
+
+      for (const url of urlsToTry) {
+        try {
+          console.log(`[Attempting Download]: ${url}`);
+          videoDownloadStream = await axios.get(url, {
+            responseType: 'stream',
+            maxContentLength: Infinity,
+            maxBodyLength: Infinity,
+            timeout: 120000,
+          });
+          if (videoDownloadStream && videoDownloadStream.status === 200) {
+            break;
+          }
+        } catch (e) {
+          lastErr = e;
+        }
+      }
+
+      if (!videoDownloadStream) {
+        throw new Error(`Download failed: ${lastErr?.message || 'Both endpoints returned 404'}`);
+      }
 
       const fileExt = path.extname(fileName) || '.mp4';
       const r2Key = `uploads/${crypto.randomBytes(8).toString('hex')}${fileExt}`;
@@ -244,4 +262,4 @@ bot.on('message', async (msg) => {
     }
   }
 });
-    
+              
