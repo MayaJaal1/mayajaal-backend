@@ -1,1277 +1,379 @@
-require('dotenv').config();
-
-const express = require('express');
-const TelegramBot = require('node-telegram-bot-api');
-const axios = require('axios');
-const crypto = require('crypto');
-const { Redis } = require('@upstash/redis');
-const path = require('path');
-const fs = require('fs');
-
-process.on('uncaughtException', (err) => console.error('[UncaughtException]:', err.message));
-process.on('unhandledRejection', (reason) => console.error('[UnhandledRejection]:', reason));
-
-const redis = Redis.fromEnv();
-const linkStore = new Map();
-
-const TOKEN = process.env.BOT_TOKEN;
-
-const BASE_URL = process.env.CUSTOM_DOMAIN
-  ? (process.env.CUSTOM_DOMAIN.startsWith('http')
-      ? process.env.CUSTOM_DOMAIN
-      : `https://${process.env.CUSTOM_DOMAIN}`)
-  : 'https://mayajaal.online';
-
-if (!TOKEN) {
-  console.error('BOT_TOKEN missing!');
-  process.exit(1);
+require("dotenv").config():
+const TelegramBot
+require("node-telegram-bot-api );
+const express require("express");
+const axios
+require("axios");
+require("path");
+const fs require("fs");
+const path
+const
+BOT TOKEN,
+TELEGRAM CHANNEL_ID,
+TELEGRAM BOT_API_BASE_URL = "http://127.0.0.1:8081",
+CUSTOM DOMAIN "https://mayajaal.online",
+UPSTASH_REDIS_REST_URL,
+UPSTASH_REDIS_REST_TOKEN.
+TERABOX COOKIE
+)
+process.envi
+if (!BOT TOKEN) [
+throw new Error("BOT TOKEN is missing");
+]
+if (ITELEGRAM_CHANNEL_ID) {
+throw new Error("TELEGRAM_CHANNEL ID is missing");
 }
-
-// Telegram Channel Storage
-// Video Telegram Channel me rahegi.
-// Cloudflare R2 me video upload nahi hogi.
-const TELEGRAM_CHANNEL_ID = process.env.TELEGRAM_CHANNEL_ID;
-
-if (!TELEGRAM_CHANNEL_ID) {
-  console.warn('⚠️ TELEGRAM_CHANNEL_ID missing');
+const bot
+new TelegramBot(BOT_TOKEN, {
+baseApiUrl: TELEGRAM_BOT_API_BASE_URL
+});
+const app express();
+const PORT
+process.env. PORT 8080/
+const BASE_URL
+CUSTOM_DOMAIN.replace(/\/+\$/,"")
+console.log(
+console.log(" MayaJaal Bot Starting...");
+console.log("=
+console.log(" Telegram Channel:", TELEGRAM_CHANNEL_ID);
+console.log(" Local Bot API, TELEGRAM_BOT_API_BASE_URL);
+console.log(" Player Domain:", BASE_URL);
+console.log("
+Video storage: Telegram Channel");
+console.log("
+console.log('
+Cloudflare R2 video upload: DISABLED");
+// Redis helpers
+17
+async function redisCommand(command) {
+if (!UPSTASH_REDIS_REST_URL || UPSTASH_REDIS_REST_TOKEN) ( 
+return null;
+1
+const response await axios.post(
+UPSTASH_REDIS_REST_URL.
+command.
+{
+headers: (
+Authorization: Bearer \$(UPSTASH_REDIS_REST_TOKEN)
+"Content-Type": "application/json"
+],
+timeout: 15000
+return response.datai
 }
-
-// Express
-const app = express();
-const PORT = process.env.PORT || 8080;
-
-app.use(express.json());
-app.use(express.static(__dirname));
-
-app.use((req, res, next) => {
-  res.header('Access-Control-Allow-Origin', '*');
-  res.header('Access-Control-Allow-Headers', '*');
-  res.header('Access-Control-Allow-Methods', 'GET, POST, OPTIONS, HEAD');
-
-  if (req.method === 'OPTIONS') {
-    return res.sendStatus(200);
-  }
-
-  next();
-});
-
-app.get('/', (req, res) => {
-  res.send('Stream Engine Online');
-});
-
-app.get('/health', (req, res) => {
-  res.json({
-    status: 'ok',
-    uptime: process.uptime()
-  });
-});
-
-// Player
-app.get('/v/:id', async (req, res) => {
-  try {
-    const id = req.params.id;
-
-    let data = linkStore.get(id);
-
-    if (!data) {
-      const raw =
-        (await redis.get(`video:${id}`)) ||
-        (await redis.get(`terabox:${id}`));
-
-      if (raw) {
-        data = typeof raw === 'string'
-          ? JSON.parse(raw)
-          : raw;
-      }
-    }
-
-    if (!data) {
-      return res.status(404).send(
-        'Video not found or link expired'
-      );
-    }
-
-    const streamUrl =
-      `${BASE_URL}/stream/${id}`;
-
-    const videoTitle =
-      data.name || 'Video Player';
-
-    res.send(`
+async function redisSet (key, value) {
+try {
+return await redisCommand ( 
+"SET
+key.
+JSON.stringify(value)
+1) 
+ catch (error) [
+console.error("Redis SET error:", error.message)1
+return null;
+async function redisGet(key) {
+try {
+const result await redisCommand([
+"GET",
+  key
+1);
+if (tresult || result.result == null) {
+return null;
+}
+return JSON.parse(result.result);
+ catch (error) {
+console.error("Redis GET error, error.message) 
+return null
+}
+// In-memory cache
+H
+const videoCache new Map():
+async function saveVideo(id, data) {
+videoCache.set(id, data);
+await redisSet( video:\${id} , data);
+}
+async function getVideo(id) {
+if (videoCache.has(id)) {
+return videoCache.get(id):
+1
+const data await redisGet("video:\$(id))
+if (data) {
+videoCache.set(id, data) 
+}
+return datar
+}
+// ID generator
+function generateld(length  10) {
+const chars =
+"abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789" 
+let result
+for (let $i=0i$ i  length i++) {
+result + chars.charAt(
+Math.floor(Math.random() chars.length)
+);
+}
+return result;
+}
+11
+// HTML escape
+11
+function escapeHtml (value) {
+return String(value**)
+.replace(/&/g, "&amp ")
+.replace(/</g
+,
+.replace(/>/g,
+.replace(/*/g,
+.replace(//g.
+"&lt ")
+"&gt ")
+"&quot")
+"&#039;");
+// Player page.
+app.get("/v/:id", async (req, res) =>  
+try
+const id
+req.params.id/
+const data await getVideo(id);
+if (!data) {
+return res.status(404).send("Video not found");
+}
+const title
+escapeHtml(
+"MayaJaal Video"
+data.name
+const streamUrl =
+   \${BASE_URL)/stream/\${encodeURIComponent(id)  
+res.setHeader("Content-Type", "text/html; charset utf-8");
+res.send("
 <!DOCTYPE html>
-<html lang="hi">
-
+<html lang $=^{*}en^{\prime\prime}>$
 <head>
 <meta charset="UTF-8">
-
 <meta name="viewport"
 content="width=device-width, initial-scale=1.0">
-
-<title>${videoTitle}</title>
-
+<title>\$(title)</title>
 <style>
-
-* {
-  box-sizing: border-box;
-  margin: 0;
-  padding: 0;
+html, body (
+margin:0;
+padding:0;
+width:100%;
+height:100%;
+background: #000;
+overflow:hidden;
+body{
+display: flex;
+align-items:centeri
+justify-content:centeri
+1
+video
+width:100%;
+height:100% 
+object-fit:contain 
+background: #000;
 }
-
-body {
-  background: #000;
-  color: #fff;
-  font-family: sans-serif;
-
-  display: flex;
-  flex-direction: column;
-
-  align-items: center;
-  justify-content: center;
-
-  min-height: 100vh;
-}
-
-.player-box {
-  width: 100%;
-  max-width: 900px;
-  padding: 16px;
-}
-
-video {
-  width: 100%;
-  max-height: 80vh;
-
-  border-radius: 12px;
-
-  background: #111;
-
-  outline: none;
-
-  box-shadow:
-    0 10px 30px
-    rgba(0,0,0,0.8);
-}
-
-.title {
-  margin-top: 15px;
-
-  font-size: 1.1rem;
-
-  color: #00ff88;
-
-  word-break: break-all;
-}
-
 </style>
 </head>
-
 <body>
-
-<div class="player-box">
-
 <video
-  controls
-  autoplay
-  playsinline
-  preload="metadata"
->
-
+controls
+autoplay
+playsinline
+preload="metadata"
+<
 <source
-  src="${streamUrl}"
-  type="${data.mimeType || 'video/mp4'}"
+src="\$(streamUrl}
+type="\${escapeHtml(
+data.mimeType "video/mp4"
 >
-
-Aapka browser HTML5 video support nahi karta.
-
+}"
+Your browser does not support HTML5 video.
 </video>
-
-<div class="title">
-${videoTitle}
-</div>
-
-</div>
-
 </body>
 </html>
-`);
-
-  } catch (err) {
-
-    res.status(500).send(
-      'Player error: ' + err.message
-    );
-
-  }
-});
-
-
-// Telegram → Cloudflare Domain → Player
-app.get('/stream/:id', async (req, res) => {
-
-  let sourceStream = null;
-
-  try {
-
-    const id = req.params.id;
-
-    let data = linkStore.get(id);
-
-    if (!data) {
-
-      const raw =
-        (await redis.get(`video:${id}`)) ||
-        (await redis.get(`terabox:${id}`));
-
-      if (raw) {
-        data =
-          typeof raw === 'string'
-            ? JSON.parse(raw)
-            : raw;
-      }
-    }
-
-    if (!data) {
-      return res.status(404).send(
-        'Stream not found'
-      );
-    }
-
-
-    // ==========================================
-    // TELEGRAM VIDEO STREAM
-    // ==========================================
-
-    if (data.telegramFileId) {
-
-      const fileInfo =
-        await bot.getFile(
-          data.telegramFileId
-        );
-
-      const filePath =
-        fileInfo?.file_path;
-
-      if (!filePath) {
-
-        return res.status(404).send(
-          'Telegram file path not available'
-        );
-
-      }
-
-
-      // Local Bot API me file_path
-      // absolute path hona chahiye.
-
-      if (!path.isAbsolute(filePath)) {
-
-        return res.status(500).send(
-          'Local Telegram Bot API is not configured'
-        );
-
-      }
-
-
-      if (!fs.existsSync(filePath)) {
-
-        return res.status(404).send(
-          'Telegram local file is not accessible'
-        );
-
-      }
-
-
-      const stat =
-        fs.statSync(filePath);
-
-      const totalSize =
-        stat.size;
-
-      const range =
-        req.headers.range;
-
-
-      res.setHeader(
-        'Accept-Ranges',
-        'bytes'
-      );
-
-      res.setHeader(
-        'Content-Type',
-        data.mimeType ||
-        'video/mp4'
-      );
-
-
-      // ==========================================
-      // RANGE REQUEST
-      // ==========================================
-
-      if (range) {
-
-        const match =
-          range.match(
-            /bytes=(\d*)-(\d*)/
-          );
-
-        if (!match) {
-
-          return res.status(416).send(
-            'Invalid Range'
-          );
-
-        }
-
-
-        const startByte =
-          match[1]
-            ? Number(match[1])
-            : 0;
-
-        const endByte =
-          match[2]
-            ? Number(match[2])
-            : totalSize - 1;
-
-
-        if (
-          !Number.isSafeInteger(startByte) ||
-          !Number.isSafeInteger(endByte) ||
-          startByte < 0 ||
-          endByte < startByte ||
-          startByte >= totalSize
-        ) {
-
-          res.setHeader(
-            'Content-Range',
-            `bytes */${totalSize}`
-          );
-
-          return res.status(416).end();
-
-        }
-
-
-        const safeEnd =
-          Math.min(
-            endByte,
-            totalSize - 1
-          );
-
-
-        const chunkSize =
-          safeEnd - startByte + 1;
-
-
-        res.status(206);
-
-        res.setHeader(
-          'Content-Range',
-          `bytes ${startByte}-${safeEnd}/${totalSize}`
-        );
-
-        res.setHeader(
-          'Content-Length',
-          chunkSize
-        );
-
-
-        sourceStream =
-          fs.createReadStream(
-            filePath,
-            {
-              start: startByte,
-              end: safeEnd
-            }
-          );
-
-      } else {
-
-        res.status(200);
-
-        res.setHeader(
-          'Content-Length',
-          totalSize
-        );
-
-        sourceStream =
-          fs.createReadStream(
-            filePath
-          );
-
-      }
-
-
-      sourceStream.on(
-        'error',
-        (err) => {
-
-          console.error(
-            '[Telegram Stream Error]',
-            err.message
-          );
-
-          if (!res.headersSent) {
-            res.status(500).end(
-              'Telegram stream error'
-            );
-          } else {
-            res.destroy(err);
-          }
-
-        }
-      );
-
-
-      req.on(
-        'close',
-        () => {
-
-          if (
-            sourceStream &&
-            !sourceStream.destroyed
-          ) {
-            sourceStream.destroy();
-          }
-
-        }
-      );
-
-
-      return sourceStream.pipe(res);
-
-    }
-
-
-    // ==========================================
-    // EXISTING TERABOX STREAM
-    // ==========================================
-
-    if (!data.url) {
-
-      return res.status(404).send(
-        'Stream expired'
-      );
-
-    }
-
-
-    let rawCookie =
-      process.env.TERABOX_COOKIE || '';
-
-    if (
-      rawCookie &&
-      !rawCookie.includes('ndus=')
-    ) {
-
-      rawCookie =
-        `ndus=${rawCookie.trim()};`;
-
-    }
-
-
-    const headers = {
-
-      'User-Agent':
-        'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-
-      'Cookie':
-        rawCookie,
-
-      'Accept':
-        '*/*'
-
-    };
-
-
-    if (req.headers.range) {
-
-      headers['Range'] =
-        req.headers.range;
-
-    }
-
-
-    const videoStream =
-      await axios.get(
-        data.url,
-        {
-          responseType: 'stream',
-
-          headers,
-
-          maxRedirects: 10,
-
-          timeout: 60000,
-
-          maxContentLength: Infinity,
-
-          maxBodyLength: Infinity
-        }
-      );
-
-
-    res.status(
-      videoStream.status
-    );
-
-
-    res.setHeader(
-      'Content-Type',
-      videoStream.headers[
-        'content-type'
-      ] || 'video/mp4'
-    );
-
-
-    res.setHeader(
-      'Accept-Ranges',
-      'bytes'
-    );
-
-
-    if (
-      videoStream.headers[
-        'content-range'
-      ]
-    ) {
-
-      res.setHeader(
-        'Content-Range',
-        videoStream.headers[
-          'content-range'
-        ]
-      );
-
-    }
-
-
-    if (
-      videoStream.headers[
-        'content-length'
-      ]
-    ) {
-
-      res.setHeader(
-        'Content-Length',
-        videoStream.headers[
-          'content-length'
-        ]
-      );
-
-    }
-
-
-    return videoStream.data.pipe(
-      res
-    );
-
-
-  } catch (err) {
-
-    console.error(
-      '[Streaming Error]',
-      err.message
-    );
-
-    if (!res.headersSent) {
-
-      res.status(500).send(
-        'Streaming error'
-      );
-
-    } else {
-
-      res.destroy(err);
-
-    }
-
-  }
-
-});
-
-
-app.listen(
-  PORT,
-  () => console.log(
-    `Server running on port ${PORT}`
-  )
-);
-
-
-// ==========================================
-// TERABOX LINK RESOLVER
-// ==========================================
-
-async function extractTeraboxLink(rawUrl) {
-
-  try {
-
-    let resolvedUrl =
-      rawUrl;
-
-
-    try {
-
-      const resp =
-        await axios.get(
-          rawUrl,
-          {
-            maxRedirects: 5,
-
-            headers: {
-              'User-Agent':
-                'Mozilla/5.0 (Windows NT 10.0; Win64; x64)'
-            },
-
-            timeout: 8000
-          }
-        );
-
-
-      if (
-        resp.request?.res?.responseUrl
-      ) {
-
-        resolvedUrl =
-          resp.request.res.responseUrl;
-
-      }
-
-    } catch (e) {}
-
-
-    const match =
-      resolvedUrl.match(
-        /\/(s|sharing\/link\?surl=)([a-zA-Z0-9_-]+)/i
-      ) ||
-
-      resolvedUrl.match(
-        /surl=([a-zA-Z0-9_-]+)/i
-      ) ||
-
-      rawUrl.match(
-        /\/s\/([a-zA-Z0-9_-]+)/i
-      );
-
-
-    let shorturl =
-      match
-        ? (match[2] || match[1])
-        : '';
-
-
-    if (
-      !shorturl &&
-      resolvedUrl.includes('/s/')
-    ) {
-
-      shorturl =
-        resolvedUrl
-          .split('/s/')[1]
-          .split(/[?&#]/)[0];
-
-    }
-
-
-    if (!shorturl) {
-      return null;
-    }
-
-
-    const formattedKey =
-      shorturl.startsWith('1')
-        ? shorturl.substring(1)
-        : shorturl;
-
-
-    let rawCookie =
-      process.env.TERABOX_COOKIE || '';
-
-
-    if (
-      rawCookie &&
-      !rawCookie.includes('ndus=')
-    ) {
-
-      rawCookie =
-        `ndus=${rawCookie.trim()};`;
-
-    }
-
-
-    for (
-      const k of
-      [formattedKey, shorturl]
-    ) {
-
-      try {
-
-        const result =
-          await axios.get(
-            `https://www.1024tera.com/share/list?app_id=250528&shorturl=${k}&root=1`,
-            {
-              headers: {
-
-                'User-Agent':
-                  'Mozilla/5.0 (Windows NT 10.0; Win64; x64)',
-
-                'Referer':
-                  'https://www.1024tera.com/',
-
-                'Cookie':
-                  rawCookie
-
-              },
-
-              timeout: 8000
-            }
-          );
-
-
-        if (
-          result.data?.errno === 0 &&
-          result.data?.list?.length > 0
-        ) {
-
-          const file =
-            result.data.list[0];
-
-
-          const streamUrl =
-            file.dlink ||
-            file.direct_link ||
-            file.url;
-
-
-          if (streamUrl) {
-
-            return {
-
-              url: streamUrl,
-
-              name:
-                file.server_filename ||
-                'Video'
-
-            };
-
-          }
-
-        }
-
-      } catch (err) {}
-
-    }
-
-  } catch (e) {}
-
-
-  return null;
-
+)catch (error) {
+console.error("Player error:", error);
+res.status(500).send(
+"Player error"
 }
-
-
-// ==========================================
-// TELEGRAM BOT
-// ==========================================
-
-const TELEGRAM_API_BASE_URL =
-  String(
-    process.env.TELEGRAM_BOT_API_BASE_URL ||
-    'http://127.0.0.1:8081'
-  ).replace(/\/$/, '');
-
-
-const bot =
-  new TelegramBot(
-    TOKEN,
-    {
-      baseApiUrl:
-        TELEGRAM_API_BASE_URL,
-
-      polling: {
-        autoStart: true,
-
-        params: {
-          timeout: 10
-        }
-      }
-    }
-  );
-
-
-bot.on(
-  'polling_error',
-  async (error) => {
-
-    if (
-      error.message &&
-      error.message.includes(
-        '409 Conflict'
-      )
-    ) {
-
-      await new Promise(
-        r => setTimeout(r, 4000)
-      );
-
-    }
-
-  }
-);
-
-
-function escapeHtml(str = '') {
-
-  return String(str).replace(
-    /[&<>"']/g,
-    (c) => ({
-      '&': '&amp;',
-      '<': '&lt;',
-      '>': '&gt;',
-      '"': '&quot;',
-      "'": '&#39;'
-    }[c])
-  );
-
+});
+17
+// Health check
+app.get("/ , (req, res) => {
+res.json((
+status: online",
+bot: "MayaJaal".
+storage: "Telegram Channel",
+r2: false,
+localBot Api: TELEGRAM_BOT_API_BASE_URL,
+player: BASE_URL
+});
+ );
+// Video streaming route
+11
+app.get("/stream/:id", async (req, res) => {
+try {
+const id
+req.params.id 
+const data await getVideo(id):
+if (!data) {
+return res.status(404).send("Video not found");
 }
-
-
-bot.onText(
-  /\/start/,
-  (msg) => {
-
-    bot.sendMessage(
-      msg.chat.id,
-
-      `🎬 <b>Stream Converter Bot</b>\n\n` +
-
-      `• <b>Video Upload:</b> ` +
-      `Video Telegram Channel me save hogi ` +
-      `aur aapke Cloudflare domain player par chalegi.\n` +
-
-      `• <b>Link Convert:</b> ` +
-      `Terabox link bhej kar stream link banayein.`,
-
-      {
-        parse_mode: 'HTML'
-      }
-    );
-
-  }
-);// ==========================================
-// VIDEO UPLOAD
-// User → Bot → Telegram Channel
-// Video R2/Cloudflare Storage me nahi jayegi.
-// ==========================================
-
-bot.on(
-  'message',
-  async (msg) => {
-
-    const chatId =
-      msg.chat.id;
-
-
-    const uploaderName =
-      msg.from?.username
-        ? `@${msg.from.username}`
-        : (
-            msg.from?.first_name ||
-            'User'
-          );
-
-
-    const videoObj =
-      msg.video ||
-      msg.document ||
-      (
-        msg.animation
-          ? msg.animation
-          : null
-      );
-
-
-    // ==========================================
-    // VIDEO MESSAGE
-    // ==========================================
-
-    if (videoObj) {
-
-
-      if (!TELEGRAM_CHANNEL_ID) {
-
-        return bot.sendMessage(
-          chatId,
-
-          '❌ <b>TELEGRAM_CHANNEL_ID configured nahi hai.</b>',
-
-          {
-            parse_mode: 'HTML'
-          }
-        );
-
-      }
-
-
-      const fileId =
-        videoObj.file_id;
-
-
-      const fileName =
-        videoObj.file_name ||
-        `video_${Date.now()}.mp4`;
-
-
-      const statusMsg =
-        await bot.sendMessage(
-          chatId,
-
-          `⚡ <i>Video Telegram Channel me save ho rahi hai...</i>`,
-
-          {
-            parse_mode: 'HTML'
-          }
-        );
-
-
-      try {
-
-
-        // ======================================
-        // COPY VIDEO DIRECTLY TO CHANNEL
-        // ======================================
-
-        const copied =
-          await bot.copyMessage(
-            TELEGRAM_CHANNEL_ID,
-            chatId,
-            msg.message_id
-          );
-
-
-        const channelMessageId =
-          copied?.message_id;
-
-
-        if (!channelMessageId) {
-
-          throw new Error(
-            'Telegram Channel message ID nahi mila'
-          );
-
-        }
-
-
-        // ======================================
-        // FILE INFORMATION
-        // ======================================
-
-        const fileInfo =
-          await bot.getFile(
-            fileId
-          );
-
-
-        const shortId =
-          crypto.randomBytes(4)
-          .toString('hex');
-
-
-        const payload = {
-
-          name:
-            fileName,
-
-          telegramFileId:
-            fileId,
-
-          channelId:
-            String(
-              TELEGRAM_CHANNEL_ID
-            ),
-
-          channelMessageId:
-            channelMessageId,
-
-          filePath:
-            fileInfo?.file_path ||
-            null,
-
-          fileSize:
-            Number(
-              videoObj.file_size ||
-              0
-            ),
-
-          mimeType:
-            videoObj.mime_type ||
-            'video/mp4',
-
-          uploader:
-            uploaderName
-
-        };
-
-
-        // ======================================
-        // SAVE LINK DATA
-        // ======================================
-
-        linkStore.set(
-          shortId,
-          payload
-        );
-
-
-        await redis.set(
-          `video:${shortId}`,
-
-          JSON.stringify(
-            payload
-          ),
-
-          {
-            ex:
-              30 * 86400
-          }
-        );
-
-
-        const playUrl =
-          `${BASE_URL}/v/${shortId}`;
-
-
-        await bot.deleteMessage(
-          chatId,
-          statusMsg.message_id
-        ).catch(() => {});
-
-
-        // ======================================
-        // SEND PLAYER LINK
-        // ======================================
-
-        const reply =
-          `✨ <b>Video Ready!</b>\n\n` +
-
-          `📌 <b>File:</b> ` +
-          `${escapeHtml(fileName)}\n\n` +
-
-          `📦 <b>Storage:</b> Telegram Channel\n` +
-
-          `☁️ <b>Player:</b> ` +
-          `Cloudflare Domain\n\n` +
-
-          `🔗 <b>Your Player Link:</b>\n` +
-          `${playUrl}`;
-
-
-        return bot.sendMessage(
-          chatId,
-
-          reply,
-
-          {
-            parse_mode: 'HTML',
-
-            disable_web_page_preview:
-              false
-          }
-        );
-
-
-      } catch (err) {
-
-
-        console.error(
-          '[Telegram Channel Upload Error]',
-          err
-        );
-
-
-        await bot.deleteMessage(
-          chatId,
-          statusMsg.message_id
-        ).catch(() => {});
-
-
-        return bot.sendMessage(
-          chatId,
-
-          `❌ <b>Upload Error:</b>\n` +
-          `<code>${escapeHtml(err.message)}</code>`,
-
-          {
-            parse_mode: 'HTML'
-          }
-        );
-
-      }
-
-    }
-
-
-    // ==========================================
-    // LINK RECEIVE
-    // ==========================================
-
-    const incomingText =
-      (msg.text || '').trim();
-
-
-    if (
-      !incomingText ||
-      incomingText.startsWith('/')
-    ) {
-
-      return;
-
-    }
-
-
-    const urlRegex =
-      /(https?:\/\/[^\s<>"']+)/gi;
-
-
-    const urls =
-      incomingText.match(
-        urlRegex
-      ) || [];
-
-
-    if (
-      urls.length === 0
-    ) {
-
-      return;
-
-    }
-
-
-    const statusMsg =
-      await bot.sendMessage(
-        chatId,
-
-        `🔄 <i>Link process ho raha hai...</i>`,
-
-        {
-          parse_mode: 'HTML'
-        }
-      );
-
-
-    try {
-
-
-      const targetUrl =
-        urls[0];
-
-
-      let extracted =
-        await extractTeraboxLink(
-          targetUrl
-        );
-
-
-      if (!extracted) {
-
-        extracted = {
-
-          url:
-            targetUrl,
-
-          name:
-            'Web Video'
-
-        };
-
-      }
-
-
-      const shortId =
-        crypto.randomBytes(4)
-        .toString('hex');
-
-
-      const payload = {
-
-        name:
-          extracted.name,
-
-        url:
-          extracted.url,
-
-        uploader:
-          uploaderName
-
-      };
-
-
-      linkStore.set(
-        shortId,
-        payload
-      );
-
-
-      await redis.set(
-        `video:${shortId}`,
-
-        JSON.stringify(
-          payload
-        ),
-
-        {
-          ex:
-            30 * 86400
-        }
-      );
-
-
-      const playUrl =
-        `${BASE_URL}/v/${shortId}`;
-
-
-      await bot.deleteMessage(
-        chatId,
-        statusMsg.message_id
-      ).catch(() => {});
-
-
-      bot.sendMessage(
-        chatId,
-
-        `✨ <b>Aapka Stream Link:</b>\n` +
-        `${playUrl}`,
-
-        {
-          parse_mode: 'HTML'
-        }
-      );
-
-
-    } catch (err) {
-
-
-      await bot.deleteMessage(
-        chatId,
-        statusMsg.message_id
-      ).catch(() => {});
-
-
-      bot.sendMessage(
-        chatId,
-
-        `❌ <b>Error:</b>\n` +
-        `<code>${escapeHtml(err.message)}</code>`,
-
-        {
-          parse_mode: 'HTML'
-        }
-      );
-
-    }
-
-  }
+// Telegram video
+if (data.telegramFileId) {
+const fileInfo await bot.getFile(
+data.telegramFileld
+if (!fileInfo
+IfileInfo.file_path) {
+return res.status(404).send(
+"Telegram file path unavailable"
+}
+const filePath
+fileInfo.file path:
+if (!path, isAbsolute(filePath)) {
+return res.status(500).send(
+"Local Bot API did not return an absolute file path
+};
+}
+if (!fs.existsSync(filePath)) {
+return res.status(404).send(
+"Telegram local file is not available"
+const stat
+fs.statSync(filePath);
+const fileSize
+const range
+res.setHeader(
+stat.size)
+req.headers.range:
+"Accept-Ranges",
+"bytes'
+res.setHeader(
+"Content-Type"
+data.mimeType "video/mp4"
+};
+// Cloudflare proxy can serve the stream,
+// but it will not be used as permanent storage.
+res.setHeader(
+"Cache-Control",
+"no-store, no-cache, must-revalidate"
+if (range) (
+const match range.match(
+/bytes=(\d+)-(\d+)/
+if ( match) [
+return res.status(416).send(
+"Invalid Range"
+let start
+match[1]
+? parseInt(match[1], 10)
+01
+let end match[2]
+? parseInt(match[2], 10)
+: fileSize
+17
+if (start >= fileSize) {
+res.setHeader(
+ Content-Range",
+bytes /\${fileSize) 
+return res.status(416).end();
+}
+if (end > fileSize) {
+end fileSize 17
+const chunkSize
+end start + 1 
+res.status(206);
+res.setHeader(
+"Content-Range",
+  bytes \$ start)-\$ end}/\${fileSize}
+res.setHeader(
+"Content-Length"
+chunkSize
+const stream =
+fs.createReadStream(
+filePath,
+{
+start,
+end
+}
+ 
+stream.on("error", (error) => {
+console.error(
+"Telegram stream error:",
+error.message
+if (tres.headersSent) (
+res.status(500).end();
+} else {
+res.destroy();
+}
+});
+return stream.pipe(res);
+1
+res.status(200) 
+res.setHeader(
+"Content-Length",
+fileSize
+const stream
+fs.createReadStream(filePath):
+stream.on("error", (error) => {
+console.error(
+"Telegram stream error:",
+error message
+if (!res.headersSent) {
+res.status(500).end();
+ else  
+res.destroy();
+1
+return stream.pipe(res);
+}
+// Terabox streaming
+if (data.url) {
+const headers
+[};
+if (req.headers.range) {
+headers. Range
+req.headers.range:
+if (TERABOX_COOKIE) {
+headers. Cookie
+TERABOX_COOKIE 
+}
+const response
+await axios({
+method:  GET",
+url: data.url,
+headers,
+responseType: "stream",
+validateStatus: () => true
+res.status(
+response.status
+if (response.headers["content-type"]) [
+res.setHeader(
+"Content-Type",
+response.headers  content-type  
+}
+if (response.headers["content-length"]) {
+res.setHeader(
+"Content-Length",
+response.headers[ content-length"]
+}
+if (response.headers["content-range ]) {
+res.setHeader(
+"Content-Range",
+response.headers content-range*]
 );
+res.setHeader(
+ Accept-Ranges",
+"bytes"
+return response.data.pipe(res);
+}
+return res.status(404).send(
+"No playable source found"
+ catch (error) {
+console.error(
+"Stream error:",
+error message
+);
+if (!res.headersSent) {
+return res.status(500).send(
+"Unable to stream video
+1
+res.destroy())
+ );
+  
