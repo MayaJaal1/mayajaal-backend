@@ -13,7 +13,7 @@ const { Upload } = require('@aws-sdk/lib-storage');
 process.on('uncaughtException', (err) => console.error('[UncaughtException]:', err.message));
 process.on('unhandledRejection', (reason) => console.error('[UnhandledRejection]:', reason));
 
-// 1. Initial Config & Fallback Redis Setup
+// 1. Initial Config & Fallback Storage
 let redis;
 try {
   redis = Redis.fromEnv();
@@ -28,7 +28,7 @@ const BASE_URL = process.env.CUSTOM_DOMAIN
   ? (process.env.CUSTOM_DOMAIN.startsWith('http') ? process.env.CUSTOM_DOMAIN : `https://${process.env.CUSTOM_DOMAIN}`)
   : 'https://mayajaal.online';
 
-// 2. Cloudflare R2 Client Setup
+// 2. Cloudflare R2 Client Setup (Fixed IDs)
 const R2_ACCOUNT_ID = String(process.env.R2_ACCOUNT_ID || '9a17e6f8a4af372b6b0ab1ad1cdb982d').trim();
 const R2_ACCESS_KEY_ID = String(process.env.R2_ACCESS_KEY_ID || 'fe0370e7a3f380c0dee831d6c37fd851').trim();
 const R2_SECRET_ACCESS_KEY = String(process.env.R2_SECRET_ACCESS_KEY || '').trim();
@@ -177,7 +177,7 @@ app.get('/stream/:id', async (req, res) => {
 });
 
 app.listen(PORT, () => console.log(`🚀 Server running on port ${PORT}`));
-// 4. Link Resolvers (Supports terasharefile.com and multiple mirrors)
+// 4. Link Resolvers (Supports terasharefile, 1024tera, terabox)
 async function extractTeraboxLink(rawUrl) {
   try {
     let resolvedUrl = rawUrl.trim();
@@ -241,7 +241,7 @@ async function extractTeraboxLink(rawUrl) {
           if (streamUrl) {
             return { 
               url: streamUrl, 
-              name: file.server_filename || 'Video' 
+              name: file.server_filename || `video_${Date.now()}.mp4` 
             };
           }
         }
@@ -267,8 +267,8 @@ function escapeHtml(str = '') {
 bot.onText(/\/start/, (msg) => {
   bot.sendMessage(msg.chat.id,
     `🎬 <b>Stream Converter Bot</b>\n\n` +
-    `• <b>Video Upload:</b> Video bhejein, R2 me upload hokar domain play link banega.\n` +
-    `• <b>Link Convert:</b> Terabox / Terasharefile link bhej kar stream link banayein.`,
+    `• <b>Video Upload:</b> Direct video bhejein, R2 par save hokar play link banega.\n` +
+    `• <b>Terabox Link:</b> Terabox / Terasharefile link bhejein, R2 me upload hokar permanent link banega.`,
     { parse_mode: 'HTML' }
   );
 });
@@ -327,7 +327,7 @@ bot.on('message', async (msg) => {
     }
   }
 
-  // Link Receive
+  // Link Receive & Transfer to R2
   const incomingText = (msg.text || '').trim();
   if (!incomingText || incomingText.startsWith('/')) return;
 
@@ -335,17 +335,53 @@ bot.on('message', async (msg) => {
   const urls = incomingText.match(urlRegex) || [];
   if (urls.length === 0) return;
 
-  const statusMsg = await bot.sendMessage(chatId, `🔄 <i>Link process ho raha hai...</i>`, { parse_mode: 'HTML' });
+  const statusMsg = await bot.sendMessage(chatId, `🔄 <i>Terabox video fetch aur R2 par upload ho rahi hai...</i>`, { parse_mode: 'HTML' });
 
   try {
     const targetUrl = urls[0];
-    let extracted = await extractTeraboxLink(targetUrl);
-    if (!extracted) {
-      extracted = { url: targetUrl, name: 'Web Video' };
+    const extracted = await extractTeraboxLink(targetUrl);
+
+    if (!extracted || !extracted.url) {
+      await bot.deleteMessage(chatId, statusMsg.message_id).catch(() => {});
+      return bot.sendMessage(chatId, `❌ <b>Error:</b> Terabox se direct link fetch nahi ho saki. Check karein cookie valid hai ya nahi.`, { parse_mode: 'HTML' });
     }
 
+    let rawCookie = process.env.TERABOX_COOKIE || '';
+    if (rawCookie && !rawCookie.includes('ndus=')) {
+      rawCookie = `ndus=${rawCookie.trim()};`;
+    }
+
+    // Terabox se video stream lena
+    const videoStream = await axios.get(extracted.url, {
+      responseType: 'stream',
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        'Cookie': rawCookie,
+        'Accept': '*/*'
+      },
+      timeout: 30000
+    });
+
+    const fileExt = path.extname(extracted.name) || '.mp4';
+    const r2Key = `terabox/${crypto.randomBytes(8).toString('hex')}${fileExt}`;
+
+    // Cloudflare R2 bucket mein stream upload
+    const parallelUpload = new Upload({
+      client: r2Client,
+      params: {
+        Bucket: R2_BUCKET_NAME,
+        Key: r2Key,
+        Body: videoStream.data,
+        ContentType: 'video/mp4',
+      },
+      queueSize: 4,
+      partSize: 1024 * 1024 * 5,
+    });
+
+    await parallelUpload.done();
+
     const shortId = crypto.randomBytes(4).toString('hex');
-    const payload = { name: extracted.name, url: extracted.url, uploader: uploaderName };
+    const payload = { name: extracted.name, r2Key: r2Key, uploader: uploaderName };
     
     linkStore.set(shortId, payload);
     await redis.set(`video:${shortId}`, JSON.stringify(payload), { ex: 30 * 86400 });
@@ -353,10 +389,15 @@ bot.on('message', async (msg) => {
     const playUrl = `${BASE_URL}/v/${shortId}`;
     await bot.deleteMessage(chatId, statusMsg.message_id).catch(() => {});
 
-    bot.sendMessage(chatId, `✨ <b>Aapka Stream Link:</b>\n${playUrl}`, { parse_mode: 'HTML' });
+    const reply = `✨ <b>Terabox Video Ready!</b>\n\n` +
+                  `📌 <b>File:</b> ${escapeHtml(extracted.name)}\n\n` +
+                  `🔗 <b>Aapka Player Link:</b>\n${playUrl}`;
+
+    bot.sendMessage(chatId, reply, { parse_mode: 'HTML', disable_web_page_preview: false });
+
   } catch (err) {
     await bot.deleteMessage(chatId, statusMsg.message_id).catch(() => {});
-    bot.sendMessage(chatId, `❌ <b>Error:</b> <code>${escapeHtml(err.message)}</code>`, { parse_mode: 'HTML' });
+    bot.sendMessage(chatId, `❌ <b>Transfer Error:</b> <code>${escapeHtml(err.message)}</code>`, { parse_mode: 'HTML' });
   }
 });
-    
+  
