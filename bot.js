@@ -26,7 +26,7 @@ const BASE_URL = process.env.CUSTOM_DOMAIN
   ? (process.env.CUSTOM_DOMAIN.startsWith('http') ? process.env.CUSTOM_DOMAIN : `https://${process.env.CUSTOM_DOMAIN}`)
   : 'https://mayajaal.online';
 
-// 2. Cloudflare R2 S3 Client Setup
+// 2. Cloudflare R2 Client Setup
 const R2_ACCOUNT_ID = String(process.env.R2_ACCOUNT_ID || '9a17e6f8a4af372b6b0ab1ad1cdb982d').trim();
 const R2_ACCESS_KEY_ID = String(process.env.R2_ACCESS_KEY_ID || 'fe0370e7a3f380c0dee831d6c37fd851').trim();
 const R2_SECRET_ACCESS_KEY = String(process.env.R2_SECRET_ACCESS_KEY || '').trim();
@@ -59,7 +59,7 @@ app.use((req, res, next) => {
   next();
 });
 
-app.get('/', (req, res) => res.send('Stream Engine Online - 2GB Local Render API Active'));
+app.get('/', (req, res) => res.send('Stream Engine Online - Local 2GB Bot API Active'));
 app.get('/health', (req, res) => res.json({ status: 'ok', uptime: process.uptime() }));
 
 // HTML5 Video Player
@@ -146,7 +146,7 @@ app.get('/stream/:id', async (req, res) => {
 });
 
 app.listen(PORT, () => console.log(`🚀 Web Server running on port ${PORT}`));
-// 4. Render Local Bot API Client (Unlocks 2GB Limit)
+                                // 4. Render Local Bot API Client (Unlocks 2GB Limit)
 const LOCAL_API_URL = process.env.LOCAL_BOT_API_URL 
   ? process.env.LOCAL_BOT_API_URL.trim().replace(/\/$/, '') 
   : 'https://tg-local-api-gxrv.onrender.com';
@@ -174,7 +174,7 @@ bot.onText(/\/start/, (msg) => {
   bot.sendMessage(msg.chat.id,
     `🎬 <b>MayaJaal Stream Converter Bot (2GB Active)</b>\n\n` +
     `⚡ <b>Local API Server Connected!</b>\n` +
-    `Ab aap <b>50MB, 500MB, 1GB ya 2GB tak</b> ki video file direct Telegram par bhejein, direct Cloudflare R2 par upload hokar play link banegi!`,
+    `Ab aap <b>50MB, 500MB, 1GB ya 2GB tak</b> ki video direct Telegram par bhejein, direct Cloudflare R2 par upload hokar play link banegi!`,
     { parse_mode: 'HTML' }
   );
 });
@@ -191,8 +191,17 @@ bot.on('message', async (msg) => {
     const statusMsg = await bot.sendMessage(chatId, `⚡ <i>Video fetch karke Cloudflare R2 par upload ho rahi hai... (2GB Limit Allowed)</i>`, { parse_mode: 'HTML' });
 
     try {
-      const fileLink = await bot.getFileLink(fileId);
-      console.log(`[Media Download]: Fetching file -> ${fileLink}`);
+      // 1. Local server se raw file info fetch karein
+      const fileInfo = await bot.getFile(fileId);
+      if (!fileInfo || !fileInfo.file_path) {
+        throw new Error('Telegram local server se file_path nahi mila');
+      }
+
+      // 2. Direct local server download URL banayein (Fixes 404)
+      const downloadBase = LOCAL_API_URL ? LOCAL_API_URL : 'https://api.telegram.org';
+      const fileLink = `${downloadBase}/file/bot${TOKEN}/${fileInfo.file_path}`;
+
+      console.log(`[Media Download]: Streaming from -> ${fileLink}`);
 
       const videoDownloadStream = await axios.get(fileLink, {
         responseType: 'stream',
