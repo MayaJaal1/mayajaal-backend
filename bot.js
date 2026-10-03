@@ -5,11 +5,15 @@ const crypto = require('crypto');
 const { Redis } = require('@upstash/redis');
 const path = require('path');
 const { S3Client, GetObjectCommand } = require('@aws-sdk/client-s3');
+const { Upload } = require('@aws-sdk/lib-storage');
+const { TelegramClient } = require('telegram');
+const { StringSession } = require('telegram/sessions');
+const { NewMessage } = require('telegram/events');
 
 process.on('uncaughtException', (err) => console.error('[UncaughtException]:', err.message));
 process.on('unhandledRejection', (reason) => console.error('[UnhandledRejection]:', reason));
 
-// 1. Redis Cache Setup
+// 1. Redis Cache
 let redis;
 try {
   redis = Redis.fromEnv();
@@ -22,7 +26,7 @@ const BASE_URL = process.env.CUSTOM_DOMAIN
   ? (process.env.CUSTOM_DOMAIN.startsWith('http') ? process.env.CUSTOM_DOMAIN : `https://${process.env.CUSTOM_DOMAIN}`)
   : 'https://mayajaal.online';
 
-// 2. Cloudflare R2 Client
+// 2. Cloudflare R2 Setup
 const R2_ACCOUNT_ID = String(process.env.R2_ACCOUNT_ID || '9a17e6f8a4af372b6b0ab1ad1cdb982d').trim();
 const R2_ACCESS_KEY_ID = String(process.env.R2_ACCESS_KEY_ID || 'fe0370e7a3f380c0dee831d6c37fd851').trim();
 const R2_SECRET_ACCESS_KEY = String(process.env.R2_SECRET_ACCESS_KEY || '').trim();
@@ -38,7 +42,7 @@ const r2Client = new S3Client({
   forcePathStyle: true,
 });
 
-console.log('✅ Cloudflare R2 Client Initialized');
+console.log('✅ Cloudflare R2 Initialized');
 
 // 3. Express Web Engine
 const app = express();
@@ -55,10 +59,10 @@ app.use((req, res, next) => {
   next();
 });
 
-app.get('/', (req, res) => res.send('Stream Engine Online (2GB MTProto Enabled)'));
+app.get('/', (req, res) => res.send('Stream Engine Online - 2GB MTProto Active'));
 app.get('/health', (req, res) => res.json({ status: 'ok', uptime: process.uptime() }));
 
-// HTML5 Video Player Route
+// HTML5 Video Player
 app.get('/v/:id', async (req, res) => {
   try {
     const id = req.params.id;
@@ -70,7 +74,7 @@ app.get('/v/:id', async (req, res) => {
     }
 
     if (!data || !data.r2Key) {
-      return res.status(404).send('Video not found or still processing on Cloudflare R2');
+      return res.status(404).send('Video not found or processing on Cloudflare R2');
     }
 
     const streamUrl = `${BASE_URL}/stream/${id}`;
@@ -95,7 +99,7 @@ app.get('/v/:id', async (req, res) => {
         <div class="player-box">
           <video controls autoplay playsinline preload="metadata">
             <source src="${streamUrl}" type="video/mp4">
-            Browser video stream support nahi karta.
+            Aapka browser HTML5 video play nahi kar pa raha hai.
           </video>
           <div class="title">🎬 ${videoTitle}</div>
         </div>
@@ -107,7 +111,7 @@ app.get('/v/:id', async (req, res) => {
   }
 });
 
-// Domain Range Streaming Route (Full Seek Support)
+// Domain Streaming Range Route
 app.get('/stream/:id', async (req, res) => {
   try {
     const id = req.params.id;
@@ -141,17 +145,8 @@ app.get('/stream/:id', async (req, res) => {
   }
 });
 
-app.listen(PORT, () => console.log(`🚀 Server running on port ${PORT}`));
-
-module.exports = { linkStore, redis, r2Client, R2_BUCKET_NAME, BASE_URL };
-const { linkStore, redis, r2Client, R2_BUCKET_NAME, BASE_URL } = require('./index'); // Agar same file ho toh direct import use karein
-const { TelegramClient } = require('telegram');
-const { StringSession } = require('telegram/sessions');
-const { NewMessage } = require('telegram/events');
-const { Upload } = require('@aws-sdk/lib-storage');
-const crypto = require('crypto');
-
-// Telegram MTProto Credentials
+app.listen(PORT, () => console.log(`🚀 Web Server running on port ${PORT}`));
+// 4. Telegram MTProto Client Setup (2GB Bypass Engine)
 const apiId = parseInt(process.env.TELEGRAM_API_ID || '35399167');
 const apiHash = String(process.env.TELEGRAM_API_HASH || '8a34526a5e73078110072770dd85e5b').trim();
 const botToken = String(process.env.BOT_TOKEN || '').trim();
@@ -164,11 +159,16 @@ function escapeHtml(str = '') {
   return String(str).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 }
 
-async function startBot() {
+async function initBot() {
+  if (!botToken) {
+    console.error('❌ BOT_TOKEN missing in variables!');
+    return;
+  }
+
   await client.start({
     botAuthToken: botToken,
   });
-  console.log('✅ 2GB MTProto Telegram Bot Successfully Connected!');
+  console.log('✅ GramJS 2GB MTProto Bot Client Connected Safely!');
 
   client.addEventHandler(async (event) => {
     const message = event.message;
@@ -176,17 +176,16 @@ async function startBot() {
 
     const chatId = message.chatId;
 
-    // /start command
     if (message.message && message.message.startsWith('/start')) {
       return client.sendMessage(chatId, {
-        message: `🎬 <b>Stream Converter Bot (2GB Limit Active)</b>\n\n` +
-                 `Ab 20MB ki koi pabandi nahi hai!\n` +
-                 `Aap <b>100MB, 500MB ya 2GB tak</b> ki koi bhi video file bhejein, woh direct Cloudflare R2 par upload hokar play link banegi.`,
+        message: `🎬 <b>Stream Converter Bot (2GB File Limit)</b>\n\n` +
+                 `Ab 20MB wali koi limit nahi hai!\n` +
+                 `Seedha <b>500MB, 1GB ya 2GB tak ki video file</b> yahan send karein, woh direct Cloudflare R2 par upload hokar play link banegi.`,
         parseMode: 'html',
       });
     }
 
-    // Media Check (Video, Document, GIF)
+    // Video ya Document detection
     if (message.media && (message.media.document || message.media.video)) {
       let fileName = `video_${Date.now()}.mp4`;
 
@@ -197,31 +196,21 @@ async function startBot() {
       }
 
       const statusMsg = await client.sendMessage(chatId, {
-        message: `⚡ <i>Video fetch karke Cloudflare R2 par upload ho rahi hai... (2GB Limit Allowed)</i>`,
+        message: `⚡ <i>Video fetch hokar Cloudflare R2 par upload ho rahi hai... (2GB Tak Supported)</i>`,
         parseMode: 'html',
       });
 
       try {
-        console.log(`[MTProto]: Downloading media: ${fileName}`);
+        console.log(`[MTProto]: Downloading file ${fileName}...`);
 
-        // Direct Buffer Download (Bypasses 20MB limit up to 2000MB)
-        const mediaBuffer = await client.downloadMedia(message.media, {
-          progressCallback: (downloaded, total) => {
-            const percent = Math.round((Number(downloaded) / Number(total)) * 100);
-            if (percent % 25 === 0) {
-              console.log(`Download progress: ${percent}%`);
-            }
-          },
-        });
-
-        if (!mediaBuffer) throw new Error('File download nahi ho saki');
+        const mediaBuffer = await client.downloadMedia(message.media);
+        if (!mediaBuffer) throw new Error('Telegram media download nahi ho saki');
 
         const fileExt = fileName.includes('.') ? fileName.substring(fileName.lastIndexOf('.')) : '.mp4';
         const r2Key = `uploads/${crypto.randomBytes(8).toString('hex')}${fileExt}`;
 
-        console.log(`[R2 Upload]: Uploading to bucket: ${r2Key}`);
+        console.log(`[Cloudflare R2]: Uploading to R2 key ${r2Key}...`);
 
-        // Cloudflare R2 Multipart Upload
         const parallelUpload = new Upload({
           client: r2Client,
           params: {
@@ -237,10 +226,7 @@ async function startBot() {
         await parallelUpload.done();
 
         const shortId = crypto.randomBytes(4).toString('hex');
-        const payload = {
-          name: fileName,
-          r2Key: r2Key,
-        };
+        const payload = { name: fileName, r2Key: r2Key };
 
         linkStore.set(shortId, payload);
         await redis.set(`video:${shortId}`, JSON.stringify(payload), { ex: 30 * 86400 });
@@ -258,7 +244,7 @@ async function startBot() {
         });
 
       } catch (err) {
-        console.error('[Upload Failed]:', err);
+        console.error('[Upload Error]:', err.message);
         await client.deleteMessages(chatId, [statusMsg.id]).catch(() => {});
         return client.sendMessage(chatId, {
           message: `❌ <b>Upload Error:</b> <code>${escapeHtml(err.message)}</code>`,
@@ -269,4 +255,5 @@ async function startBot() {
   }, new NewMessage({}));
 }
 
-startBot();
+initBot().catch((e) => console.error('[Bot Init Error]:', e.message));
+          
