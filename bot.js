@@ -56,10 +56,10 @@ app.use((req, res, next) => {
   next();
 });
 
-app.get('/', (req, res) => res.send('Stream Engine Online - 2GB Render API Active'));
+app.get('/', (req, res) => res.send('Stream Engine Online - Local 2GB Bot API Active'));
 app.get('/health', (req, res) => res.json({ status: 'ok', uptime: process.uptime() }));
 
-// HTML5 Video Player
+// Video Player Page
 app.get('/v/:id', async (req, res) => {
   try {
     const id = req.params.id;
@@ -143,19 +143,17 @@ app.get('/stream/:id', async (req, res) => {
 });
 
 app.listen(PORT, () => console.log(`🚀 Web Server running on port ${PORT}`));
-// Render Local Bot API Server Connection (2000MB Limit)
+      // Render Local Bot API Configuration (Bypasses 20MB -> Unlocks 2GB)
 const LOCAL_API_URL = process.env.LOCAL_BOT_API_URL 
   ? process.env.LOCAL_BOT_API_URL.trim().replace(/\/$/, '') 
-  : undefined;
+  : 'https://tg-local-api-gxrv.onrender.com';
 
 const botOptions = {
-  polling: { autoStart: true, params: { timeout: 10 } }
+  polling: { autoStart: true, params: { timeout: 10 } },
+  baseApiUrl: LOCAL_API_URL
 };
 
-if (LOCAL_API_URL) {
-  botOptions.baseApiUrl = LOCAL_API_URL;
-  console.log(`🔗 2GB Local API Connected: ${LOCAL_API_URL}`);
-}
+console.log(`🔗 Connecting to 2GB Local Bot API: ${LOCAL_API_URL}`);
 
 const bot = new TelegramBot(TOKEN, botOptions);
 
@@ -173,7 +171,7 @@ bot.onText(/\/start/, (msg) => {
   bot.sendMessage(msg.chat.id,
     `🎬 <b>MayaJaal Stream Converter Bot (2GB Active)</b>\n\n` +
     `⚡ <b>Local API Server Connected!</b>\n` +
-    `Ab aap <b>50MB, 500MB ya 2GB tak</b> ki koi bhi video direct Telegram par bhejein, bina kisi error ke Cloudflare R2 par upload hokar play link banegi!`,
+    `Ab aap <b>50MB, 500MB ya 2GB tak</b> ki video direct Telegram par bhejein, direct Cloudflare R2 par upload hokar play link banegi!`,
     { parse_mode: 'HTML' }
   );
 });
@@ -240,4 +238,3 @@ bot.on('message', async (msg) => {
     }
   }
 });
-                    
