@@ -13,7 +13,6 @@ const { Upload } = require('@aws-sdk/lib-storage');
 process.on('uncaughtException', (err) => console.error('[UncaughtException]:', err.message));
 process.on('unhandledRejection', (reason) => console.error('[UnhandledRejection]:', reason));
 
-// 1. Initial Storage Setup
 let redis;
 try {
   redis = Redis.fromEnv();
@@ -28,7 +27,6 @@ const BASE_URL = process.env.CUSTOM_DOMAIN
   ? (process.env.CUSTOM_DOMAIN.startsWith('http') ? process.env.CUSTOM_DOMAIN : `https://${process.env.CUSTOM_DOMAIN}`)
   : 'https://mayajaal.online';
 
-// 2. Cloudflare R2 Client Setup
 const R2_ACCOUNT_ID = String(process.env.R2_ACCOUNT_ID || '9a17e6f8a4af372b6b0ab1ad1cdb982d').trim();
 const R2_ACCESS_KEY_ID = String(process.env.R2_ACCESS_KEY_ID || 'fe0370e7a3f380c0dee831d6c37fd851').trim();
 const R2_SECRET_ACCESS_KEY = String(process.env.R2_SECRET_ACCESS_KEY || '').trim();
@@ -46,7 +44,6 @@ const r2Client = new S3Client({
 
 console.log('✅ Cloudflare R2 Client Initialized');
 
-// 3. Express Web Engine
 const app = express();
 const PORT = process.env.PORT || 8080;
 
@@ -64,7 +61,6 @@ app.use((req, res, next) => {
 app.get('/', (req, res) => res.send('Stream Engine Online'));
 app.get('/health', (req, res) => res.json({ status: 'ok', uptime: process.uptime() }));
 
-// Web Player Route (Direct Cloudflare R2 Player)
 app.get('/v/:id', async (req, res) => {
   try {
     const id = req.params.id;
@@ -80,7 +76,7 @@ app.get('/v/:id', async (req, res) => {
     }
 
     const streamUrl = `${BASE_URL}/stream/${id}`;
-    const videoTitle = data.name || 'Diskwala Video Player';
+    const videoTitle = data.name || 'Video Player';
 
     res.send(`
       <!DOCTYPE html>
@@ -113,7 +109,6 @@ app.get('/v/:id', async (req, res) => {
   }
 });
 
-// Domain Streaming Route
 app.get('/stream/:id', async (req, res) => {
   try {
     const id = req.params.id;
@@ -148,98 +143,86 @@ app.get('/stream/:id', async (req, res) => {
 });
 
 app.listen(PORT, () => console.log(`🚀 Server running on port ${PORT}`));
-// 4. Diskwala Stream Resolver (Extracts from JSON state & API)
+// 4. Diskwala Multi-Strategy Extractor
 async function fetchDiskwalaStream(rawUrl) {
   let target = rawUrl.trim();
-
-  // Extract ID (e.g., 6ac117542a52418b2481f290)
   const idMatch = target.match(/\/(?:app|file|share|d)\/([a-zA-Z0-9]+)/i);
   const fileId = idMatch ? idMatch[1] : '';
 
   if (!fileId) {
-    console.error('[Diskwala]: ID parse nahi ho saki:', target);
+    console.error('[Diskwala]: ID extract nahi ho saki:', target);
     return null;
   }
 
+  console.log(`[Diskwala]: Processing fileId = ${fileId}`);
   let directUrl = '';
   let fileName = `diskwala_${fileId}.mp4`;
 
-  // Method 1: Fetch Page HTML and parse Next.js / React initial state
-  try {
-    const pageResp = await axios.get(target, {
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36',
-        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8'
-      },
-      timeout: 15000
-    });
+  const commonHeaders = {
+    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36',
+    'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
+    'Accept-Language': 'en-US,en;q=0.9',
+    'Referer': target
+  };
 
-    const html = pageResp.data || '';
+  // Strategy 1: Diskwala Direct API Endpoints
+  const apiAttempts = [
+    `https://www.diskwala.com/api/file/${fileId}`,
+    `https://api.diskwala.com/file/${fileId}`,
+    `https://www.diskwala.com/api/v1/file/details?id=${fileId}`
+  ];
 
-    // Next.js hydration script parser
-    const nextDataMatch = html.match(/<script id="__NEXT_DATA__" type="application\/json">([\s\S]*?)<\/script>/i);
-    if (nextDataMatch && nextDataMatch[1]) {
-      try {
+  for (const ep of apiAttempts) {
+    try {
+      console.log(`[Diskwala API]: Trying endpoint -> ${ep}`);
+      const res = await axios.get(ep, { headers: commonHeaders, timeout: 10000 });
+      console.log(`[Diskwala API Success]:`, JSON.stringify(res.data).substring(0, 150));
+      
+      const d = res.data?.data || res.data;
+      if (d?.downloadUrl || d?.fileUrl || d?.url || d?.stream_url) {
+        directUrl = d.downloadUrl || d.fileUrl || d.url || d.stream_url;
+        fileName = d.name || d.title || fileName;
+        break;
+      }
+    } catch (e) {
+      console.log(`[Diskwala API Error]: ${ep} -> ${e.response?.status || e.message}`);
+    }
+  }
+
+  // Strategy 2: Web Scraping JSON State Fallback
+  if (!directUrl) {
+    try {
+      console.log(`[Diskwala HTML]: Fetching web page HTML...`);
+      const pageResp = await axios.get(target, { headers: commonHeaders, timeout: 15000 });
+      const html = pageResp.data || '';
+
+      const nextDataMatch = html.match(/<script id="__NEXT_DATA__" type="application\/json">([\s\S]*?)<\/script>/i);
+      if (nextDataMatch && nextDataMatch[1]) {
         const nextJson = JSON.parse(nextDataMatch[1]);
         const pageProps = nextJson?.props?.pageProps || {};
-        const fileData = pageProps?.file || pageProps?.data || pageProps;
-
-        directUrl = fileData?.downloadUrl || fileData?.fileUrl || fileData?.url || fileData?.streamUrl || '';
-        if (fileData?.name || fileData?.title) {
-          fileName = fileData.name || fileData.title;
-        }
-      } catch (e) {}
-    }
-
-    // Direct JSON regex fallback
-    if (!directUrl) {
-      const urlMatch = html.match(/"(?:downloadUrl|fileUrl|stream_url|direct_url)":\s*"([^"]+)"/i);
-      if (urlMatch && urlMatch[1]) {
-        directUrl = urlMatch[1].replace(/\\u0026/g, '&');
+        const fileObj = pageProps?.file || pageProps?.data || pageProps;
+        directUrl = fileObj?.downloadUrl || fileObj?.fileUrl || fileObj?.url || fileObj?.streamUrl || '';
+        if (fileObj?.name || fileObj?.title) fileName = fileObj.name || fileObj.title;
       }
-    }
-  } catch (err) {
-    console.error('[Diskwala HTML Error]:', err.message);
-  }
 
-  // Method 2: Diskwala Backend API call fallback
-  if (!directUrl) {
-    const apiEndpoints = [
-      `https://www.diskwala.com/api/v1/file/${fileId}`,
-      `https://www.diskwala.com/api/file/${fileId}`,
-      `https://diskwala.com/api/v1/file/${fileId}`
-    ];
-
-    for (const ep of apiEndpoints) {
-      try {
-        const apiRes = await axios.get(ep, {
-          headers: {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-            'Referer': target
-          },
-          timeout: 8000
-        });
-
-        const resData = apiRes.data?.data || apiRes.data;
-        if (resData?.downloadUrl || resData?.fileUrl || resData?.url) {
-          directUrl = resData.downloadUrl || resData.fileUrl || resData.url;
-          if (resData.name || resData.title) fileName = resData.name || resData.title;
-          break;
+      if (!directUrl) {
+        const urlMatch = html.match(/"(?:downloadUrl|fileUrl|stream_url|direct_url)":\s*"([^"]+)"/i);
+        if (urlMatch && urlMatch[1]) {
+          directUrl = urlMatch[1].replace(/\\u0026/g, '&');
         }
-      } catch (e) {}
+      }
+    } catch (e) {
+      console.error(`[Diskwala HTML Failed]: Status ${e.response?.status || e.message}`);
     }
   }
 
-  // Stream fetch & connect to R2
+  // Stream video to Cloudflare R2
   if (directUrl) {
     try {
-      console.log(`[Diskwala Stream]: Fetching file stream from ${directUrl}`);
+      console.log(`[Diskwala Stream]: Direct URL found -> ${directUrl}`);
       const stream = await axios.get(directUrl, {
         responseType: 'stream',
-        headers: {
-          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-          'Referer': target
-        },
+        headers: commonHeaders,
         timeout: 60000
       });
 
@@ -251,8 +234,8 @@ async function fetchDiskwalaStream(rawUrl) {
         stream: stream.data,
         fileName: fileName
       };
-    } catch (streamErr) {
-      console.error('[Diskwala Stream Error]:', streamErr.message);
+    } catch (err) {
+      console.error(`[Diskwala Stream Pipe Error]: ${err.message}`);
     }
   }
 
@@ -275,17 +258,17 @@ function escapeHtml(str = '') {
 bot.onText(/\/start/, (msg) => {
   bot.sendMessage(msg.chat.id,
     `🎬 <b>Stream Converter Bot</b>\n\n` +
-    `• <b>Direct Video:</b> File bhejein, R2 bucket me direct store hogi.\n` +
-    `• <b>Diskwala Link:</b> Link bhejein, video Cloudflare R2 me upload hokar domain play link banega.`,
+    `• <b>Direct Video:</b> File send karein, R2 me upload hokar play link banega.\n` +
+    `• <b>Diskwala Link:</b> Diskwala link bhejein, video Cloudflare R2 me transfer hokar domain play link banega.`,
     { parse_mode: 'HTML' }
   );
 });
 
-// Video direct Cloudflare R2 Upload
 bot.on('message', async (msg) => {
   const chatId = msg.chat.id;
   const uploaderName = msg.from?.username ? `@${msg.from.username}` : (msg.from?.first_name || 'User');
 
+  // Direct video file
   const videoObj = msg.video || msg.document || (msg.animation ? msg.animation : null);
   if (videoObj) {
     const fileId = videoObj.file_id;
@@ -334,7 +317,7 @@ bot.on('message', async (msg) => {
     }
   }
 
-  // Link Receive
+  // Link receive
   const incomingText = (msg.text || '').trim();
   if (!incomingText || incomingText.startsWith('/')) return;
 
@@ -352,13 +335,12 @@ bot.on('message', async (msg) => {
 
       if (!streamData || !streamData.stream) {
         await bot.deleteMessage(chatId, statusMsg.message_id).catch(() => {});
-        return bot.sendMessage(chatId, `❌ <b>Error:</b> Diskwala se direct download stream nahi mil paayi. Link check karein.`, { parse_mode: 'HTML' });
+        return bot.sendMessage(chatId, `❌ <b>Error:</b> Diskwala se direct download stream nahi mil paayi. Railway logs check karein.`, { parse_mode: 'HTML' });
       }
 
       const fileExt = path.extname(streamData.fileName) || '.mp4';
       const r2Key = `diskwala/${crypto.randomBytes(8).toString('hex')}${fileExt}`;
 
-      // Uploading directly into Cloudflare R2
       const parallelUpload = new Upload({
         client: r2Client,
         params: {
@@ -387,8 +369,8 @@ bot.on('message', async (msg) => {
       await bot.deleteMessage(chatId, statusMsg.message_id).catch(() => {});
 
       const reply = `✨ <b>Cloudflare R2 Par Video Upload Safal!</b>\n\n` +
-                    `📌 <b>File:</b> ${escapeHtml(streamData.fileName)}\n\n` +
-                    `🔗 <b>Aapka Player Link:</b>\n${playUrl}`;
+                  `📌 <b>File:</b> ${escapeHtml(streamData.fileName)}\n\n` +
+                  `🔗 <b>Aapka Player Link:</b>\n${playUrl}`;
 
       return bot.sendMessage(chatId, reply, { parse_mode: 'HTML', disable_web_page_preview: false });
 
@@ -398,3 +380,4 @@ bot.on('message', async (msg) => {
     }
   }
 });
+        
