@@ -12,6 +12,7 @@ const { Upload } = require('@aws-sdk/lib-storage');
 process.on('uncaughtException', (err) => console.error('[UncaughtException]:', err.message));
 process.on('unhandledRejection', (reason) => console.error('[UnhandledRejection]:', reason));
 
+// 1. Redis Cache Setup
 let redis;
 try {
   redis = Redis.fromEnv();
@@ -25,10 +26,11 @@ const BASE_URL = process.env.CUSTOM_DOMAIN
   ? (process.env.CUSTOM_DOMAIN.startsWith('http') ? process.env.CUSTOM_DOMAIN : `https://${process.env.CUSTOM_DOMAIN}`)
   : 'https://mayajaal.online';
 
-const R2_ACCOUNT_ID = String(process.env.R2_ACCOUNT_ID || '9a17e6f8a4af372b6b0ab1ad1cdb982d').trim();
-const R2_ACCESS_KEY_ID = String(process.env.R2_ACCESS_KEY_ID || 'fe0370e7a3f380c0dee831d6c37fd851').trim();
-const R2_SECRET_ACCESS_KEY = String(process.env.R2_SECRET_ACCESS_KEY || '').trim();
-const R2_BUCKET_NAME = String(process.env.R2_BUCKET_NAME || '').trim();
+// 2. Cloudflare R2 Client Setup (Signature Mismatch Fix)
+const R2_ACCOUNT_ID = String(process.env.R2_ACCOUNT_ID || '9a17e6f8a4af372b6b0ab1ad1cdb982d').trim().replace(/['"]/g, '');
+const R2_ACCESS_KEY_ID = String(process.env.R2_ACCESS_KEY_ID || 'fe0370e7a3f380c0dee831d6c37fd851').trim().replace(/['"]/g, '');
+const R2_SECRET_ACCESS_KEY = String(process.env.R2_SECRET_ACCESS_KEY || '').trim().replace(/['"]/g, '');
+const R2_BUCKET_NAME = String(process.env.R2_BUCKET_NAME || '').trim().replace(/['"]/g, '');
 
 const r2Client = new S3Client({
   region: 'auto',
@@ -37,11 +39,11 @@ const r2Client = new S3Client({
     accessKeyId: R2_ACCESS_KEY_ID,
     secretAccessKey: R2_SECRET_ACCESS_KEY,
   },
-  forcePathStyle: true,
 });
 
-console.log('✅ Cloudflare R2 Initialized');
+console.log('✅ Cloudflare R2 Client Initialized');
 
+// 3. Express Web Engine
 const app = express();
 const PORT = process.env.PORT || 8080;
 
@@ -56,10 +58,10 @@ app.use((req, res, next) => {
   next();
 });
 
-app.get('/', (req, res) => res.send('Stream Engine Online'));
+app.get('/', (req, res) => res.send('Stream Engine Online - Active'));
 app.get('/health', (req, res) => res.json({ status: 'ok', uptime: process.uptime() }));
 
-// Video Player Page
+// HTML5 Video Player
 app.get('/v/:id', async (req, res) => {
   try {
     const id = req.params.id;
@@ -142,7 +144,7 @@ app.get('/stream/:id', async (req, res) => {
 });
 
 app.listen(PORT, () => console.log(`🚀 Web Server running on port ${PORT}`));
-    // Local Bot API and Official API Setup
+// 4. Local API & Telegram Setup
 const LOCAL_API_URL = (process.env.LOCAL_BOT_API_URL || 'https://tg-local-api-gxrv.onrender.com').trim().replace(/\/$/, '');
 
 const bot = new TelegramBot(TOKEN, {
@@ -185,31 +187,26 @@ bot.on('message', async (msg) => {
         throw new Error('Telegram server se file path nahi mila');
       }
 
-      let videoDownloadStream;
       let cleanPath = fileInfo.file_path;
-
-      // Agar path me disk path (/var/lib/...) hai, sanitize karein
       if (cleanPath.includes(TOKEN)) {
         cleanPath = cleanPath.substring(cleanPath.indexOf(TOKEN) + TOKEN.length);
       }
       cleanPath = cleanPath.replace(/^\/+/, '');
 
-      // Strategy 1: Official Telegram Cloud URL (100% works for normal files)
       const officialUrl = `https://api.telegram.org/file/bot${TOKEN}/${cleanPath}`;
-      // Strategy 2: Render Local Server URL
       const localUrl = `${LOCAL_API_URL}/file/bot${TOKEN}/${cleanPath}`;
 
-      console.log(`[Downloading]: Trying stream...`);
+      console.log(`[Media Download]: Fetching stream...`);
 
+      let videoDownloadStream;
       try {
-        // Pehle official se try karein taaki 10MB-20MB fail na ho
         videoDownloadStream = await axios.get(officialUrl, {
           responseType: 'stream',
           maxContentLength: Infinity,
           maxBodyLength: Infinity,
         });
       } catch (errOfficial) {
-        console.log(`[Official CDN Fallback]: Trying Local Server ${localUrl}`);
+        console.log(`[CDN Fallback]: Using Local API -> ${localUrl}`);
         videoDownloadStream = await axios.get(localUrl, {
           responseType: 'stream',
           maxContentLength: Infinity,
