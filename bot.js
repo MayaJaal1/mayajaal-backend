@@ -7,7 +7,8 @@ const crypto = require('crypto');
 const { Redis } = require('@upstash/redis');
 const path = require('path');
 const fs = require('fs');
-const { S3Client, PutObjectCommand, GetObjectCommand } = require('@aws-sdk/client-s3');
+const { S3Client, GetObjectCommand } = require('@aws-sdk/client-s3');
+const { Upload } = require('@aws-sdk/lib-storage');
 
 process.on('uncaughtException', (err) => console.error('[UncaughtException]:', err.message));
 process.on('unhandledRejection', (reason) => console.error('[UnhandledRejection]:', reason));
@@ -38,6 +39,52 @@ const R2_BUCKET_NAME = process.env.R2_BUCKET_NAME;
 
 const r2Client = new S3Client({
   region: 'auto',
+  endpoint: `https://${R2_ACCOUNT_Yeh raha aapka bot code do hisson mein baanta hua. Aap ise copy karke use kar sakte hain.
+
+---
+
+### **Part 1: Setup, Cloudflare R2 Client, aur Express Player/Streaming Routes**
+
+Is part mein configuration, Cloudflare R2 connection, web video player page (`/v/:id`), aur range chunk streaming endpoint shamil hain:
+
+```javascript
+require('dotenv').config();
+
+const express = require('express');
+const TelegramBot = require('node-telegram-bot-api');
+const axios = require('axios');
+const crypto = require('crypto');
+const { Redis } = require('@upstash/redis');
+const path = require('path');
+const fs = require('fs');
+const { S3Client, GetObjectCommand } = require('@aws-sdk/client-s3');
+const { Upload } = require('@aws-sdk/lib-storage');
+
+process.on('uncaughtException', (err) => console.error('[UncaughtException]:', err.message));
+process.on('unhandledRejection', (reason) => console.error('[UnhandledRejection]:', reason));
+
+// 1. Initial Config
+const redis = Redis.fromEnv();
+const linkStore = new Map();
+
+const TOKEN = process.env.BOT_TOKEN;
+const BASE_URL = process.env.CUSTOM_DOMAIN 
+  ? (process.env.CUSTOM_DOMAIN.startsWith('http') ? process.env.CUSTOM_DOMAIN : `https://${process.env.CUSTOM_DOMAIN}`)
+  : '[https://mayajaal.online](https://mayajaal.online)';
+
+if (!TOKEN) {
+  console.error('BOT_TOKEN missing!');
+  process.exit(1);
+}
+
+// 2. Cloudflare R2 Client
+const R2_ACCOUNT_ID = process.env.R2_ACCOUNT_ID;
+const R2_ACCESS_KEY_ID = process.env.R2_ACCESS_KEY_ID;
+const R2_SECRET_ACCESS_KEY = process.env.R2_SECRET_ACCESS_KEY;
+const R2_BUCKET_NAME = process.env.R2_BUCKET_NAME;
+
+const r2Client = new S3Client({
+  region: 'auto',
   endpoint: `https://${R2_ACCOUNT_ID}.r2.cloudflarestorage.com`,
   credentials: {
     accessKeyId: R2_ACCESS_KEY_ID,
@@ -45,11 +92,9 @@ const r2Client = new S3Client({
   },
 });
 
-console.log('✅ Cloudflare R2 Engine Initialized!');
+console.log('Cloudflare R2 Client Initialized');
 
-// ═══════════════════════════════════════════
-// 2. EXPRESS HTTP SERVER & STREAMING ENGINE
-// ═══════════════════════════════════════════
+// 3. Express Web Engine
 const app = express();
 const PORT = process.env.PORT || 8080;
 
@@ -64,10 +109,10 @@ app.use((req, res, next) => {
   next();
 });
 
-app.get('/', (req, res) => res.send('MayaJaal Fast Stream Engine Live!'));
+app.get('/', (req, res) => res.send('Stream Engine Online'));
 app.get('/health', (req, res) => res.json({ status: 'ok', uptime: process.uptime() }));
 
-// 🎬 Web Player Page (Aapke Domain Par Play Hoga)
+// Web Player Route (Custom Domain par video run karne ke liye)
 app.get('/v/:id', async (req, res) => {
   try {
     const id = req.params.id;
@@ -81,11 +126,11 @@ app.get('/v/:id', async (req, res) => {
     if (!data) return res.status(404).send('Video not found or link expired');
 
     const streamUrl = `${BASE_URL}/stream/${id}`;
-    const videoTitle = data.name || 'MayaJaal Stream';
+    const videoTitle = data.name || 'Video Player';
 
     res.send(`
       <!DOCTYPE html>
-      <html lang="en">
+      <html lang="hi">
       <head>
         <meta charset="UTF-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -93,8 +138,8 @@ app.get('/v/:id', async (req, res) => {
         <style>
           * { box-sizing: border-box; margin: 0; padding: 0; }
           body { background: #000; color: #fff; font-family: sans-serif; display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 100vh; }
-          .player-box { width: 100%; max-width: 900px; padding: 12px; }
-          video { width: 100%; max-height: 80vh; border-radius: 12px; background: #111; outline: none; box-shadow: 0 10px 30px rgba(0,0,0,0.8); }
+          .player-box { width: 100%; max-width: 900px; padding: 16px; }
+          video { width: 100%; max-height: 80vh; border-radius: 12px; background: #111; outline: none; }
           .title { margin-top: 15px; font-size: 1.1rem; color: #00ff88; word-break: break-all; }
         </style>
       </head>
@@ -102,19 +147,19 @@ app.get('/v/:id', async (req, res) => {
         <div class="player-box">
           <video controls autoplay playsinline preload="metadata">
             <source src="${streamUrl}" type="video/mp4">
-            Aapka browser HTML5 video support nahi karta.
+            Aapka browser HTML5 video play karne me samarth nahi hai.
           </video>
-          <div class="title">🎬 ${videoTitle}</div>
+          <div class="title">${videoTitle}</div>
         </div>
       </body>
       </html>
     `);
   } catch (err) {
-    res.status(500).send('Error loading player: ' + err.message);
+    res.status(500).send('Player error: ' + err.message);
   }
 });
 
-// ⚡ Direct Proxy Stream (Aapke Domain Se Stream Hogi)
+// Domain Streaming Route
 app.get('/stream/:id', async (req, res) => {
   try {
     const id = req.params.id;
@@ -127,7 +172,6 @@ app.get('/stream/:id', async (req, res) => {
 
     if (!data) return res.status(404).send('Stream not found');
 
-    // Case 1: Agar R2 me upload hui file hai
     if (data.r2Key) {
       const range = req.headers.range;
       const command = new GetObjectCommand({
@@ -147,7 +191,6 @@ app.get('/stream/:id', async (req, res) => {
       return response.Body.pipe(res);
     }
 
-    // Case 2: External Proxy (Terabox / Diskwala)
     if (!data.url) return res.status(404).send('Stream expired');
 
     let rawCookie = process.env.TERABOX_COOKIE || '';
@@ -181,10 +224,8 @@ app.get('/stream/:id', async (req, res) => {
   }
 });
 
-app.listen(PORT, () => console.log(`✅ MayaJaal Web Engine running on port ${PORT}`));
-// ═══════════════════════════════════════════
-// 3. LINK RESOLVERS
-// ═══════════════════════════════════════════
+app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
+// 4. Link Resolvers
 async function extractTeraboxLink(rawUrl) {
   try {
     let resolvedUrl = rawUrl;
@@ -211,10 +252,10 @@ async function extractTeraboxLink(rawUrl) {
 
     for (const k of [formattedKey, shorturl]) {
       try {
-        const res = await axios.get(`https://www.1024tera.com/share/list?app_id=250528&shorturl=${k}&root=1`, {
+        const res = await axios.get(`[https://www.1024tera.com/share/list?app_id=250528&shorturl=$](https://www.1024tera.com/share/list?app_id=250528&shorturl=$){k}&root=1`, {
           headers: {
             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)',
-            'Referer': 'https://www.1024tera.com/',
+            'Referer': '[https://www.1024tera.com/](https://www.1024tera.com/)',
             'Cookie': rawCookie
           },
           timeout: 8000
@@ -223,7 +264,7 @@ async function extractTeraboxLink(rawUrl) {
         if (res.data?.errno === 0 && res.data?.list?.length > 0) {
           const file = res.data.list[0];
           const streamUrl = file.dlink || file.direct_link || file.url;
-          if (streamUrl) return { url: streamUrl, name: file.server_filename || 'Terabox Video' };
+          if (streamUrl) return { url: streamUrl, name: file.server_filename || 'Video' };
         }
       } catch (err) {}
     }
@@ -231,9 +272,7 @@ async function extractTeraboxLink(rawUrl) {
   return null;
 }
 
-// ═══════════════════════════════════════════
-// 4. TELEGRAM BOT CONTROLLER
-// ═══════════════════════════════════════════
+// 5. Telegram Bot Handlers
 const bot = new TelegramBot(TOKEN, { polling: { autoStart: true, params: { timeout: 10 } } });
 
 bot.on('polling_error', async (error) => {
@@ -246,14 +285,14 @@ function escapeHtml(str = '') {
 
 bot.onText(/\/start/, (msg) => {
   bot.sendMessage(msg.chat.id,
-    `🎬 <b>MayaJaal Ultra Stream Engine</b>\n\n` +
-    `• <b>Upload:</b> Koi bhi video bhejein, wo seedhe Cloudflare R2 me jayegi aur aapke domain ka link milega.\n` +
-    `• <b>Links:</b> Terabox link bhej kar custom play link payein.`,
+    `🎬 <b>Stream Converter Bot</b>\n\n` +
+    `• <b>Video Upload:</b> Koi bhi video file bhejein, wo Cloudflare par upload hokar aapke domain se chalegi.\n` +
+    `• <b>Link Convert:</b> Terabox link bhej kar stream link banayein.`,
     { parse_mode: 'HTML' }
   );
 });
 
-// Video Handler: R2 par upload karega aur custom domain link dega
+// Video direct Cloudflare R2 par upload karne ka block
 bot.on('message', async (msg) => {
   const chatId = msg.chat.id;
   const uploaderName = msg.from?.username ? `@${msg.from.username}` : (msg.from?.first_name || 'User');
@@ -265,24 +304,27 @@ bot.on('message', async (msg) => {
     const statusMsg = await bot.sendMessage(chatId, `⚡ <i>Video Cloudflare R2 par upload ho rahi hai...</i>`, { parse_mode: 'HTML' });
 
     try {
-      // 1. Telegram file link nikal kar stream lein
       const fileLink = await bot.getFileLink(fileId);
       const videoDownloadStream = await axios.get(fileLink, { responseType: 'stream' });
 
-      // 2. R2 par upload karein
       const fileExt = path.extname(fileName) || '.mp4';
       const r2Key = `uploads/${crypto.randomBytes(8).toString('hex')}${fileExt}`;
 
-      const uploadCommand = new PutObjectCommand({
-        Bucket: R2_BUCKET_NAME,
-        Key: r2Key,
-        Body: videoDownloadStream.data,
-        ContentType: videoObj.mime_type || 'video/mp4',
+      // Multipart upload jisse streaming error na aaye
+      const parallelUpload = new Upload({
+        client: r2Client,
+        params: {
+          Bucket: R2_BUCKET_NAME,
+          Key: r2Key,
+          Body: videoDownloadStream.data,
+          ContentType: videoObj.mime_type || 'video/mp4',
+        },
+        queueSize: 4,
+        partSize: 1024 * 1024 * 5,
       });
 
-      await r2Client.send(uploadCommand);
+      await parallelUpload.done();
 
-      // 3. Aapke custom domain ka unique play URL banayein
       const shortId = crypto.randomBytes(4).toString('hex');
       const payload = { name: fileName, r2Key: r2Key, uploader: uploaderName };
       
@@ -293,10 +335,9 @@ bot.on('message', async (msg) => {
 
       await bot.deleteMessage(chatId, statusMsg.message_id).catch(() => {});
 
-      const reply = `✨ <b>MayaJaal Stream Ready!</b>\n\n` +
+      const reply = `✨ <b>Video Ready!</b>\n\n` +
                     `📌 <b>File:</b> ${escapeHtml(fileName)}\n\n` +
-                    `🔗 <b>Aapka Domain Player Link:</b>\n${playUrl}\n\n` +
-                    `⚡ <i>Hosted on Cloudflare R2 & Streaming via ${BASE_URL}</i>`;
+                    `🔗 <b>Aapka Domain Player Link:</b>\n${playUrl}`;
 
       return bot.sendMessage(chatId, reply, { parse_mode: 'HTML', disable_web_page_preview: false });
 
@@ -306,7 +347,7 @@ bot.on('message', async (msg) => {
     }
   }
 
-  // Text Link Handler
+  // Link receive karne ka block
   const incomingText = (msg.text || '').trim();
   if (!incomingText || incomingText.startsWith('/')) return;
 
@@ -314,7 +355,7 @@ bot.on('message', async (msg) => {
   const urls = incomingText.match(urlRegex) || [];
   if (urls.length === 0) return;
 
-  const statusMsg = await bot.sendMessage(chatId, `🔄 <i>Processing link...</i>`, { parse_mode: 'HTML' });
+  const statusMsg = await bot.sendMessage(chatId, `🔄 <i>Link process ho raha hai...</i>`, { parse_mode: 'HTML' });
 
   try {
     const targetUrl = urls[0];
@@ -330,10 +371,10 @@ bot.on('message', async (msg) => {
     const playUrl = `${BASE_URL}/v/${shortId}`;
     await bot.deleteMessage(chatId, statusMsg.message_id).catch(() => {});
 
-    bot.sendMessage(chatId, `✨ <b>Stream Link:</b>\n${playUrl}`, { parse_mode: 'HTML' });
+    bot.sendMessage(chatId, `✨ <b>Aapka Stream Link:</b>\n${playUrl}`, { parse_mode: 'HTML' });
   } catch (err) {
     await bot.deleteMessage(chatId, statusMsg.message_id).catch(() => {});
     bot.sendMessage(chatId, `❌ <b>Error:</b> <code>${escapeHtml(err.message)}</code>`, { parse_mode: 'HTML' });
   }
 });
-                  
+    
