@@ -12,7 +12,6 @@ const { Upload } = require('@aws-sdk/lib-storage');
 process.on('uncaughtException', (err) => console.error('[UncaughtException]:', err.message));
 process.on('unhandledRejection', (reason) => console.error('[UnhandledRejection]:', reason));
 
-// 1. Redis Cache Setup
 let redis;
 try {
   redis = Redis.fromEnv();
@@ -26,11 +25,11 @@ const BASE_URL = process.env.CUSTOM_DOMAIN
   ? (process.env.CUSTOM_DOMAIN.startsWith('http') ? process.env.CUSTOM_DOMAIN : `https://${process.env.CUSTOM_DOMAIN}`)
   : 'https://mayajaal.online';
 
-// 2. Cloudflare R2 Client Setup (Signature Mismatch Fix)
-const R2_ACCOUNT_ID = String(process.env.R2_ACCOUNT_ID || '9a17e6f8a4af372b6b0ab1ad1cdb982d').trim().replace(/['"]/g, '');
-const R2_ACCESS_KEY_ID = String(process.env.R2_ACCESS_KEY_ID || 'fe0370e7a3f380c0dee831d6c37fd851').trim().replace(/['"]/g, '');
-const R2_SECRET_ACCESS_KEY = String(process.env.R2_SECRET_ACCESS_KEY || '').trim().replace(/['"]/g, '');
-const R2_BUCKET_NAME = String(process.env.R2_BUCKET_NAME || '').trim().replace(/['"]/g, '');
+// Pehle wala working credentials aur forcePathStyle config
+const R2_ACCOUNT_ID = String(process.env.R2_ACCOUNT_ID || '9a17e6f8a4af372b6b0ab1ad1cdb982d').trim();
+const R2_ACCESS_KEY_ID = String(process.env.R2_ACCESS_KEY_ID || 'fe0370e7a3f380c0dee831d6c37fd851').trim();
+const R2_SECRET_ACCESS_KEY = String(process.env.R2_SECRET_ACCESS_KEY || '').trim();
+const R2_BUCKET_NAME = String(process.env.R2_BUCKET_NAME || '').trim();
 
 const r2Client = new S3Client({
   region: 'auto',
@@ -39,11 +38,11 @@ const r2Client = new S3Client({
     accessKeyId: R2_ACCESS_KEY_ID,
     secretAccessKey: R2_SECRET_ACCESS_KEY,
   },
+  forcePathStyle: true,
 });
 
-console.log('✅ Cloudflare R2 Client Initialized');
+console.log('✅ Cloudflare R2 Initialized (Working Config)');
 
-// 3. Express Web Engine
 const app = express();
 const PORT = process.env.PORT || 8080;
 
@@ -58,10 +57,10 @@ app.use((req, res, next) => {
   next();
 });
 
-app.get('/', (req, res) => res.send('Stream Engine Online - Active'));
+app.get('/', (req, res) => res.send('Stream Engine Online'));
 app.get('/health', (req, res) => res.json({ status: 'ok', uptime: process.uptime() }));
 
-// HTML5 Video Player
+// Video Player Page
 app.get('/v/:id', async (req, res) => {
   try {
     const id = req.params.id;
@@ -144,7 +143,7 @@ app.get('/stream/:id', async (req, res) => {
 });
 
 app.listen(PORT, () => console.log(`🚀 Web Server running on port ${PORT}`));
-// 4. Local API & Telegram Setup
+// Render Local Bot API Server URL (Unlocks 2GB)
 const LOCAL_API_URL = (process.env.LOCAL_BOT_API_URL || 'https://tg-local-api-gxrv.onrender.com').trim().replace(/\/$/, '');
 
 const bot = new TelegramBot(TOKEN, {
@@ -164,8 +163,8 @@ function escapeHtml(str = '') {
 
 bot.onText(/\/start/, (msg) => {
   bot.sendMessage(msg.chat.id,
-    `🎬 <b>MayaJaal Stream Converter Bot</b>\n\n` +
-    `⚡ Direct file send karein, link turant ban jayegi!`,
+    `🎬 <b>MayaJaal Stream Converter Bot (2GB Active)</b>\n\n` +
+    `⚡ Video bhejte hi Cloudflare R2 link ban jayegi!`,
     { parse_mode: 'HTML' }
   );
 });
@@ -187,32 +186,22 @@ bot.on('message', async (msg) => {
         throw new Error('Telegram server se file path nahi mila');
       }
 
-      let cleanPath = fileInfo.file_path;
-      if (cleanPath.includes(TOKEN)) {
-        cleanPath = cleanPath.substring(cleanPath.indexOf(TOKEN) + TOKEN.length);
+      let filePath = fileInfo.file_path;
+      // Agar path me pura disk path (/var/lib/telegram-bot-api/...) hai toh sanitize karein
+      if (filePath.includes(TOKEN)) {
+        filePath = filePath.substring(filePath.indexOf(TOKEN) + TOKEN.length);
       }
-      cleanPath = cleanPath.replace(/^\/+/, '');
+      filePath = filePath.replace(/^\/+/, '');
 
-      const officialUrl = `https://api.telegram.org/file/bot${TOKEN}/${cleanPath}`;
-      const localUrl = `${LOCAL_API_URL}/file/bot${TOKEN}/${cleanPath}`;
+      // Local API download endpoint
+      const downloadUrl = `${LOCAL_API_URL}/file/bot${TOKEN}/${filePath}`;
+      console.log(`[Media Download]: Streaming from -> ${downloadUrl}`);
 
-      console.log(`[Media Download]: Fetching stream...`);
-
-      let videoDownloadStream;
-      try {
-        videoDownloadStream = await axios.get(officialUrl, {
-          responseType: 'stream',
-          maxContentLength: Infinity,
-          maxBodyLength: Infinity,
-        });
-      } catch (errOfficial) {
-        console.log(`[CDN Fallback]: Using Local API -> ${localUrl}`);
-        videoDownloadStream = await axios.get(localUrl, {
-          responseType: 'stream',
-          maxContentLength: Infinity,
-          maxBodyLength: Infinity,
-        });
-      }
+      const videoDownloadStream = await axios.get(downloadUrl, {
+        responseType: 'stream',
+        maxContentLength: Infinity,
+        maxBodyLength: Infinity,
+      });
 
       const fileExt = path.extname(fileName) || '.mp4';
       const r2Key = `uploads/${crypto.randomBytes(8).toString('hex')}${fileExt}`;
@@ -255,3 +244,4 @@ bot.on('message', async (msg) => {
     }
   }
 });
+    
