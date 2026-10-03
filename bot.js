@@ -13,56 +13,6 @@ const { Upload } = require('@aws-sdk/lib-storage');
 process.on('uncaughtException', (err) => console.error('[UncaughtException]:', err.message));
 process.on('unhandledRejection', (reason) => console.error('[UnhandledRejection]:', reason));
 
-// ═══════════════════════════════════════════
-// 0. CONFIG & STORAGE
-// ═══════════════════════════════════════════
-const redis = Redis.fromEnv();
-const linkStore = new Map();
-
-const TOKEN = process.env.BOT_TOKEN;
-const BASE_URL = process.env.CUSTOM_DOMAIN 
-  ? (process.env.CUSTOM_DOMAIN.startsWith('http') ? process.env.CUSTOM_DOMAIN : `https://${process.env.CUSTOM_DOMAIN}`)
-  : 'https://mayajaal.online';
-
-if (!TOKEN) {
-  console.error('❌ BOT_TOKEN missing!');
-  process.exit(1);
-}
-
-// ═══════════════════════════════════════════
-// 1. CLOUDFLARE R2 CLIENT SETUP
-// ═══════════════════════════════════════════
-const R2_ACCOUNT_ID = process.env.R2_ACCOUNT_ID;
-const R2_ACCESS_KEY_ID = process.env.R2_ACCESS_KEY_ID;
-const R2_SECRET_ACCESS_KEY = process.env.R2_SECRET_ACCESS_KEY;
-const R2_BUCKET_NAME = process.env.R2_BUCKET_NAME;
-
-const r2Client = new S3Client({
-  region: 'auto',
-  endpoint: `https://${R2_ACCOUNT_Yeh raha aapka bot code do hisson mein baanta hua. Aap ise copy karke use kar sakte hain.
-
----
-
-### **Part 1: Setup, Cloudflare R2 Client, aur Express Player/Streaming Routes**
-
-Is part mein configuration, Cloudflare R2 connection, web video player page (`/v/:id`), aur range chunk streaming endpoint shamil hain:
-
-```javascript
-require('dotenv').config();
-
-const express = require('express');
-const TelegramBot = require('node-telegram-bot-api');
-const axios = require('axios');
-const crypto = require('crypto');
-const { Redis } = require('@upstash/redis');
-const path = require('path');
-const fs = require('fs');
-const { S3Client, GetObjectCommand } = require('@aws-sdk/client-s3');
-const { Upload } = require('@aws-sdk/lib-storage');
-
-process.on('uncaughtException', (err) => console.error('[UncaughtException]:', err.message));
-process.on('unhandledRejection', (reason) => console.error('[UnhandledRejection]:', reason));
-
 // 1. Initial Config
 const redis = Redis.fromEnv();
 const linkStore = new Map();
@@ -70,7 +20,7 @@ const linkStore = new Map();
 const TOKEN = process.env.BOT_TOKEN;
 const BASE_URL = process.env.CUSTOM_DOMAIN 
   ? (process.env.CUSTOM_DOMAIN.startsWith('http') ? process.env.CUSTOM_DOMAIN : `https://${process.env.CUSTOM_DOMAIN}`)
-  : '[https://mayajaal.online](https://mayajaal.online)';
+  : 'https://mayajaal.online';
 
 if (!TOKEN) {
   console.error('BOT_TOKEN missing!');
@@ -92,7 +42,7 @@ const r2Client = new S3Client({
   },
 });
 
-console.log('Cloudflare R2 Client Initialized');
+console.log('✅ Cloudflare R2 Client Initialized');
 
 // 3. Express Web Engine
 const app = express();
@@ -112,7 +62,7 @@ app.use((req, res, next) => {
 app.get('/', (req, res) => res.send('Stream Engine Online'));
 app.get('/health', (req, res) => res.json({ status: 'ok', uptime: process.uptime() }));
 
-// Web Player Route (Custom Domain par video run karne ke liye)
+// Web Player Route
 app.get('/v/:id', async (req, res) => {
   try {
     const id = req.params.id;
@@ -147,7 +97,7 @@ app.get('/v/:id', async (req, res) => {
         <div class="player-box">
           <video controls autoplay playsinline preload="metadata">
             <source src="${streamUrl}" type="video/mp4">
-            Aapka browser HTML5 video play karne me samarth nahi hai.
+            Aapka browser HTML5 video support nahi karta.
           </video>
           <div class="title">${videoTitle}</div>
         </div>
@@ -252,10 +202,10 @@ async function extractTeraboxLink(rawUrl) {
 
     for (const k of [formattedKey, shorturl]) {
       try {
-        const res = await axios.get(`[https://www.1024tera.com/share/list?app_id=250528&shorturl=$](https://www.1024tera.com/share/list?app_id=250528&shorturl=$){k}&root=1`, {
+        const res = await axios.get(`https://www.1024tera.com/share/list?app_id=250528&shorturl=${k}&root=1`, {
           headers: {
             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)',
-            'Referer': '[https://www.1024tera.com/](https://www.1024tera.com/)',
+            'Referer': 'https://www.1024tera.com/',
             'Cookie': rawCookie
           },
           timeout: 8000
@@ -286,13 +236,13 @@ function escapeHtml(str = '') {
 bot.onText(/\/start/, (msg) => {
   bot.sendMessage(msg.chat.id,
     `🎬 <b>Stream Converter Bot</b>\n\n` +
-    `• <b>Video Upload:</b> Koi bhi video file bhejein, wo Cloudflare par upload hokar aapke domain se chalegi.\n` +
+    `• <b>Video Upload:</b> Video send karein, R2 me upload hokar domain play link banega.\n` +
     `• <b>Link Convert:</b> Terabox link bhej kar stream link banayein.`,
     { parse_mode: 'HTML' }
   );
 });
 
-// Video direct Cloudflare R2 par upload karne ka block
+// Video direct Cloudflare R2 par upload
 bot.on('message', async (msg) => {
   const chatId = msg.chat.id;
   const uploaderName = msg.from?.username ? `@${msg.from.username}` : (msg.from?.first_name || 'User');
@@ -310,7 +260,6 @@ bot.on('message', async (msg) => {
       const fileExt = path.extname(fileName) || '.mp4';
       const r2Key = `uploads/${crypto.randomBytes(8).toString('hex')}${fileExt}`;
 
-      // Multipart upload jisse streaming error na aaye
       const parallelUpload = new Upload({
         client: r2Client,
         params: {
@@ -347,7 +296,7 @@ bot.on('message', async (msg) => {
     }
   }
 
-  // Link receive karne ka block
+  // Link Receive
   const incomingText = (msg.text || '').trim();
   if (!incomingText || incomingText.startsWith('/')) return;
 
@@ -377,4 +326,4 @@ bot.on('message', async (msg) => {
     bot.sendMessage(chatId, `❌ <b>Error:</b> <code>${escapeHtml(err.message)}</code>`, { parse_mode: 'HTML' });
   }
 });
-    
+        
