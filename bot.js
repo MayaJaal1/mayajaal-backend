@@ -79,7 +79,7 @@ app.get('/v/:id', async (req, res) => {
 
     const videoTitle = data.name || 'Video Player';
 
-    // Scenario A: Diskwala Stream Embed
+    // Scenario A: Diskwala Embed Player
     if (data.isDiskwala && data.diskwalaUrl) {
       return res.send(`
         <!DOCTYPE html>
@@ -90,10 +90,10 @@ app.get('/v/:id', async (req, res) => {
           <title>${videoTitle}</title>
           <style>
             * { box-sizing: border-box; margin: 0; padding: 0; }
-            body { background: #000; color: #fff; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; overflow: hidden; padding: 10px; }
-            .player-container { width: 100%; max-width: 950px; height: 85vh; display: flex; flex-direction: column; }
+            body { background: #000; color: #fff; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; overflow: hidden; padding: 8px; }
+            .player-container { width: 100%; max-width: 960px; height: 88vh; display: flex; flex-direction: column; }
             iframe { width: 100%; height: 100%; border: none; border-radius: 12px; background: #111; box-shadow: 0 10px 30px rgba(0,0,0,0.9); }
-            .title { padding: 12px 5px; font-size: 1.05rem; color: #00ff88; word-break: break-all; }
+            .title { padding: 10px 5px; font-size: 1.05rem; color: #00ff88; word-break: break-all; }
           </style>
         </head>
         <body>
@@ -106,7 +106,7 @@ app.get('/v/:id', async (req, res) => {
       `);
     }
 
-    // Scenario B: R2 Direct MP4 Video Player
+    // Scenario B: Cloudflare R2 Direct MP4 Player
     const streamUrl = `${BASE_URL}/stream/${id}`;
     res.send(`
       <!DOCTYPE html>
@@ -190,8 +190,8 @@ function escapeHtml(str = '') {
 bot.onText(/\/start/, (msg) => {
   bot.sendMessage(msg.chat.id,
     `🎬 <b>Stream Converter Bot</b>\n\n` +
-    `• <b>Direct Video:</b> Video file bhejein, seedha Cloudflare R2 par store hogi.\n` +
-    `• <b>Diskwala Link:</b> Diskwala link bhejein, aapke custom domain player link me turant convert ho jayegi.`,
+    `• <b>Direct Video:</b> File bhejein, R2 par save hokar play link banega.\n` +
+    `• <b>Diskwala Link:</b> Link bhejein, aapke custom domain player link me turant convert ho jayega.`,
     { parse_mode: 'HTML' }
   );
 });
@@ -201,7 +201,7 @@ bot.on('message', async (msg) => {
   const chatId = msg.chat.id;
   const uploaderName = msg.from?.username ? `@${msg.from.username}` : (msg.from?.first_name || 'User');
 
-  // Direct video file handling
+  // 1. Direct Telegram video file handling
   const videoObj = msg.video || msg.document || (msg.animation ? msg.animation : null);
   if (videoObj) {
     const fileId = videoObj.file_id;
@@ -250,7 +250,7 @@ bot.on('message', async (msg) => {
     }
   }
 
-  // Link receive
+  // 2. Link receive
   const incomingText = (msg.text || '').trim();
   if (!incomingText || incomingText.startsWith('/')) return;
 
@@ -260,7 +260,7 @@ bot.on('message', async (msg) => {
 
   const targetUrl = urls[0];
 
-  // Diskwala Link Convert Engine
+  // Diskwala Instant Link Engine
   if (targetUrl.includes('diskwala.com')) {
     const statusMsg = await bot.sendMessage(chatId, `⚡ <i>Diskwala stream link generate ho rahi hai...</i>`, { parse_mode: 'HTML' });
 
@@ -270,13 +270,12 @@ bot.on('message', async (msg) => {
 
       if (!fileId) {
         await bot.deleteMessage(chatId, statusMsg.message_id).catch(() => {});
-        return bot.sendMessage(chatId, `❌ <b>Error:</b> Diskwala link se ID nahi nikaal paaye.`, { parse_mode: 'HTML' });
+        return bot.sendMessage(chatId, `❌ <b>Error:</b> Diskwala link se ID extract nahi ho saki.`, { parse_mode: 'HTML' });
       }
 
-      // Universal Diskwala Stream URL
       const diskwalaEmbedUrl = `https://www.diskwala.com/app/${fileId}`;
-
       const shortId = crypto.randomBytes(4).toString('hex');
+
       const payload = {
         name: `Diskwala Video (${fileId})`,
         isDiskwala: true,
@@ -301,3 +300,4 @@ bot.on('message', async (msg) => {
     }
   }
 });
+    
