@@ -13,7 +13,7 @@ const { Upload } = require('@aws-sdk/lib-storage');
 process.on('uncaughtException', (err) => console.error('[UncaughtException]:', err.message));
 process.on('unhandledRejection', (reason) => console.error('[UnhandledRejection]:', reason));
 
-// 1. Initial Storage Setup
+// 1. Storage Setup
 let redis;
 try {
   redis = Redis.fromEnv();
@@ -46,7 +46,7 @@ const r2Client = new S3Client({
 
 console.log('✅ Cloudflare R2 Client Initialized');
 
-// 3. Express Web Engine
+// 3. Express Engine
 const app = express();
 const PORT = process.env.PORT || 8080;
 
@@ -64,7 +64,7 @@ app.use((req, res, next) => {
 app.get('/', (req, res) => res.send('Stream Engine Online'));
 app.get('/health', (req, res) => res.json({ status: 'ok', uptime: process.uptime() }));
 
-// Web Player Route (Plays R2 Video Direct)
+// Web Player Route
 app.get('/v/:id', async (req, res) => {
   try {
     const id = req.params.id;
@@ -76,7 +76,7 @@ app.get('/v/:id', async (req, res) => {
     }
 
     if (!data || !data.r2Key) {
-      return res.status(404).send('Video not found or still processing on Cloudflare R2');
+      return res.status(404).send('Video not found or processing on Cloudflare R2');
     }
 
     const streamUrl = `${BASE_URL}/stream/${id}`;
@@ -101,7 +101,7 @@ app.get('/v/:id', async (req, res) => {
         <div class="player-box">
           <video controls autoplay playsinline preload="metadata">
             <source src="${streamUrl}" type="video/mp4">
-            Aapka browser video play nahi kar pa raha hai.
+            Aapka browser video play karne me samarth nahi hai.
           </video>
           <div class="title">🎬 ${videoTitle}</div>
         </div>
@@ -113,7 +113,7 @@ app.get('/v/:id', async (req, res) => {
   }
 });
 
-// Domain Streaming Route (R2 Range Chunk Streaming)
+// Domain Streaming Route
 app.get('/stream/:id', async (req, res) => {
   try {
     const id = req.params.id;
@@ -148,30 +148,25 @@ app.get('/stream/:id', async (req, res) => {
 });
 
 app.listen(PORT, () => console.log(`🚀 Server running on port ${PORT}`));
-// NOTE: Agar cookie expire ho jaye toh yahan nayi fresh 'ndus' value daal sakte hain
-const BACKUP_COOKIE = 'ndus=Yzdpm64teHuiTpyF1tSZ-m4ANxhFN7shhUG1hMNu;';
+const FALLBACK_COOKIE = 'ndus=Yzdpm64teHuiTpyF1tSZ-m4ANxhFN7shhUG1hMNu;';
 
-// 4. Terabox Direct Stream Resolver with Full Logs
+// 4. Terabox Stream Resolver with Anti-Bot Headers
 async function fetchTeraboxDownloadStream(rawUrl) {
   let target = rawUrl.trim();
 
-  // 1. Resolve domain redirect agar terasharefile ho
   try {
     const headResp = await axios.get(target, {
       maxRedirects: 10,
       headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36'
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36'
       },
       timeout: 10000
     });
     if (headResp.request?.res?.responseUrl) {
       target = headResp.request.res.responseUrl;
     }
-  } catch (e) {
-    console.error('[Redirect Error]:', e.message);
-  }
+  } catch (e) {}
 
-  // 2. Extract surl key
   const match = target.match(/\/s\/1?([a-zA-Z0-9_-]+)/i) || 
                 target.match(/[?&]surl=1?([a-zA-Z0-9_-]+)/i) || 
                 rawUrl.match(/\/s\/1?([a-zA-Z0-9_-]+)/i);
@@ -183,34 +178,36 @@ async function fetchTeraboxDownloadStream(rawUrl) {
   }
 
   if (!key) {
-    console.error('[Parse Error]: Terabox surl key nahi mili URL se:', target);
+    console.error('[Key Error]: Link se key extract nahi ho saki');
     return null;
   }
 
-  const cookieVal = process.env.TERABOX_COOKIE || BACKUP_COOKIE;
+  const cookieVal = process.env.TERABOX_COOKIE || FALLBACK_COOKIE;
   const cookieFormatted = cookieVal.includes('ndus=') ? cookieVal : `ndus=${cookieVal.trim()};`;
 
-  // 3. API Attempts (Official APIs with shorturl variants)
-  const apiAttempts = [
-    { url: `https://www.1024tera.com/share/list?app_id=250528&shorturl=1${key}&root=1`, referer: 'https://www.1024tera.com/' },
-    { url: `https://www.1024tera.com/share/list?app_id=250528&shorturl=${key}&root=1`, referer: 'https://www.1024tera.com/' },
-    { url: `https://www.terabox.app/share/list?app_id=250528&shorturl=1${key}&root=1`, referer: 'https://www.terabox.app/' },
-    { url: `https://www.terabox.app/share/list?app_id=250528&shorturl=${key}&root=1`, referer: 'https://www.terabox.app/' }
+  const requestHeaders = {
+    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36',
+    'Accept': 'application/json, text/plain, */*',
+    'Accept-Language': 'en-US,en;q=0.9',
+    'Referer': 'https://www.1024tera.com/',
+    'Cookie': cookieFormatted
+  };
+
+  const endpoints = [
+    `https://www.1024tera.com/share/list?app_id=250528&shorturl=1${key}&root=1`,
+    `https://www.1024tera.com/share/list?app_id=250528&shorturl=${key}&root=1`,
+    `https://www.terabox.app/share/list?app_id=250528&shorturl=1${key}&root=1`
   ];
 
-  for (const item of apiAttempts) {
+  for (const endpoint of endpoints) {
     try {
-      console.log(`[Terabox API Request]: Calling ${item.url}`);
-      const res = await axios.get(item.url, {
-        headers: {
-          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
-          'Referer': item.referer,
-          'Cookie': cookieFormatted
-        },
+      console.log(`[Terabox Fetching]: ${endpoint}`);
+      const res = await axios.get(endpoint, {
+        headers: requestHeaders,
         timeout: 15000
       });
 
-      console.log(`[Terabox API Response]: errno=${res.data?.errno}, errmsg=${res.data?.errmsg || 'none'}, items=${res.data?.list?.length || 0}`);
+      console.log(`[Terabox Response]: errno=${res.data?.errno}, errmsg=${res.data?.errmsg || 'OK'}`);
 
       if (res.data?.errno === 0 && res.data?.list && res.data.list.length > 0) {
         const file = res.data.list[0];
@@ -218,11 +215,11 @@ async function fetchTeraboxDownloadStream(rawUrl) {
         const filename = file.server_filename || `terabox_${Date.now()}.mp4`;
 
         if (dlink) {
-          console.log(`[Terabox Download]: Starting direct stream download for ${filename}`);
+          console.log(`[Stream Found]: Connecting download stream for ${filename}`);
           const stream = await axios.get(dlink, {
             responseType: 'stream',
             headers: {
-              'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+              'User-Agent': requestHeaders['User-Agent'],
               'Cookie': cookieFormatted,
               'Accept': '*/*'
             },
@@ -236,7 +233,7 @@ async function fetchTeraboxDownloadStream(rawUrl) {
         }
       }
     } catch (e) {
-      console.error(`[Terabox API Error]: ${e.message}`);
+      console.error(`[API Call Failed]: ${e.message}`);
     }
   }
 
@@ -259,8 +256,8 @@ function escapeHtml(str = '') {
 bot.onText(/\/start/, (msg) => {
   bot.sendMessage(msg.chat.id,
     `🎬 <b>Stream Converter Bot</b>\n\n` +
-    `• <b>Direct File:</b> Video send karein, R2 me upload hokar play link banega.\n` +
-    `• <b>Terabox Link:</b> Terabox link bhejein, video Cloudflare R2 par transfer hokar custom player me chalegi.`,
+    `• <b>Direct Video File:</b> File bhejein, R2 par save hogi.\n` +
+    `• <b>Terabox Link:</b> Terabox link bhejein, R2 par transfer hokar custom player link banega.`,
     { parse_mode: 'HTML' }
   );
 });
@@ -340,7 +337,6 @@ bot.on('message', async (msg) => {
     const fileExt = path.extname(streamData.fileName) || '.mp4';
     const r2Key = `terabox/${crypto.randomBytes(8).toString('hex')}${fileExt}`;
 
-    // Cloudflare R2 Direct Upload
     const parallelUpload = new Upload({
       client: r2Client,
       params: {
@@ -379,4 +375,4 @@ bot.on('message', async (msg) => {
     bot.sendMessage(chatId, `❌ <b>Transfer Error:</b> <code>${escapeHtml(err.message)}</code>`, { parse_mode: 'HTML' });
   }
 });
-                                         
+      
