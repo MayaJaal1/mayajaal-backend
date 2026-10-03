@@ -104,7 +104,7 @@ app.get('/verify-key/:key', async (req, res) => {
     res.status(500).json({ valid: false, error: err.message });
   }
 });
-// Embedded Web Player Page
+// Web Player UI
 function servePlayerPage(req, res) {
   const id = req.params.id;
   const playerFile = path.join(__dirname, 'player.html');
@@ -232,14 +232,17 @@ app.get('/stream/:id', async (req, res) => {
     if (!data.url) return res.status(404).send('Stream expired');
 
     const targetUrl = data.url;
-    const rawCookie = process.env.TERABOX_COOKIE || 'ndus=Yzdpm64teHuiTpyF1tSZ-m4ANxhFN7shhUG1hMNu;';
-    const cookie = rawCookie.includes('ndus=') ? rawCookie : `ndus=${rawCookie};`;
+    let rawCookie = process.env.TERABOX_COOKIE || '';
+    if (rawCookie && !rawCookie.includes('ndus=')) {
+      rawCookie = `ndus=${rawCookie.trim()};`;
+    }
+
     const isTerabox = targetUrl.includes('terabox') || targetUrl.includes('1024tera') || targetUrl.includes('baidupcs');
 
     const headers = {
       'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36',
       'Referer': isTerabox ? 'https://www.1024tera.com/' : (targetUrl.includes('diskwala') ? 'https://diskwala.com/' : 'https://mayajaal.online/'),
-      'Cookie': cookie,
+      'Cookie': rawCookie,
       'Accept': '*/*'
     };
 
@@ -267,26 +270,20 @@ app.get('/stream/:id', async (req, res) => {
 });
 
 app.listen(PORT, () => console.log(`✅ MayaJaal Web Engine running on port ${PORT}`));
+
 // ═══════════════════════════════════════════
 // 4. LINK RESOLVERS
 // ═══════════════════════════════════════════
 async function extractTeraboxLink(rawUrl) {
   try {
     let resolvedUrl = rawUrl;
-    
-    // Auto-resolve redirects for short links (teraboxlink, terasharelink, etc.)
     try {
       const resp = await axios.get(rawUrl, {
         maxRedirects: 5,
-        validateStatus: (status) => status >= 200 && status < 400,
-        headers: {
-          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
-        },
-        timeout: 7000
+        headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36' },
+        timeout: 8000
       });
-      if (resp.request?.res?.responseUrl) {
-        resolvedUrl = resp.request.res.responseUrl;
-      }
+      if (resp.request?.res?.responseUrl) resolvedUrl = resp.request.res.responseUrl;
     } catch (e) {}
 
     const match = resolvedUrl.match(/\/(s|sharing\/link\?surl=)([a-zA-Z0-9_-]+)/i) || 
@@ -294,26 +291,23 @@ async function extractTeraboxLink(rawUrl) {
                   rawUrl.match(/\/s\/([a-zA-Z0-9_-]+)/i);
 
     let shorturl = match ? (match[2] || match[1]) : '';
-    if (!shorturl && resolvedUrl.includes('/s/')) {
-      shorturl = resolvedUrl.split('/s/')[1].split(/[?&#]/)[0];
-    }
-    if (!shorturl && rawUrl.includes('/s/')) {
-      shorturl = rawUrl.split('/s/')[1].split(/[?&#]/)[0];
-    }
+    if (!shorturl && resolvedUrl.includes('/s/')) shorturl = resolvedUrl.split('/s/')[1].split(/[?&#]/)[0];
+    if (!shorturl && rawUrl.includes('/s/')) shorturl = rawUrl.split('/s/')[1].split(/[?&#]/)[0];
     if (!shorturl) return null;
 
     const formattedKey = shorturl.startsWith('1') ? shorturl.substring(1) : shorturl;
-    const rawCookie = process.env.TERABOX_COOKIE || 'ndus=Yzdpm64teHuiTpyF1tSZ-m4ANxhFN7shhUG1hMNu;';
-    const cookie = rawCookie.includes('ndus=') ? rawCookie : `ndus=${rawCookie};`;
+    let rawCookie = process.env.TERABOX_COOKIE || '';
+    if (rawCookie && !rawCookie.includes('ndus=')) {
+      rawCookie = `ndus=${rawCookie.trim()};`;
+    }
 
-    // Method 1: Official API Query
     for (const k of [formattedKey, shorturl]) {
       try {
         const res = await axios.get(`https://www.1024tera.com/share/list?app_id=250528&shorturl=${k}&root=1`, {
           headers: {
             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
             'Referer': 'https://www.1024tera.com/',
-            'Cookie': cookie,
+            'Cookie': rawCookie,
             'Accept': 'application/json, text/plain, */*'
           },
           timeout: 8000
@@ -322,19 +316,13 @@ async function extractTeraboxLink(rawUrl) {
         if (res.data?.errno === 0 && res.data?.list?.length > 0) {
           const file = res.data.list[0];
           const streamUrl = file.dlink || file.direct_link || file.url;
-          if (streamUrl) {
-            return {
-              url: streamUrl,
-              name: file.server_filename || 'Terabox Video'
-            };
-          }
+          if (streamUrl) return { url: streamUrl, name: file.server_filename || 'Terabox Video' };
         }
       } catch (err) {}
     }
 
-    // Method 2: Public Cloudflare Worker Fallback
     try {
-      const gw = await axios.get(`https://terabox-api.graydeveloper.workers.dev/?url=${encodeURIComponent(rawUrl)}`, { timeout: 8000 });
+      const gw = await axios.get(`https://terabox-api.graydeveloper.workers.dev/?url=${encodeURIComponent(rawUrl)}`, { timeout: 9000 });
       if (gw.data && (gw.data.direct_link || gw.data.download_link || gw.data.stream_url)) {
         return {
           url: gw.data.direct_link || gw.data.download_link || gw.data.stream_url,
@@ -342,7 +330,6 @@ async function extractTeraboxLink(rawUrl) {
         };
       }
     } catch (e) {}
-
   } catch (e) {}
   return null;
 }
@@ -353,10 +340,7 @@ async function extractDiskwalaLink(diskwalaUrl) {
     const fileId = match ? (match[2] || match[1]) : null;
     if (!fileId) return null;
 
-    const baseHeaders = {
-      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-      'Referer': 'https://diskwala.com/'
-    };
+    const baseHeaders = { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36', 'Referer': 'https://diskwala.com/' };
 
     try {
       const pageRes = await axios.get(diskwalaUrl, { headers: baseHeaders, timeout: 6000 });
@@ -367,8 +351,7 @@ async function extractDiskwalaLink(diskwalaUrl) {
       }
     } catch (e) {}
 
-    const apis = [`https://www.diskwala.com/api/post/${fileId}`, `https://diskwala.com/api/file/${fileId}`];
-    for (const ep of apis) {
+    for (const ep of [`https://www.diskwala.com/api/post/${fileId}`, `https://diskwala.com/api/file/${fileId}`]) {
       try {
         const res = await axios.get(ep, { headers: baseHeaders, timeout: 5000 });
         if (res.data) {
@@ -379,8 +362,8 @@ async function extractDiskwalaLink(diskwalaUrl) {
     }
   } catch (e) {}
   return null;
-  }
-            // ═══════════════════════════════════════════
+      }
+  // ═══════════════════════════════════════════
 // 5. TELEGRAM BOT CONTROLLER
 // ═══════════════════════════════════════════
 const bot = new TelegramBot(TOKEN, {
@@ -553,4 +536,4 @@ bot.on('message', async (msg) => {
     bot.sendMessage(chatId, `❌ <b>Error:</b> <code>${escapeHtml(err.message)}</code>`, { parse_mode: 'HTML' });
   }
 });
-                              
+                                                                    
