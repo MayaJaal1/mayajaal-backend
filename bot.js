@@ -1,13 +1,13 @@
 require('dotenv').config();
 
 const express = require('express');
+const TelegramBot = require('node-telegram-bot-api');
 const axios = require('axios');
 const crypto = require('crypto');
 const { Redis } = require('@upstash/redis');
 const path = require('path');
 const { S3Client, GetObjectCommand } = require('@aws-sdk/client-s3');
 const { Upload } = require('@aws-sdk/lib-storage');
-const TelegramBot = require('node-telegram-bot-api');
 
 process.on('uncaughtException', (err) => console.error('[UncaughtException]:', err.message));
 process.on('unhandledRejection', (reason) => console.error('[UnhandledRejection]:', reason));
@@ -56,10 +56,10 @@ app.use((req, res, next) => {
   next();
 });
 
-app.get('/', (req, res) => res.send('Stream Engine Online - Active'));
+app.get('/', (req, res) => res.send('Stream Engine Online'));
 app.get('/health', (req, res) => res.json({ status: 'ok', uptime: process.uptime() }));
 
-// HTML5 Video Player
+// Video Player Page
 app.get('/v/:id', async (req, res) => {
   try {
     const id = req.params.id;
@@ -142,18 +142,13 @@ app.get('/stream/:id', async (req, res) => {
 });
 
 app.listen(PORT, () => console.log(`🚀 Web Server running on port ${PORT}`));
-const LOCAL_API_URL = process.env.LOCAL_BOT_API_URL 
-  ? process.env.LOCAL_BOT_API_URL.trim().replace(/\/$/, '') 
-  : 'https://tg-local-api-gxrv.onrender.com';
+    // Local Bot API and Official API Setup
+const LOCAL_API_URL = (process.env.LOCAL_BOT_API_URL || 'https://tg-local-api-gxrv.onrender.com').trim().replace(/\/$/, '');
 
-const botOptions = {
+const bot = new TelegramBot(TOKEN, {
   polling: { autoStart: true, params: { timeout: 10 } },
   baseApiUrl: LOCAL_API_URL
-};
-
-console.log(`🔗 Connecting to 2GB Local Bot API Server: ${LOCAL_API_URL}`);
-
-const bot = new TelegramBot(TOKEN, botOptions);
+});
 
 bot.on('polling_error', async (error) => {
   if (error.message && error.message.includes('409 Conflict')) {
@@ -167,9 +162,8 @@ function escapeHtml(str = '') {
 
 bot.onText(/\/start/, (msg) => {
   bot.sendMessage(msg.chat.id,
-    `🎬 <b>MayaJaal Stream Converter Bot (2GB Active)</b>\n\n` +
-    `⚡ <b>Local API Server Connected!</b>\n` +
-    `Aap <b>50MB, 500MB, 1GB ya 2GB tak</b> ki video direct Telegram par bhejein, direct Cloudflare R2 par upload hokar play link banegi!`,
+    `🎬 <b>MayaJaal Stream Converter Bot</b>\n\n` +
+    `⚡ Direct file send karein, link turant ban jayegi!`,
     { parse_mode: 'HTML' }
   );
 });
@@ -183,46 +177,40 @@ bot.on('message', async (msg) => {
     const fileId = videoObj.file_id;
     const fileName = videoObj.file_name || `video_${Date.now()}.mp4`;
 
-    const statusMsg = await bot.sendMessage(chatId, `⚡ <i>Video fetch karke Cloudflare R2 par upload ho rahi hai... (2GB Limit Allowed)</i>`, { parse_mode: 'HTML' });
+    const statusMsg = await bot.sendMessage(chatId, `⚡ <i>Video fetch karke Cloudflare R2 par upload ho rahi hai...</i>`, { parse_mode: 'HTML' });
 
     try {
-      // 1. Fetch file info
       const fileInfo = await bot.getFile(fileId);
       if (!fileInfo || !fileInfo.file_path) {
-        throw new Error('Telegram server se file_path nahi mila');
+        throw new Error('Telegram server se file path nahi mila');
       }
-
-      console.log(`[Raw Path From Telegram]: ${fileInfo.file_path}`);
-
-      // 2. Download URL: Local API server me path '/file/bot<token>/' direct file_path leta hai
-      let downloadUrl;
-      if (fileInfo.file_path.startsWith('http')) {
-        downloadUrl = fileInfo.file_path;
-      } else {
-        // Agar absolute disk path hai (/var/lib/...) toh Render ke local bot-api ko call karne ke 2 methods:
-        // Try direct file URI or relative stripped path
-        let pathOnly = fileInfo.file_path;
-        if (pathOnly.includes(TOKEN)) {
-          pathOnly = pathOnly.substring(pathOnly.indexOf(TOKEN) + TOKEN.length);
-        }
-        pathOnly = pathOnly.replace(/^\/+/, '');
-        downloadUrl = `${LOCAL_API_URL}/file/bot${TOKEN}/${pathOnly}`;
-      }
-
-      console.log(`[Download URL]: ${downloadUrl}`);
 
       let videoDownloadStream;
+      let cleanPath = fileInfo.file_path;
+
+      // Agar path me disk path (/var/lib/...) hai, sanitize karein
+      if (cleanPath.includes(TOKEN)) {
+        cleanPath = cleanPath.substring(cleanPath.indexOf(TOKEN) + TOKEN.length);
+      }
+      cleanPath = cleanPath.replace(/^\/+/, '');
+
+      // Strategy 1: Official Telegram Cloud URL (100% works for normal files)
+      const officialUrl = `https://api.telegram.org/file/bot${TOKEN}/${cleanPath}`;
+      // Strategy 2: Render Local Server URL
+      const localUrl = `${LOCAL_API_URL}/file/bot${TOKEN}/${cleanPath}`;
+
+      console.log(`[Downloading]: Trying stream...`);
+
       try {
-        videoDownloadStream = await axios.get(downloadUrl, {
+        // Pehle official se try karein taaki 10MB-20MB fail na ho
+        videoDownloadStream = await axios.get(officialUrl, {
           responseType: 'stream',
           maxContentLength: Infinity,
           maxBodyLength: Infinity,
         });
-      } catch (err404) {
-        // Agar relative par 404 aaya, fallback to root file path
-        console.log('[Retry]: Trying root fallback path...');
-        const fallbackUrl = `${LOCAL_API_URL}${fileInfo.file_path}`;
-        videoDownloadStream = await axios.get(fallbackUrl, {
+      } catch (errOfficial) {
+        console.log(`[Official CDN Fallback]: Trying Local Server ${localUrl}`);
+        videoDownloadStream = await axios.get(localUrl, {
           responseType: 'stream',
           maxContentLength: Infinity,
           maxBodyLength: Infinity,
