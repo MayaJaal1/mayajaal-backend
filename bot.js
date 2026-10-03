@@ -12,7 +12,6 @@ const { Upload } = require('@aws-sdk/lib-storage');
 process.on('uncaughtException', (err) => console.error('[UncaughtException]:', err.message));
 process.on('unhandledRejection', (reason) => console.error('[UnhandledRejection]:', reason));
 
-// 1. Redis Cache Setup
 let redis;
 try {
   redis = Redis.fromEnv();
@@ -26,7 +25,6 @@ const BASE_URL = process.env.CUSTOM_DOMAIN
   ? (process.env.CUSTOM_DOMAIN.startsWith('http') ? process.env.CUSTOM_DOMAIN : `https://${process.env.CUSTOM_DOMAIN}`)
   : 'https://mayajaal.online';
 
-// 2. Cloudflare R2 Client Setup
 const R2_ACCOUNT_ID = String(process.env.R2_ACCOUNT_ID || '9a17e6f8a4af372b6b0ab1ad1cdb982d').trim();
 const R2_ACCESS_KEY_ID = String(process.env.R2_ACCESS_KEY_ID || 'fe0370e7a3f380c0dee831d6c37fd851').trim();
 const R2_SECRET_ACCESS_KEY = String(process.env.R2_SECRET_ACCESS_KEY || '').trim();
@@ -44,7 +42,6 @@ const r2Client = new S3Client({
 
 console.log('✅ Cloudflare R2 Initialized');
 
-// 3. Express Web Engine
 const app = express();
 const PORT = process.env.PORT || 8080;
 
@@ -99,7 +96,7 @@ app.get('/v/:id', async (req, res) => {
         <div class="player-box">
           <video controls autoplay playsinline preload="metadata">
             <source src="${streamUrl}" type="video/mp4">
-            Aapka browser video play karne me samarth nahi hai.
+            Aapka browser video play nahi kar pa raha hai.
           </video>
           <div class="title">🎬 ${videoTitle}</div>
         </div>
@@ -146,7 +143,7 @@ app.get('/stream/:id', async (req, res) => {
 });
 
 app.listen(PORT, () => console.log(`🚀 Web Server running on port ${PORT}`));
-                                // 4. Render Local Bot API Client (Unlocks 2GB Limit)
+// Render Local Bot API Client
 const LOCAL_API_URL = process.env.LOCAL_BOT_API_URL 
   ? process.env.LOCAL_BOT_API_URL.trim().replace(/\/$/, '') 
   : 'https://tg-local-api-gxrv.onrender.com';
@@ -174,7 +171,7 @@ bot.onText(/\/start/, (msg) => {
   bot.sendMessage(msg.chat.id,
     `🎬 <b>MayaJaal Stream Converter Bot (2GB Active)</b>\n\n` +
     `⚡ <b>Local API Server Connected!</b>\n` +
-    `Ab aap <b>50MB, 500MB, 1GB ya 2GB tak</b> ki video direct Telegram par bhejein, direct Cloudflare R2 par upload hokar play link banegi!`,
+    `Aap <b>50MB, 500MB, 1GB ya 2GB tak</b> ki video direct Telegram par bhejein, direct Cloudflare R2 par upload hokar play link banegi!`,
     { parse_mode: 'HTML' }
   );
 });
@@ -191,17 +188,31 @@ bot.on('message', async (msg) => {
     const statusMsg = await bot.sendMessage(chatId, `⚡ <i>Video fetch karke Cloudflare R2 par upload ho rahi hai... (2GB Limit Allowed)</i>`, { parse_mode: 'HTML' });
 
     try {
-      // 1. Local server se raw file info fetch karein
+      // 1. Local Server se file details lo
       const fileInfo = await bot.getFile(fileId);
       if (!fileInfo || !fileInfo.file_path) {
-        throw new Error('Telegram local server se file_path nahi mila');
+        throw new Error('Telegram server se file_path nahi mila');
       }
 
-      // 2. Direct local server download URL banayein (Fixes 404)
-      const downloadBase = LOCAL_API_URL ? LOCAL_API_URL : 'https://api.telegram.org';
-      const fileLink = `${downloadBase}/file/bot${TOKEN}/${fileInfo.file_path}`;
+      console.log(`[Raw Path From Telegram]: ${fileInfo.file_path}`);
 
-      console.log(`[Media Download]: Streaming from -> ${fileLink}`);
+      // 2. Fix 404: Local Bot API server ke absolute internal path ko sanitize karo
+      let cleanPath = fileInfo.file_path;
+      if (cleanPath.includes('/var/lib/telegram-bot-api/')) {
+        cleanPath = cleanPath.split('/var/lib/telegram-bot-api/')[1];
+        // token prefix hatao agar maujood ho
+        if (cleanPath.startsWith(TOKEN + '/')) {
+          cleanPath = cleanPath.replace(TOKEN + '/', '');
+        }
+      }
+
+      // Leading slash hatao
+      cleanPath = cleanPath.replace(/^\/+/, '');
+
+      const downloadBase = LOCAL_API_URL ? LOCAL_API_URL : 'https://api.telegram.org';
+      const fileLink = `${downloadBase}/file/bot${TOKEN}/${cleanPath}`;
+
+      console.log(`[Fixed Download Link]: ${fileLink}`);
 
       const videoDownloadStream = await axios.get(fileLink, {
         responseType: 'stream',
@@ -250,3 +261,4 @@ bot.on('message', async (msg) => {
     }
   }
 });
+                       
