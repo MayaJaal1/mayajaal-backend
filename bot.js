@@ -1,13 +1,14 @@
 require('dotenv').config();
 
 const express = require('express');
-const TelegramBot = require('node-telegram-bot-api');
-const axios = require('axios');
 const crypto = require('crypto');
 const { Redis } = require('@upstash/redis');
 const path = require('path');
 const { S3Client, GetObjectCommand } = require('@aws-sdk/client-s3');
 const { Upload } = require('@aws-sdk/lib-storage');
+const { TelegramClient } = require('telegram');
+const { StringSession } = require('telegram/sessions');
+const { NewMessage } = require('telegram/events');
 
 process.on('uncaughtException', (err) => console.error('[UncaughtException]:', err.message));
 process.on('unhandledRejection', (reason) => console.error('[UnhandledRejection]:', reason));
@@ -20,7 +21,6 @@ try {
 }
 
 const linkStore = new Map();
-const TOKEN = (process.env.BOT_TOKEN || '').trim();
 const BASE_URL = process.env.CUSTOM_DOMAIN 
   ? (process.env.CUSTOM_DOMAIN.startsWith('http') ? process.env.CUSTOM_DOMAIN : `https://${process.env.CUSTOM_DOMAIN}`)
   : 'https://mayajaal.online';
@@ -56,7 +56,7 @@ app.use((req, res, next) => {
   next();
 });
 
-app.get('/', (req, res) => res.send('Stream Engine Online - Stable Build'));
+app.get('/', (req, res) => res.send('Stream Engine Online - GramJS 2GB Pipeline Active'));
 app.get('/health', (req, res) => res.json({ status: 'ok', uptime: process.uptime() }));
 
 app.get('/v/:id', async (req, res) => {
@@ -65,41 +65,17 @@ app.get('/v/:id', async (req, res) => {
     let data = linkStore.get(id);
 
     if (!data) {
-      const raw = (await redis.get(`video:${id}`)) || (await redis.get(`diskwala:${id}`));
+      const raw = await redis.get(`video:${id}`);
       if (raw) data = typeof raw === 'string' ? JSON.parse(raw) : raw;
     }
 
-    if (!data) return res.status(404).send('Video not found or link expired');
-
-    const videoTitle = data.name || 'Video Player';
-
-    if (data.isDiskwala && data.diskwalaUrl) {
-      return res.send(`
-        <!DOCTYPE html>
-        <html lang="hi">
-        <head>
-          <meta charset="UTF-8">
-          <meta name="viewport" content="width=device-width, initial-scale=1.0">
-          <title>${videoTitle}</title>
-          <style>
-            * { box-sizing: border-box; margin: 0; padding: 0; }
-            body { background: #000; color: #fff; font-family: sans-serif; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; padding: 12px; }
-            .card { background: #18181b; padding: 30px; border-radius: 16px; text-align: center; max-width: 500px; width: 100%; border: 1px solid #27272a; }
-            .btn { display: inline-block; background: #00ff88; color: #000; padding: 14px 28px; border-radius: 10px; font-weight: bold; text-decoration: none; font-size: 1.1rem; margin-top: 20px; }
-          </style>
-        </head>
-        <body>
-          <div class="card">
-            <h2>🎬 ${videoTitle}</h2>
-            <p style="color: #a1a1aa; margin-top: 10px;">Yeh video external streaming server par hosted hai.</p>
-            <a href="${data.diskwalaUrl}" class="btn" target="_blank">▶ Yahan Click Karke Play Karein</a>
-          </div>
-        </body>
-        </html>
-      `);
+    if (!data || !data.r2Key) {
+      return res.status(404).send('Video not found or processing on Cloudflare R2');
     }
 
     const streamUrl = `${BASE_URL}/stream/${id}`;
+    const videoTitle = data.name || 'Video Player';
+
     res.send(`
       <!DOCTYPE html>
       <html lang="hi">
@@ -109,9 +85,9 @@ app.get('/v/:id', async (req, res) => {
         <title>${videoTitle}</title>
         <style>
           * { box-sizing: border-box; margin: 0; padding: 0; }
-          body { background: #000; color: #fff; font-family: sans-serif; display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 100vh; padding: 12px; }
+          body { background: #000; color: #fff; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 100vh; padding: 12px; }
           .player-box { width: 100%; max-width: 900px; padding: 10px; }
-          video { width: 100%; max-height: 80vh; border-radius: 12px; background: #111; outline: none; }
+          video { width: 100%; max-height: 80vh; border-radius: 12px; background: #111; outline: none; box-shadow: 0 10px 30px rgba(0,0,0,0.8); }
           .title { margin-top: 15px; font-size: 1.1rem; color: #00ff88; word-break: break-all; }
         </style>
       </head>
@@ -119,6 +95,7 @@ app.get('/v/:id', async (req, res) => {
         <div class="player-box">
           <video controls autoplay playsinline preload="metadata">
             <source src="${streamUrl}" type="video/mp4">
+            Aapka browser video play karne me samarth nahi hai.
           </video>
           <div class="title">🎬 ${videoTitle}</div>
         </div>
@@ -136,7 +113,7 @@ app.get('/stream/:id', async (req, res) => {
     let data = linkStore.get(id);
 
     if (!data) {
-      const raw = (await redis.get(`video:${id}`)) || (await redis.get(`diskwala:${id}`));
+      const raw = await redis.get(`video:${id}`);
       if (raw) data = typeof raw === 'string' ? JSON.parse(raw) : raw;
     }
 
@@ -163,112 +140,118 @@ app.get('/stream/:id', async (req, res) => {
   }
 });
 
-app.listen(PORT, () => console.log(`🚀 Server running on port ${PORT}`));
-const bot = new TelegramBot(TOKEN, { polling: { autoStart: true, params: { timeout: 10 } } });
+app.listen(PORT, () => console.log(`🚀 Web Server running on port ${PORT}`));
+// Telegram MTProto Client Setup (Full 2GB Support)
+const apiId = parseInt(process.env.TELEGRAM_API_ID || '35399167');
+const apiHash = String(process.env.TELEGRAM_API_HASH || '88a34526e5e73078110072770dd85e5b').trim();
+const botToken = String(process.env.BOT_TOKEN || '').trim();
 
-bot.on('polling_error', async (error) => {
-  if (error.message && error.message.includes('409 Conflict')) {
-    await new Promise(r => setTimeout(r, 4000));
-  }
+const client = new TelegramClient(new StringSession(''), apiId, apiHash, {
+  connectionRetries: 5,
 });
 
 function escapeHtml(str = '') {
   return String(str).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 }
 
-bot.onText(/\/start/, (msg) => {
-  bot.sendMessage(msg.chat.id,
-    `🎬 <b>Stream Converter Bot</b>\n\n` +
-    `• <b>Direct Video:</b> Video file send karein, R2 par save hokar play link banega.\n` +
-    `• <b>Diskwala Link:</b> Link bhejein, aapke custom domain player link me convert ho jayega.`,
-    { parse_mode: 'HTML' }
-  );
-});
+async function initBot() {
+  if (!botToken) {
+    console.error('❌ BOT_TOKEN variable missing hai!');
+    return;
+  }
 
-bot.on('message', async (msg) => {
-  const chatId = msg.chat.id;
-  const uploaderName = msg.from?.username ? `@${msg.from.username}` : (msg.from?.first_name || 'User');
+  await client.start({
+    botAuthToken: botToken,
+  });
+  console.log('✅ GramJS 2GB MTProto Bot Client Active!');
 
-  const videoObj = msg.video || msg.document || (msg.animation ? msg.animation : null);
-  if (videoObj) {
-    const fileId = videoObj.file_id;
-    const fileName = videoObj.file_name || `video_${Date.now()}.mp4`;
-    const statusMsg = await bot.sendMessage(chatId, `⚡ <i>Video Cloudflare R2 par upload ho rahi hai...</i>`, { parse_mode: 'HTML' });
+  client.addEventHandler(async (event) => {
+    const message = event.message;
+    if (!message) return;
 
-    try {
-      const fileLink = await bot.getFileLink(fileId);
-      const videoDownloadStream = await axios.get(fileLink, { responseType: 'stream' });
+    const chatId = message.chatId;
 
-      const fileExt = path.extname(fileName) || '.mp4';
-      const r2Key = `uploads/${crypto.randomBytes(8).toString('hex')}${fileExt}`;
+    if (message.message && message.message.startsWith('/start')) {
+      return client.sendMessage(chatId, {
+        message: `🎬 <b>Stream Converter Bot (2GB Support Active)</b>\n\n` +
+                 `Ab Telegram ke andar 20MB wali koi pabandi nahi hai.\n` +
+                 `Aap <b>100MB, 500MB ya 2GB tak</b> ki koi bhi video direct Telegram par bhejein, woh seedha Cloudflare R2 par upload hokar play link banegi!`,
+        parseMode: 'html',
+      });
+    }
 
-      const parallelUpload = new Upload({
-        client: r2Client,
-        params: {
-          Bucket: R2_BUCKET_NAME,
-          Key: r2Key,
-          Body: videoDownloadStream.data,
-          ContentType: videoObj.mime_type || 'video/mp4',
-        },
-        queueSize: 4,
-        partSize: 1024 * 1024 * 5,
+    // Media Handling (Video & Document)
+    if (message.media && (message.media.document || message.media.video)) {
+      let fileName = `video_${Date.now()}.mp4`;
+
+      if (message.media.document?.attributes) {
+        for (const attr of message.media.document.attributes) {
+          if (attr.fileName) fileName = attr.fileName;
+        }
+      }
+
+      const statusMsg = await client.sendMessage(chatId, {
+        message: `⚡ <i>Video Telegram se fetch karke Cloudflare R2 par upload ho rahi hai... (2GB Limit Allowed)</i>`,
+        parseMode: 'html',
       });
 
-      await parallelUpload.done();
+      try {
+        console.log(`[MTProto]: Downloading media ${fileName}...`);
 
-      const shortId = crypto.randomBytes(4).toString('hex');
-      const payload = { name: fileName, r2Key: r2Key, isDiskwala: false, uploader: uploaderName };
-      
-      linkStore.set(shortId, payload);
-      await redis.set(`video:${shortId}`, JSON.stringify(payload), { ex: 30 * 86400 });
+        // Direct stream download to buffer (bypasses Bot API 20MB restriction)
+        const mediaBuffer = await client.downloadMedia(message.media, {
+          workers: 4,
+        });
 
-      const playUrl = `${BASE_URL}/v/${shortId}`;
-      await bot.deleteMessage(chatId, statusMsg.message_id).catch(() => {});
+        if (!mediaBuffer) throw new Error('File download nahi ho paayi');
 
-      const reply = `✨ <b>Video Ready!</b>\n\n` +
-                    `📌 <b>File:</b> ${escapeHtml(fileName)}\n\n` +
-                    `🔗 <b>Aapka Domain Player Link:</b>\n${playUrl}`;
+        const fileExt = fileName.includes('.') ? fileName.substring(fileName.lastIndexOf('.')) : '.mp4';
+        const r2Key = `uploads/${crypto.randomBytes(8).toString('hex')}${fileExt}`;
 
-      return bot.sendMessage(chatId, reply, { parse_mode: 'HTML', disable_web_page_preview: false });
+        console.log(`[Cloudflare R2]: Uploading: ${r2Key}`);
 
-    } catch (err) {
-      await bot.deleteMessage(chatId, statusMsg.message_id).catch(() => {});
-      return bot.sendMessage(chatId, `❌ <b>Upload Error:</b> <code>${escapeHtml(err.message)}</code>`, { parse_mode: 'HTML' });
+        const parallelUpload = new Upload({
+          client: r2Client,
+          params: {
+            Bucket: R2_BUCKET_NAME,
+            Key: r2Key,
+            Body: mediaBuffer,
+            ContentType: 'video/mp4',
+          },
+          queueSize: 4,
+          partSize: 1024 * 1024 * 10,
+        });
+
+        await parallelUpload.done();
+
+        const shortId = crypto.randomBytes(4).toString('hex');
+        const payload = { name: fileName, r2Key: r2Key };
+
+        linkStore.set(shortId, payload);
+        await redis.set(`video:${shortId}`, JSON.stringify(payload), { ex: 30 * 86400 });
+
+        const playUrl = `${BASE_URL}/v/${shortId}`;
+        await client.deleteMessages(chatId, [statusMsg.id]);
+
+        const reply = `✨ <b>Video Ready (Cloudflare R2)!</b>\n\n` +
+                      `📌 <b>File:</b> ${escapeHtml(fileName)}\n\n` +
+                      `🔗 <b>Aapka Domain Player Link:</b>\n${playUrl}`;
+
+        return client.sendMessage(chatId, {
+          message: reply,
+          parseMode: 'html',
+        });
+
+      } catch (err) {
+        console.error('[Upload Error]:', err.message);
+        await client.deleteMessages(chatId, [statusMsg.id]).catch(() => {});
+        return client.sendMessage(chatId, {
+          message: `❌ <b>Upload Error:</b> <code>${escapeHtml(err.message)}</code>`,
+          parseMode: 'html',
+        });
+      }
     }
-  }
+  }, new NewMessage({}));
+}
 
-  const incomingText = (msg.text || '').trim();
-  if (!incomingText || incomingText.startsWith('/')) return;
-
-  const urlRegex = /(https?:\/\/[^\s<>"']+)/gi;
-  const urls = incomingText.match(urlRegex) || [];
-  if (urls.length === 0) return;
-
-  const targetUrl = urls[0];
-
-  if (targetUrl.includes('diskwala.com')) {
-    const idMatch = targetUrl.match(/\/(?:app|file|share|d)\/([a-zA-Z0-9]+)/i);
-    const fileId = idMatch ? idMatch[1] : '';
-
-    if (!fileId) {
-      return bot.sendMessage(chatId, `❌ <b>Error:</b> Diskwala link se ID extract nahi ho saki.`, { parse_mode: 'HTML' });
-    }
-
-    const shortId = crypto.randomBytes(4).toString('hex');
-    const payload = {
-      name: `Diskwala Video (${fileId})`,
-      isDiskwala: true,
-      diskwalaUrl: `https://www.diskwala.com/app/${fileId}`,
-      uploader: uploaderName
-    };
-
-    linkStore.set(shortId, payload);
-    await redis.set(`video:${shortId}`, JSON.stringify(payload), { ex: 30 * 86400 });
-
-    const playUrl = `${BASE_URL}/v/${shortId}`;
-    const reply = `✨ <b>Diskwala Stream Ready!</b>\n\n` +
-                  `🔗 <b>Aapka Custom Player Link:</b>\n${playUrl}`;
-
-    return bot.sendMessage(chatId, reply, { parse_mode: 'HTML', disable_web_page_preview: false });
-  }
-});
+initBot().catch((e) => console.error('[Bot Init Error]:', e.message));
