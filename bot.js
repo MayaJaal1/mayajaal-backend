@@ -104,6 +104,7 @@ app.get('/verify-key/:key', async (req, res) => {
     res.status(500).json({ valid: false, error: err.message });
   }
 });
+
 // Web Player UI
 function servePlayerPage(req, res) {
   const id = req.params.id;
@@ -138,9 +139,7 @@ function servePlayerPage(req, res) {
 }
 
 app.get('/v/:id', (req, res) => servePlayerPage(req, res));
-app.get('/tb/:id', (req, res) => servePlayerPage(req, res));
-
-// ───────────────────────────────────────────
+app.get('/tb/:id', (req, res) => servePlayerPage(req, res));// ───────────────────────────────────────────
 // 3. ZERO-BUFFER RANGE 206 STREAMING ENGINE
 // ───────────────────────────────────────────
 app.get('/stream/:id', async (req, res) => {
@@ -158,7 +157,9 @@ app.get('/stream/:id', async (req, res) => {
     res.setHeader('Cache-Control', 'public, max-age=86400');
     res.setHeader('Accept-Ranges', 'bytes');
 
+    // ═══════════════════════════════════════
     // Case 1: Telegram Channel 2GB MTProto Chunk Streamer
+    // ═══════════════════════════════════════
     if (data.channel_id && data.msg_id && tgClient && tgClient.connected) {
       try {
         const rawPeer = String(data.channel_id).trim();
@@ -228,7 +229,9 @@ app.get('/stream/:id', async (req, res) => {
       }
     }
 
-    // Case 2: External Proxy Stream (Terabox / Diskwala / Web URL)
+    // ═══════════════════════════════════════
+    // Case 2: External Proxy Stream (Terabox / Terasharefile / Diskwala / Web URL)
+    // ═══════════════════════════════════════
     if (!data.url) return res.status(404).send('Stream expired');
 
     const targetUrl = data.url;
@@ -237,11 +240,20 @@ app.get('/stream/:id', async (req, res) => {
       rawCookie = `ndus=${rawCookie.trim()};`;
     }
 
-    const isTerabox = targetUrl.includes('terabox') || targetUrl.includes('1024tera') || targetUrl.includes('baidupcs');
+    // ✅ Terabox, Terasharefile, 1024tera, BaiduPCS सभी को एक ही Referer मिलेगा
+    const isTerabox = 
+      targetUrl.includes('terabox') || 
+      targetUrl.includes('1024tera') || 
+      targetUrl.includes('baidupcs') ||
+      targetUrl.includes('terasharefile') ||
+      targetUrl.includes('terasharelink') ||
+      targetUrl.includes('teraboxlink');
 
     const headers = {
       'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36',
-      'Referer': isTerabox ? 'https://www.1024tera.com/' : (targetUrl.includes('diskwala') ? 'https://diskwala.com/' : 'https://mayajaal.online/'),
+      'Referer': isTerabox 
+        ? 'https://www.1024tera.com/' 
+        : (targetUrl.includes('diskwala') ? 'https://diskwala.com/' : 'https://mayajaal.online/'),
       'Cookie': rawCookie,
       'Accept': '*/*'
     };
@@ -269,14 +281,18 @@ app.get('/stream/:id', async (req, res) => {
   }
 });
 
-app.listen(PORT, () => console.log(`✅ MayaJaal Web Engine running on port ${PORT}`));
-
-// ═══════════════════════════════════════════
+app.listen(PORT, () => console.log(`✅ MayaJaal Web Engine running on port ${PORT}`));// ═══════════════════════════════════════════
 // 4. LINK RESOLVERS
 // ═══════════════════════════════════════════
+
+// ───────────────────────────────────────────
+// TERABOX / TERASHAREFILE EXTRACTOR
+// ───────────────────────────────────────────
 async function extractTeraboxLink(rawUrl) {
   try {
     let resolvedUrl = rawUrl;
+
+    // Step 1: Short URL को expand करो (terasharefile.com → 1024tera.com)
     try {
       const resp = await axios.get(rawUrl, {
         maxRedirects: 5,
@@ -286,6 +302,7 @@ async function extractTeraboxLink(rawUrl) {
       if (resp.request?.res?.responseUrl) resolvedUrl = resp.request.res.responseUrl;
     } catch (e) {}
 
+    // Step 2: surl / shorturl निकालो (सभी डोमेन के लिए)
     const match = resolvedUrl.match(/\/(s|sharing\/link\?surl=)([a-zA-Z0-9_-]+)/i) || 
                   resolvedUrl.match(/surl=([a-zA-Z0-9_-]+)/i) ||
                   rawUrl.match(/\/s\/([a-zA-Z0-9_-]+)/i);
@@ -296,33 +313,47 @@ async function extractTeraboxLink(rawUrl) {
     if (!shorturl) return null;
 
     const formattedKey = shorturl.startsWith('1') ? shorturl.substring(1) : shorturl;
+
     let rawCookie = process.env.TERABOX_COOKIE || '';
     if (rawCookie && !rawCookie.includes('ndus=')) {
       rawCookie = `ndus=${rawCookie.trim()};`;
     }
 
+    // Step 3: 1024tera API से direct link निकालो
     for (const k of [formattedKey, shorturl]) {
       try {
-        const res = await axios.get(`https://www.1024tera.com/share/list?app_id=250528&shorturl=${k}&root=1`, {
-          headers: {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-            'Referer': 'https://www.1024tera.com/',
-            'Cookie': rawCookie,
-            'Accept': 'application/json, text/plain, */*'
-          },
-          timeout: 8000
-        });
+        const res = await axios.get(
+          `https://www.1024tera.com/share/list?app_id=250528&shorturl=${k}&root=1`,
+          {
+            headers: {
+              'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+              'Referer': 'https://www.1024tera.com/',
+              'Cookie': rawCookie,
+              'Accept': 'application/json, text/plain, */*'
+            },
+            timeout: 8000
+          }
+        );
 
         if (res.data?.errno === 0 && res.data?.list?.length > 0) {
           const file = res.data.list[0];
           const streamUrl = file.dlink || file.direct_link || file.url;
-          if (streamUrl) return { url: streamUrl, name: file.server_filename || 'Terabox Video' };
+          if (streamUrl) {
+            return { 
+              url: streamUrl, 
+              name: file.server_filename || 'Terabox Video' 
+            };
+          }
         }
       } catch (err) {}
     }
 
+    // Step 4: Fallback – Worker API
     try {
-      const gw = await axios.get(`https://terabox-api.graydeveloper.workers.dev/?url=${encodeURIComponent(rawUrl)}`, { timeout: 9000 });
+      const gw = await axios.get(
+        `https://terabox-api.graydeveloper.workers.dev/?url=${encodeURIComponent(rawUrl)}`,
+        { timeout: 9000 }
+      );
       if (gw.data && (gw.data.direct_link || gw.data.download_link || gw.data.stream_url)) {
         return {
           url: gw.data.direct_link || gw.data.download_link || gw.data.stream_url,
@@ -330,28 +361,42 @@ async function extractTeraboxLink(rawUrl) {
         };
       }
     } catch (e) {}
+
   } catch (e) {}
   return null;
 }
 
+// ───────────────────────────────────────────
+// DISKWALA EXTRACTOR
+// ───────────────────────────────────────────
 async function extractDiskwalaLink(diskwalaUrl) {
   try {
-    const match = diskwalaUrl.match(/\/(app|view|file|p|post|d)\/([a-zA-Z0-9_-]+)/i) || diskwalaUrl.match(/diskwala\.com\/([a-zA-Z0-9_-]+)/i);
+    const match = diskwalaUrl.match(/\/(app|view|file|p|post|d)\/([a-zA-Z0-9_-]+)/i) || 
+                  diskwalaUrl.match(/diskwala\.com\/([a-zA-Z0-9_-]+)/i);
     const fileId = match ? (match[2] || match[1]) : null;
     if (!fileId) return null;
 
-    const baseHeaders = { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36', 'Referer': 'https://diskwala.com/' };
+    const baseHeaders = { 
+      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36', 
+      'Referer': 'https://diskwala.com/' 
+    };
 
     try {
       const pageRes = await axios.get(diskwalaUrl, { headers: baseHeaders, timeout: 6000 });
       const html = pageRes.data;
       if (typeof html === 'string') {
-        const streamMatch = html.match(/"(https?:\/\/[^"]+\.(mp4|m3u8)[^"]*)"/i) || html.match(/src=["'](https?:\/\/[^"']+)["']/i);
-        if (streamMatch && streamMatch[1]) return { url: streamMatch[1], name: 'Diskwala Video' };
+        const streamMatch = html.match(/"(https?:\/\/[^"]+\.(mp4|m3u8)[^"]*)"/i) || 
+                            html.match(/src=["'](https?:\/\/[^"']+)["']/i);
+        if (streamMatch && streamMatch[1]) {
+          return { url: streamMatch[1], name: 'Diskwala Video' };
+        }
       }
     } catch (e) {}
 
-    for (const ep of [`https://www.diskwala.com/api/post/${fileId}`, `https://diskwala.com/api/file/${fileId}`]) {
+    for (const ep of [
+      `https://www.diskwala.com/api/post/${fileId}`,
+      `https://diskwala.com/api/file/${fileId}`
+    ]) {
       try {
         const res = await axios.get(ep, { headers: baseHeaders, timeout: 5000 });
         if (res.data) {
@@ -362,8 +407,7 @@ async function extractDiskwalaLink(diskwalaUrl) {
     }
   } catch (e) {}
   return null;
-      }
-  // ═══════════════════════════════════════════
+}// ═══════════════════════════════════════════
 // 5. TELEGRAM BOT CONTROLLER
 // ═══════════════════════════════════════════
 const bot = new TelegramBot(TOKEN, {
@@ -384,7 +428,13 @@ async function getUser(chatId) {
     const data = await redis.get(`user_settings:${chatId}`);
     if (data) return typeof data === 'string' ? JSON.parse(data) : data;
   } catch (err) {}
-  return { apiToken: null, header: null, footer: null, bold: false, enableText: true };
+  return { 
+    apiToken: null, 
+    header: null, 
+    footer: null, 
+    bold: false, 
+    enableText: true 
+  };
 }
 
 async function saveUser(chatId, data) {
@@ -394,19 +444,31 @@ async function saveUser(chatId, data) {
 }
 
 function escapeHtml(str = '') {
-  return String(str).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  return String(str).replace(/[&<>"']/g, (c) => ({ 
+    '&': '&amp;', 
+    '<': '&lt;', 
+    '>': '&gt;', 
+    '"': '&quot;', 
+    "'": '&#39;' 
+  }[c]));
 }
 
+// ───────────────────────────────────────────
+// /start COMMAND
+// ───────────────────────────────────────────
 bot.onText(/\/start/, (msg) => {
   bot.sendMessage(msg.chat.id,
     `🎬 <b>MayaJaal Ultra Stream Engine</b>\n\n` +
-    `• <b>Bulk Converter:</b> Teraboxlink, Terabox, Diskwala links bhejein\n` +
+    `• <b>Bulk Converter:</b> Terabox, Terasharefile, Diskwala links bhejein\n` +
     `• <b>Telegram Video Upload:</b> Vault storage + fast Cloudflare 206 play\n` +
     `• <b>API Setup:</b> <code>/api</code> command se connect karein`,
     { parse_mode: 'HTML' }
   );
 });
 
+// ───────────────────────────────────────────
+// /api COMMAND
+// ───────────────────────────────────────────
 bot.onText(/\/api(?:\s+(.+))?/, async (msg, match) => {
   const chatId = msg.chat.id;
   const token = match[1] ? match[1].trim() : null;
@@ -415,7 +477,11 @@ bot.onText(/\/api(?:\s+(.+))?/, async (msg, match) => {
     const user = await getUser(chatId);
     user.apiToken = token;
     await saveUser(chatId, user);
-    return bot.sendMessage(chatId, `✅ <b>API Token Connected:</b> <code>${escapeHtml(token)}</code>`, { parse_mode: 'HTML' });
+    return bot.sendMessage(
+      chatId, 
+      `✅ <b>API Token Connected:</b> <code>${escapeHtml(token)}</code>`, 
+      { parse_mode: 'HTML' }
+    );
   }
 
   const keyUrl = `${BASE_URL}/key?tg=${chatId}`;
@@ -425,25 +491,36 @@ bot.onText(/\/api(?:\s+(.+))?/, async (msg, match) => {
     `Key milne par send karein:\n<code>/api YOUR_KEY</code>`,
     { parse_mode: 'HTML', disable_web_page_preview: true }
   );
-});
-
+});// ═══════════════════════════════════════════
+// 6. MESSAGE HANDLER (Video Upload + Link Converter)
+// ═══════════════════════════════════════════
 bot.on('message', async (msg) => {
   const chatId = msg.chat.id;
   const user = await getUser(chatId);
-  const uploaderName = msg.from?.username ? `@${msg.from.username}` : (msg.from?.first_name || 'MayaJaal Cloud');
+  const uploaderName = msg.from?.username 
+    ? `@${msg.from.username}` 
+    : (msg.from?.first_name || 'MayaJaal Cloud');
 
+  // ─────────────────────────────────────
   // 1. Direct Video / File Upload (Telegram Storage Vault)
+  // ─────────────────────────────────────
   const videoObj = msg.video || msg.document || (msg.animation ? msg.animation : null);
   if (videoObj) {
     const fileName = videoObj.file_name || `video_${Date.now()}.mp4`;
-    const statusMsg = await bot.sendMessage(chatId, `⚡ <i>Video Telegram Storage Vault mein save ho rahi hai...</i>`, { parse_mode: 'HTML' });
+    const statusMsg = await bot.sendMessage(
+      chatId, 
+      `⚡ <i>Video Telegram Storage Vault mein save ho rahi hai...</i>`, 
+      { parse_mode: 'HTML' }
+    );
 
     try {
       let channelMsgId = null;
 
       if (STORAGE_CHANNEL_ID) {
         const rawPeer = STORAGE_CHANNEL_ID.trim();
-        const peer = rawPeer.startsWith('@') ? rawPeer : (rawPeer.startsWith('-100') ? parseInt(rawPeer, 10) : rawPeer);
+        const peer = rawPeer.startsWith('@') 
+          ? rawPeer 
+          : (rawPeer.startsWith('-100') ? parseInt(rawPeer, 10) : rawPeer);
         const forwarded = await bot.forwardMessage(peer, chatId, msg.message_id);
         channelMsgId = forwarded.message_id;
       }
@@ -467,14 +544,24 @@ bot.on('message', async (msg) => {
       reply += `📌 <b>File:</b> ${escapeHtml(fileName)}\n\n🔗 <b>Cloudflare Player Link:</b>\n${playUrl}\n\n⚡ <i>Telegram Vault Saved & Zero-Buffer Playback Active!</i>`;
       if (user.footer && user.enableText) reply += `\n\n<b>${escapeHtml(user.footer)}</b>`;
 
-      return bot.sendMessage(chatId, reply, { parse_mode: 'HTML', disable_web_page_preview: false });
+      return bot.sendMessage(chatId, reply, { 
+        parse_mode: 'HTML', 
+        disable_web_page_preview: false 
+      });
     } catch (err) {
       await bot.deleteMessage(chatId, statusMsg.message_id).catch(() => {});
-      return bot.sendMessage(chatId, `❌ <b>Error:</b> <code>${escapeHtml(err.message)}</code>`, { parse_mode: 'HTML' });
+      return bot.sendMessage(
+        chatId, 
+        `❌ <b>Error:</b> <code>${escapeHtml(err.message)}</code>`, 
+        { parse_mode: 'HTML' }
+      );
     }
   }
 
+  // ─────────────────────────────────────
   // 2. Parallel Bulk Link Converter
+  //    Supports: Terabox, Terasharefile, Diskwala, Web URL
+  // ─────────────────────────────────────
   const incomingText = (msg.text || msg.caption || '').trim();
   if (!incomingText || incomingText.startsWith('/')) return;
 
@@ -482,15 +569,21 @@ bot.on('message', async (msg) => {
   const urls = incomingText.match(urlRegex) || [];
   if (urls.length === 0) return;
 
-  const statusMsg = await bot.sendMessage(chatId, `🔄 <i>${urls.length} link(s) process ho rahe hain...</i>`, { parse_mode: 'HTML' });
+  const statusMsg = await bot.sendMessage(
+    chatId, 
+    `🔄 <i>${urls.length} link(s) process ho rahe hain...</i>`, 
+    { parse_mode: 'HTML' }
+  );
 
   try {
     const resolveLink = async (targetUrl) => {
       let extracted = null;
-      if (/diskwala/i.test(targetUrl)) {
-        extracted = await extractDiskwalaLink(targetUrl);
-      } else if (/(terabox|1024tera|teraboxlink|terasharelink)/i.test(targetUrl)) {
+
+      // ✅ Terasharefile + Terabox + 1024tera सभी एक ही extractor में
+      if (/(terabox|1024tera|teraboxlink|terasharelink|terasharefile|terashare)/i.test(targetUrl)) {
         extracted = await extractTeraboxLink(targetUrl);
+      } else if (/diskwala/i.test(targetUrl)) {
+        extracted = await extractDiskwalaLink(targetUrl);
       } else {
         extracted = { url: targetUrl, name: 'Web Stream Video' };
       }
@@ -504,7 +597,11 @@ bot.on('message', async (msg) => {
         };
         linkStore.set(shortId, payload);
         await redis.set(`video:${shortId}`, JSON.stringify(payload), { ex: 30 * 86400 });
-        return { success: true, name: payload.name, playUrl: `${BASE_URL}/v/${shortId}` };
+        return { 
+          success: true, 
+          name: payload.name, 
+          playUrl: `${BASE_URL}/v/${shortId}` 
+        };
       }
       return { success: false, url: targetUrl };
     };
@@ -517,23 +614,35 @@ bot.on('message', async (msg) => {
 
     results.forEach((res) => {
       if (res.status === 'fulfilled' && res.value.success) {
-        successList.push(`📌 <b>${escapeHtml(res.value.name)}</b>\n🔗 ${res.value.playUrl}`);
+        successList.push(
+          `📌 <b>${escapeHtml(res.value.name)}</b>\n🔗 ${res.value.playUrl}`
+        );
       } else {
         failedCount++;
       }
     });
 
     if (successList.length === 0) {
-      return bot.sendMessage(chatId, `❌ <b>Links convert nahi ho sake (Link invalid ya expired hai).</b>`, { parse_mode: 'HTML' });
+      return bot.sendMessage(
+        chatId, 
+        `❌ <b>Links convert nahi ho sake (Link invalid ya expired hai).</b>`, 
+        { parse_mode: 'HTML' }
+      );
     }
 
     let finalMsg = `✨ <b>Converted Stream Links (${successList.length}):</b>\n\n` + successList.join('\n\n');
     if (failedCount > 0) finalMsg += `\n\n⚠️ <i>${failedCount} link(s) fail ho gaye.</i>`;
 
-    bot.sendMessage(chatId, finalMsg, { parse_mode: 'HTML', disable_web_page_preview: true });
+    bot.sendMessage(chatId, finalMsg, { 
+      parse_mode: 'HTML', 
+      disable_web_page_preview: true 
+    });
   } catch (err) {
     await bot.deleteMessage(chatId, statusMsg.message_id).catch(() => {});
-    bot.sendMessage(chatId, `❌ <b>Error:</b> <code>${escapeHtml(err.message)}</code>`, { parse_mode: 'HTML' });
+    bot.sendMessage(
+      chatId, 
+      `❌ <b>Error:</b> <code>${escapeHtml(err.message)}</code>`, 
+      { parse_mode: 'HTML' }
+    );
   }
 });
-                                                                    
