@@ -13,7 +13,7 @@ const { Upload } = require('@aws-sdk/lib-storage');
 process.on('uncaughtException', (err) => console.error('[UncaughtException]:', err.message));
 process.on('unhandledRejection', (reason) => console.error('[UnhandledRejection]:', reason));
 
-// 1. Storage Setup
+// 1. Initial Storage Setup
 let redis;
 try {
   redis = Redis.fromEnv();
@@ -46,7 +46,7 @@ const r2Client = new S3Client({
 
 console.log('✅ Cloudflare R2 Client Initialized');
 
-// 3. Express Engine
+// 3. Express Web Engine
 const app = express();
 const PORT = process.env.PORT || 8080;
 
@@ -64,23 +64,23 @@ app.use((req, res, next) => {
 app.get('/', (req, res) => res.send('Stream Engine Online'));
 app.get('/health', (req, res) => res.json({ status: 'ok', uptime: process.uptime() }));
 
-// Web Player Route
+// Web Player Route (Plays R2 Video Direct)
 app.get('/v/:id', async (req, res) => {
   try {
     const id = req.params.id;
     let data = linkStore.get(id);
 
     if (!data) {
-      const raw = (await redis.get(`video:${id}`)) || (await redis.get(`terabox:${id}`));
+      const raw = (await redis.get(`video:${id}`)) || (await redis.get(`diskwala:${id}`));
       if (raw) data = typeof raw === 'string' ? JSON.parse(raw) : raw;
     }
 
     if (!data || !data.r2Key) {
-      return res.status(404).send('Video not found or processing on Cloudflare R2');
+      return res.status(404).send('Video not found or still processing on Cloudflare R2');
     }
 
     const streamUrl = `${BASE_URL}/stream/${id}`;
-    const videoTitle = data.name || 'Video Player';
+    const videoTitle = data.name || 'Diskwala Video Player';
 
     res.send(`
       <!DOCTYPE html>
@@ -120,7 +120,7 @@ app.get('/stream/:id', async (req, res) => {
     let data = linkStore.get(id);
 
     if (!data) {
-      const raw = (await redis.get(`video:${id}`)) || (await redis.get(`terabox:${id}`));
+      const raw = (await redis.get(`video:${id}`)) || (await redis.get(`diskwala:${id}`));
       if (raw) data = typeof raw === 'string' ? JSON.parse(raw) : raw;
     }
 
@@ -148,93 +148,80 @@ app.get('/stream/:id', async (req, res) => {
 });
 
 app.listen(PORT, () => console.log(`🚀 Server running on port ${PORT}`));
-const FALLBACK_COOKIE = 'ndus=Yzdpm64teHuiTpyF1tSZ-m4ANxhFN7shhUG1hMNu;';
-
-// 4. Terabox Stream Resolver with Anti-Bot Headers
-async function fetchTeraboxDownloadStream(rawUrl) {
+// 4. Diskwala Stream Resolver Engine
+async function fetchDiskwalaStream(rawUrl) {
   let target = rawUrl.trim();
 
+  // Extract ID (e.g. 6ac117542a52418b2481f290)
+  const idMatch = target.match(/\/app\/([a-zA-Z0-9]+)/i) || target.match(/\/file\/([a-zA-Z0-9]+)/i);
+  const fileId = idMatch ? idMatch[1] : '';
+
+  if (!fileId) return null;
+
   try {
-    const headResp = await axios.get(target, {
-      maxRedirects: 10,
+    // 1. Direct Web Page Fetch to extract download URL / direct link
+    const pageResp = await axios.get(target, {
       headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36'
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36',
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8'
       },
-      timeout: 10000
+      timeout: 15000
     });
-    if (headResp.request?.res?.responseUrl) {
-      target = headResp.request.res.responseUrl;
+
+    const html = pageResp.data || '';
+    
+    // Title parse
+    let fileName = `diskwala_${fileId}.mp4`;
+    const titleMatch = html.match(/<title>([^<]+)<\/title>/i);
+    if (titleMatch && titleMatch[1]) {
+      fileName = titleMatch[1].replace(/Diskwala|Download|Free/gi, '').trim() || fileName;
+      if (!fileName.endsWith('.mp4')) fileName += '.mp4';
     }
-  } catch (e) {}
 
-  const match = target.match(/\/s\/1?([a-zA-Z0-9_-]+)/i) || 
-                target.match(/[?&]surl=1?([a-zA-Z0-9_-]+)/i) || 
-                rawUrl.match(/\/s\/1?([a-zA-Z0-9_-]+)/i);
+    // Direct download / streaming link regex
+    let directDownloadUrl = '';
+    const srcMatch = html.match(/href=["'](https?:\/\/[^"']+\.(?:mp4|mkv|download)[^"']*)["']/i) ||
+                     html.match(/src=["'](https?:\/\/[^"']+\.(?:mp4|mkv)[^"']*)["']/i) ||
+                     html.match(/["']downloadUrl["']\s*:\s*["']([^"']+)["']/i);
 
-  let key = match ? match[1] : '';
-  if (!key && target.includes('/s/')) {
-    key = target.split('/s/')[1].split(/[?&#/]/)[0];
-    if (key.startsWith('1')) key = key.substring(1);
-  }
+    if (srcMatch && srcMatch[1]) {
+      directDownloadUrl = srcMatch[1];
+    } else {
+      // Diskwala API endpoints fallback
+      const apiEndpoints = [
+        `https://www.diskwala.com/api/file/${fileId}`,
+        `https://diskwala.com/api/v1/file/${fileId}`
+      ];
+      for (const endpoint of apiEndpoints) {
+        try {
+          const apiRes = await axios.get(endpoint, { timeout: 8000 });
+          if (apiRes.data?.downloadUrl || apiRes.data?.fileUrl) {
+            directDownloadUrl = apiRes.data.downloadUrl || apiRes.data.fileUrl;
+            if (apiRes.data.name) fileName = apiRes.data.name;
+            break;
+          }
+        } catch (e) {}
+      }
+    }
 
-  if (!key) {
-    console.error('[Key Error]: Link se key extract nahi ho saki');
-    return null;
-  }
-
-  const cookieVal = process.env.TERABOX_COOKIE || FALLBACK_COOKIE;
-  const cookieFormatted = cookieVal.includes('ndus=') ? cookieVal : `ndus=${cookieVal.trim()};`;
-
-  const requestHeaders = {
-    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36',
-    'Accept': 'application/json, text/plain, */*',
-    'Accept-Language': 'en-US,en;q=0.9',
-    'Referer': 'https://www.1024tera.com/',
-    'Cookie': cookieFormatted
-  };
-
-  const endpoints = [
-    `https://www.1024tera.com/share/list?app_id=250528&shorturl=1${key}&root=1`,
-    `https://www.1024tera.com/share/list?app_id=250528&shorturl=${key}&root=1`,
-    `https://www.terabox.app/share/list?app_id=250528&shorturl=1${key}&root=1`
-  ];
-
-  for (const endpoint of endpoints) {
-    try {
-      console.log(`[Terabox Fetching]: ${endpoint}`);
-      const res = await axios.get(endpoint, {
-        headers: requestHeaders,
-        timeout: 15000
+    if (directDownloadUrl) {
+      console.log(`[Diskwala Stream Found]: Downloading from ${directDownloadUrl}`);
+      const stream = await axios.get(directDownloadUrl, {
+        responseType: 'stream',
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36',
+          'Referer': target
+        },
+        timeout: 60000
       });
 
-      console.log(`[Terabox Response]: errno=${res.data?.errno}, errmsg=${res.data?.errmsg || 'OK'}`);
-
-      if (res.data?.errno === 0 && res.data?.list && res.data.list.length > 0) {
-        const file = res.data.list[0];
-        const dlink = file.dlink || file.direct_link || file.url;
-        const filename = file.server_filename || `terabox_${Date.now()}.mp4`;
-
-        if (dlink) {
-          console.log(`[Stream Found]: Connecting download stream for ${filename}`);
-          const stream = await axios.get(dlink, {
-            responseType: 'stream',
-            headers: {
-              'User-Agent': requestHeaders['User-Agent'],
-              'Cookie': cookieFormatted,
-              'Accept': '*/*'
-            },
-            timeout: 60000
-          });
-
-          return {
-            stream: stream.data,
-            fileName: filename
-          };
-        }
-      }
-    } catch (e) {
-      console.error(`[API Call Failed]: ${e.message}`);
+      return {
+        stream: stream.data,
+        fileName: fileName
+      };
     }
+  } catch (err) {
+    console.error('[Diskwala Extract Error]:', err.message);
   }
 
   return null;
@@ -256,13 +243,13 @@ function escapeHtml(str = '') {
 bot.onText(/\/start/, (msg) => {
   bot.sendMessage(msg.chat.id,
     `🎬 <b>Stream Converter Bot</b>\n\n` +
-    `• <b>Direct Video File:</b> File bhejein, R2 par save hogi.\n` +
-    `• <b>Terabox Link:</b> Terabox link bhejein, R2 par transfer hokar custom player link banega.`,
+    `• <b>Direct Video:</b> File bhejein, R2 bucket me direct store hogi.\n` +
+    `• <b>Diskwala Link:</b> Diskwala link bhejein, video Cloudflare R2 me upload hokar permanent custom play link banega.`,
     { parse_mode: 'HTML' }
   );
 });
 
-// Direct File Upload Handler
+// Video direct Cloudflare R2 Upload
 bot.on('message', async (msg) => {
   const chatId = msg.chat.id;
   const uploaderName = msg.from?.username ? `@${msg.from.username}` : (msg.from?.first_name || 'User');
@@ -315,7 +302,7 @@ bot.on('message', async (msg) => {
     }
   }
 
-  // Link Handler
+  // Link Receive
   const incomingText = (msg.text || '').trim();
   if (!incomingText || incomingText.startsWith('/')) return;
 
@@ -323,56 +310,61 @@ bot.on('message', async (msg) => {
   const urls = incomingText.match(urlRegex) || [];
   if (urls.length === 0) return;
 
-  const statusMsg = await bot.sendMessage(chatId, `⏳ <i>Terabox video fetch aur Cloudflare R2 par upload ho rahi hai... Kripya thoda intezar karein.</i>`, { parse_mode: 'HTML' });
+  const targetUrl = urls[0];
 
-  try {
-    const targetUrl = urls[0];
-    const streamData = await fetchTeraboxDownloadStream(targetUrl);
+  // Diskwala Link Processing
+  if (targetUrl.includes('diskwala.com')) {
+    const statusMsg = await bot.sendMessage(chatId, `⏳ <i>Diskwala video fetch aur Cloudflare R2 par upload ho rahi hai... Kripya thoda intezar karein.</i>`, { parse_mode: 'HTML' });
 
-    if (!streamData || !streamData.stream) {
+    try {
+      const streamData = await fetchDiskwalaStream(targetUrl);
+
+      if (!streamData || !streamData.stream) {
+        await bot.deleteMessage(chatId, statusMsg.message_id).catch(() => {});
+        return bot.sendMessage(chatId, `❌ <b>Error:</b> Diskwala se direct download stream nahi mil paayi. Link check karein.`, { parse_mode: 'HTML' });
+      }
+
+      const fileExt = path.extname(streamData.fileName) || '.mp4';
+      const r2Key = `diskwala/${crypto.randomBytes(8).toString('hex')}${fileExt}`;
+
+      // Uploading directly into Cloudflare R2
+      const parallelUpload = new Upload({
+        client: r2Client,
+        params: {
+          Bucket: R2_BUCKET_NAME,
+          Key: r2Key,
+          Body: streamData.stream,
+          ContentType: 'video/mp4',
+        },
+        queueSize: 4,
+        partSize: 1024 * 1024 * 5,
+      });
+
+      await parallelUpload.done();
+
+      const shortId = crypto.randomBytes(4).toString('hex');
+      const payload = {
+        name: streamData.fileName,
+        r2Key: r2Key,
+        uploader: uploaderName
+      };
+
+      linkStore.set(shortId, payload);
+      await redis.set(`video:${shortId}`, JSON.stringify(payload), { ex: 30 * 86400 });
+
+      const playUrl = `${BASE_URL}/v/${shortId}`;
       await bot.deleteMessage(chatId, statusMsg.message_id).catch(() => {});
-      return bot.sendMessage(chatId, `❌ <b>Error:</b> Terabox se download stream nahi mil payi. Cookie expire ho sakti hai ya account verify required hai. Railway logs check karein.`, { parse_mode: 'HTML' });
+
+      const reply = `✨ <b>Cloudflare R2 Par Video Upload Safal!</b>\n\n` +
+                    `📌 <b>File:</b> ${escapeHtml(streamData.fileName)}\n\n` +
+                    `🔗 <b>Aapka Player Link:</b>\n${playUrl}`;
+
+      return bot.sendMessage(chatId, reply, { parse_mode: 'HTML', disable_web_page_preview: false });
+
+    } catch (err) {
+      await bot.deleteMessage(chatId, statusMsg.message_id).catch(() => {});
+      return bot.sendMessage(chatId, `❌ <b>Transfer Error:</b> <code>${escapeHtml(err.message)}</code>`, { parse_mode: 'HTML' });
     }
-
-    const fileExt = path.extname(streamData.fileName) || '.mp4';
-    const r2Key = `terabox/${crypto.randomBytes(8).toString('hex')}${fileExt}`;
-
-    const parallelUpload = new Upload({
-      client: r2Client,
-      params: {
-        Bucket: R2_BUCKET_NAME,
-        Key: r2Key,
-        Body: streamData.stream,
-        ContentType: 'video/mp4',
-      },
-      queueSize: 4,
-      partSize: 1024 * 1024 * 5,
-    });
-
-    await parallelUpload.done();
-
-    const shortId = crypto.randomBytes(4).toString('hex');
-    const payload = {
-      name: streamData.fileName,
-      r2Key: r2Key,
-      uploader: uploaderName
-    };
-
-    linkStore.set(shortId, payload);
-    await redis.set(`video:${shortId}`, JSON.stringify(payload), { ex: 30 * 86400 });
-
-    const playUrl = `${BASE_URL}/v/${shortId}`;
-    await bot.deleteMessage(chatId, statusMsg.message_id).catch(() => {});
-
-    const reply = `✨ <b>Cloudflare R2 Par Video Upload Safal!</b>\n\n` +
-                  `📌 <b>File:</b> ${escapeHtml(streamData.fileName)}\n\n` +
-                  `🔗 <b>Aapka Player Link:</b>\n${playUrl}`;
-
-    bot.sendMessage(chatId, reply, { parse_mode: 'HTML', disable_web_page_preview: false });
-
-  } catch (err) {
-    await bot.deleteMessage(chatId, statusMsg.message_id).catch(() => {});
-    bot.sendMessage(chatId, `❌ <b>Transfer Error:</b> <code>${escapeHtml(err.message)}</code>`, { parse_mode: 'HTML' });
   }
 });
-      
+          
