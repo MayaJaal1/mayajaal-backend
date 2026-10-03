@@ -1,13 +1,13 @@
 require('dotenv').config();
 
 const express = require('express');
-const TelegramBot = require('node-telegram-bot-api');
 const axios = require('axios');
 const crypto = require('crypto');
 const { Redis } = require('@upstash/redis');
 const path = require('path');
 const { S3Client, GetObjectCommand } = require('@aws-sdk/client-s3');
 const { Upload } = require('@aws-sdk/lib-storage');
+const TelegramBot = require('node-telegram-bot-api');
 
 process.on('uncaughtException', (err) => console.error('[UncaughtException]:', err.message));
 process.on('unhandledRejection', (reason) => console.error('[UnhandledRejection]:', reason));
@@ -56,7 +56,7 @@ app.use((req, res, next) => {
   next();
 });
 
-app.get('/', (req, res) => res.send('Stream Engine Online - Local 2GB Bot API Active'));
+app.get('/', (req, res) => res.send('Stream Engine Online - Active'));
 app.get('/health', (req, res) => res.json({ status: 'ok', uptime: process.uptime() }));
 
 // HTML5 Video Player
@@ -88,7 +88,7 @@ app.get('/v/:id', async (req, res) => {
           * { box-sizing: border-box; margin: 0; padding: 0; }
           body { background: #000; color: #fff; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 100vh; padding: 12px; }
           .player-box { width: 100%; max-width: 900px; padding: 10px; }
-          video { width: 100%; max-height: 80vh; border-radius: 12px; background: #111; outline: none; box-shadow: 0 10px 30px rgba(0,0,0,0.8); }
+          video { width: 100%; max-height: 80vh; border-radius: 12px; background: #111; outline: none; }
           .title { margin-top: 15px; font-size: 1.1rem; color: #00ff88; word-break: break-all; }
         </style>
       </head>
@@ -96,7 +96,6 @@ app.get('/v/:id', async (req, res) => {
         <div class="player-box">
           <video controls autoplay playsinline preload="metadata">
             <source src="${streamUrl}" type="video/mp4">
-            Aapka browser video play nahi kar pa raha hai.
           </video>
           <div class="title">🎬 ${videoTitle}</div>
         </div>
@@ -143,7 +142,6 @@ app.get('/stream/:id', async (req, res) => {
 });
 
 app.listen(PORT, () => console.log(`🚀 Web Server running on port ${PORT}`));
-// Render Local Bot API Client
 const LOCAL_API_URL = process.env.LOCAL_BOT_API_URL 
   ? process.env.LOCAL_BOT_API_URL.trim().replace(/\/$/, '') 
   : 'https://tg-local-api-gxrv.onrender.com';
@@ -188,7 +186,7 @@ bot.on('message', async (msg) => {
     const statusMsg = await bot.sendMessage(chatId, `⚡ <i>Video fetch karke Cloudflare R2 par upload ho rahi hai... (2GB Limit Allowed)</i>`, { parse_mode: 'HTML' });
 
     try {
-      // 1. Local Server se file details lo
+      // 1. Fetch file info
       const fileInfo = await bot.getFile(fileId);
       if (!fileInfo || !fileInfo.file_path) {
         throw new Error('Telegram server se file_path nahi mila');
@@ -196,29 +194,40 @@ bot.on('message', async (msg) => {
 
       console.log(`[Raw Path From Telegram]: ${fileInfo.file_path}`);
 
-      // 2. Fix 404: Local Bot API server ke absolute internal path ko sanitize karo
-      let cleanPath = fileInfo.file_path;
-      if (cleanPath.includes('/var/lib/telegram-bot-api/')) {
-        cleanPath = cleanPath.split('/var/lib/telegram-bot-api/')[1];
-        // token prefix hatao agar maujood ho
-        if (cleanPath.startsWith(TOKEN + '/')) {
-          cleanPath = cleanPath.replace(TOKEN + '/', '');
+      // 2. Download URL: Local API server me path '/file/bot<token>/' direct file_path leta hai
+      let downloadUrl;
+      if (fileInfo.file_path.startsWith('http')) {
+        downloadUrl = fileInfo.file_path;
+      } else {
+        // Agar absolute disk path hai (/var/lib/...) toh Render ke local bot-api ko call karne ke 2 methods:
+        // Try direct file URI or relative stripped path
+        let pathOnly = fileInfo.file_path;
+        if (pathOnly.includes(TOKEN)) {
+          pathOnly = pathOnly.substring(pathOnly.indexOf(TOKEN) + TOKEN.length);
         }
+        pathOnly = pathOnly.replace(/^\/+/, '');
+        downloadUrl = `${LOCAL_API_URL}/file/bot${TOKEN}/${pathOnly}`;
       }
 
-      // Leading slash hatao
-      cleanPath = cleanPath.replace(/^\/+/, '');
+      console.log(`[Download URL]: ${downloadUrl}`);
 
-      const downloadBase = LOCAL_API_URL ? LOCAL_API_URL : 'https://api.telegram.org';
-      const fileLink = `${downloadBase}/file/bot${TOKEN}/${cleanPath}`;
-
-      console.log(`[Fixed Download Link]: ${fileLink}`);
-
-      const videoDownloadStream = await axios.get(fileLink, {
-        responseType: 'stream',
-        maxContentLength: Infinity,
-        maxBodyLength: Infinity,
-      });
+      let videoDownloadStream;
+      try {
+        videoDownloadStream = await axios.get(downloadUrl, {
+          responseType: 'stream',
+          maxContentLength: Infinity,
+          maxBodyLength: Infinity,
+        });
+      } catch (err404) {
+        // Agar relative par 404 aaya, fallback to root file path
+        console.log('[Retry]: Trying root fallback path...');
+        const fallbackUrl = `${LOCAL_API_URL}${fileInfo.file_path}`;
+        videoDownloadStream = await axios.get(fallbackUrl, {
+          responseType: 'stream',
+          maxContentLength: Infinity,
+          maxBodyLength: Infinity,
+        });
+      }
 
       const fileExt = path.extname(fileName) || '.mp4';
       const r2Key = `uploads/${crypto.randomBytes(8).toString('hex')}${fileExt}`;
@@ -261,4 +270,3 @@ bot.on('message', async (msg) => {
     }
   }
 });
-                       
