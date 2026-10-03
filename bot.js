@@ -22,7 +22,9 @@ if (!TELEGRAM_CHANNEL_ID) {
   throw new Error("TELEGRAM_CHANNEL_ID is missing");
 }
 
+// Đã bật polling để bot nhận tin nhắn
 const bot = new TelegramBot(BOT_TOKEN, {
+  polling: true,
   baseApiUrl: TELEGRAM_BOT_API_BASE_URL
 });
 
@@ -87,6 +89,7 @@ async function redisGet(key) {
     return null;
   }
 }
+
 // In-memory cache
 const videoCache = new Map();
 
@@ -321,6 +324,7 @@ app.get("/stream/:id", async (req, res) => {
     res.destroy();
   }
 });
+
 // Telegram bot message handler
 bot.on("message", async (msg) => {
   try {
