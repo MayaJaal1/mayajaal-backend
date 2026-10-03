@@ -13,7 +13,7 @@ const { Upload } = require('@aws-sdk/lib-storage');
 process.on('uncaughtException', (err) => console.error('[UncaughtException]:', err.message));
 process.on('unhandledRejection', (reason) => console.error('[UnhandledRejection]:', reason));
 
-// 1. Initial Config & Fallback Storage
+// 1. Initial Config
 let redis;
 try {
   redis = Redis.fromEnv();
@@ -28,7 +28,7 @@ const BASE_URL = process.env.CUSTOM_DOMAIN
   ? (process.env.CUSTOM_DOMAIN.startsWith('http') ? process.env.CUSTOM_DOMAIN : `https://${process.env.CUSTOM_DOMAIN}`)
   : 'https://mayajaal.online';
 
-// 2. Cloudflare R2 Client Setup (Fixed IDs)
+// 2. Cloudflare R2 Client Setup (Pre-configured Keys)
 const R2_ACCOUNT_ID = String(process.env.R2_ACCOUNT_ID || '9a17e6f8a4af372b6b0ab1ad1cdb982d').trim();
 const R2_ACCESS_KEY_ID = String(process.env.R2_ACCESS_KEY_ID || 'fe0370e7a3f380c0dee831d6c37fd851').trim();
 const R2_SECRET_ACCESS_KEY = String(process.env.R2_SECRET_ACCESS_KEY || '').trim();
@@ -111,7 +111,7 @@ app.get('/v/:id', async (req, res) => {
   }
 });
 
-// Domain Streaming Route
+// Domain Streaming Route (R2 Range Stream)
 app.get('/stream/:id', async (req, res) => {
   try {
     const id = req.params.id;
@@ -177,75 +177,82 @@ app.get('/stream/:id', async (req, res) => {
 });
 
 app.listen(PORT, () => console.log(`🚀 Server running on port ${PORT}`));
-// 4. Link Resolvers (Supports terasharefile, 1024tera, terabox)
+// 4. Link Resolvers (Terabox & Terasharefile Support)
 async function extractTeraboxLink(rawUrl) {
   try {
-    let resolvedUrl = rawUrl.trim();
+    let target = rawUrl.trim();
 
+    // 1. Redirect follow karna
     try {
-      const resp = await axios.get(resolvedUrl, {
+      const headResp = await axios.get(target, {
         maxRedirects: 10,
         headers: {
           'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-          'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8'
         },
         timeout: 10000
       });
-      if (resp.request?.res?.responseUrl) {
-        resolvedUrl = resp.request.res.responseUrl;
+      if (headResp.request?.res?.responseUrl) {
+        target = headResp.request.res.responseUrl;
       }
     } catch (e) {}
 
-    const match = resolvedUrl.match(/\/(?:s|sharing\/link\?surl=)([a-zA-Z0-9_-]+)/i) || 
-                  resolvedUrl.match(/[?&]surl=([a-zA-Z0-9_-]+)/i) ||
-                  rawUrl.match(/\/(?:s|sharing\/link\?surl=)([a-zA-Z0-9_-]+)/i) ||
-                  rawUrl.match(/[?&]surl=([a-zA-Z0-9_-]+)/i);
+    // 2. Fallback Engine 1: Terabox Direct Web Extractor API
+    try {
+      const apiRes = await axios.get(`https://terabox-api-lake.vercel.app/api?url=${encodeURIComponent(target)}`, { timeout: 12000 });
+      if (apiRes.data && apiRes.data.download_link) {
+        return {
+          url: apiRes.data.download_link,
+          name: apiRes.data.file_name || `video_${Date.now()}.mp4`
+        };
+      }
+    } catch (err) {}
+
+    // 3. Fallback Engine 2: Terabox Web API (ndus Cookie)
+    const match = target.match(/\/(?:s|sharing\/link\?surl=)([a-zA-Z0-9_-]+)/i) || 
+                  target.match(/[?&]surl=([a-zA-Z0-9_-]+)/i);
 
     let shorturl = match ? match[1] : '';
-    
-    if (!shorturl && resolvedUrl.includes('/s/')) {
-      const parts = resolvedUrl.split('/s/')[1];
+    if (!shorturl && target.includes('/s/')) {
+      const parts = target.split('/s/')[1];
       if (parts) shorturl = parts.split(/[?&#/]/)[0];
     }
 
-    if (!shorturl) return null;
+    if (shorturl) {
+      const formattedKey = shorturl.startsWith('1') ? shorturl.substring(1) : shorturl;
+      let rawCookie = process.env.TERABOX_COOKIE || '';
+      if (rawCookie && !rawCookie.includes('ndus=')) {
+        rawCookie = `ndus=${rawCookie.trim()};`;
+      }
 
-    const formattedKey = shorturl.startsWith('1') ? shorturl.substring(1) : shorturl;
-    
-    let rawCookie = process.env.TERABOX_COOKIE || '';
-    if (rawCookie && !rawCookie.includes('ndus=')) {
-      rawCookie = `ndus=${rawCookie.trim()};`;
-    }
+      const endpoints = [
+        `https://www.1024tera.com/share/list?app_id=250528&shorturl=${formattedKey}&root=1`,
+        `https://www.terabox.app/share/list?app_id=250528&shorturl=${formattedKey}&root=1`,
+        `https://www.terabox.com/share/list?app_id=250528&shorturl=${formattedKey}&root=1`
+      ];
 
-    const apiEndpoints = [
-      `https://www.1024tera.com/share/list?app_id=250528&shorturl=${formattedKey}&root=1`,
-      `https://www.1024tera.com/share/list?app_id=250528&shorturl=${shorturl}&root=1`,
-      `https://www.terabox.app/share/list?app_id=250528&shorturl=${formattedKey}&root=1`,
-      `https://www.terabox.com/share/list?app_id=250528&shorturl=${formattedKey}&root=1`
-    ];
+      for (const endpoint of endpoints) {
+        try {
+          const res = await axios.get(endpoint, {
+            headers: {
+              'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+              'Referer': 'https://www.1024tera.com/',
+              'Cookie': rawCookie
+            },
+            timeout: 10000
+          });
 
-    for (const endpoint of apiEndpoints) {
-      try {
-        const res = await axios.get(endpoint, {
-          headers: {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-            'Referer': 'https://www.1024tera.com/',
-            'Cookie': rawCookie
-          },
-          timeout: 10000
-        });
-
-        if (res.data?.errno === 0 && res.data?.list?.length > 0) {
-          const file = res.data.list[0];
-          const streamUrl = file.dlink || file.direct_link || file.url;
-          if (streamUrl) {
-            return { 
-              url: streamUrl, 
-              name: file.server_filename || `video_${Date.now()}.mp4` 
-            };
+          if (res.data?.errno === 0 && res.data?.list?.length > 0) {
+            const file = res.data.list[0];
+            const streamUrl = file.dlink || file.direct_link || file.url;
+            if (streamUrl) {
+              return { 
+                url: streamUrl, 
+                name: file.server_filename || `video_${Date.now()}.mp4` 
+              };
+            }
           }
-        }
-      } catch (err) {}
+        } catch (e) {}
+      }
     }
   } catch (e) {}
   return null;
@@ -267,7 +274,7 @@ function escapeHtml(str = '') {
 bot.onText(/\/start/, (msg) => {
   bot.sendMessage(msg.chat.id,
     `🎬 <b>Stream Converter Bot</b>\n\n` +
-    `• <b>Video Upload:</b> Direct video bhejein, R2 par save hokar play link banega.\n` +
+    `• <b>Video Upload:</b> Video bhejein, R2 par save hokar play link banega.\n` +
     `• <b>Terabox Link:</b> Terabox / Terasharefile link bhejein, R2 me upload hokar permanent link banega.`,
     { parse_mode: 'HTML' }
   );
@@ -351,7 +358,6 @@ bot.on('message', async (msg) => {
       rawCookie = `ndus=${rawCookie.trim()};`;
     }
 
-    // Terabox se video stream lena
     const videoStream = await axios.get(extracted.url, {
       responseType: 'stream',
       headers: {
@@ -365,7 +371,6 @@ bot.on('message', async (msg) => {
     const fileExt = path.extname(extracted.name) || '.mp4';
     const r2Key = `terabox/${crypto.randomBytes(8).toString('hex')}${fileExt}`;
 
-    // Cloudflare R2 bucket mein stream upload
     const parallelUpload = new Upload({
       client: r2Client,
       params: {
@@ -400,4 +405,3 @@ bot.on('message', async (msg) => {
     bot.sendMessage(chatId, `❌ <b>Transfer Error:</b> <code>${escapeHtml(err.message)}</code>`, { parse_mode: 'HTML' });
   }
 });
-  
