@@ -7,7 +7,9 @@ const crypto = require('crypto');
 const { Redis } = require('@upstash/redis');
 const path = require('path');
 const fs = require('fs');
+const https = require('https');
 const { S3Client, GetObjectCommand } = require('@aws-sdk/client-s3');
+const { NodeHttpHandler } = require('@smithy/node-http-handler');
 const { Upload } = require('@aws-sdk/lib-storage');
 
 process.on('uncaughtException', (err) => console.error('[UncaughtException]:', err.message));
@@ -27,11 +29,11 @@ if (!TOKEN) {
   process.exit(1);
 }
 
-// 2. Cloudflare R2 Client Setup
-const R2_ACCOUNT_ID = String(process.env.R2_ACCOUNT_ID || '').trim();
-const R2_ACCESS_KEY_ID = String(process.env.R2_ACCESS_KEY_ID || '').trim();
-const R2_SECRET_ACCESS_KEY = String(process.env.R2_SECRET_ACCESS_KEY || '').trim();
-const R2_BUCKET_NAME = String(process.env.R2_BUCKET_NAME || '').trim();
+// 2. Cloudflare R2 Client Setup (Fixed SSL & Fallback)
+const R2_ACCOUNT_ID = String(process.env.R2_ACCOUNT_ID || '9a17e6f8a4af372b6b0ab1ad1cdb982d').trim();
+const R2_ACCESS_KEY_ID = String(process.env.R2_ACCESS_KEY_ID || process.env.R2_ACCESS_KEY || '').trim();
+const R2_SECRET_ACCESS_KEY = String(process.env.R2_SECRET_ACCESS_KEY || process.env.R2_SECRET_KEY || '').trim();
+const R2_BUCKET_NAME = String(process.env.R2_BUCKET_NAME || 'mayajaal-storage').trim();
 
 const r2Client = new S3Client({
   region: 'auto',
@@ -41,6 +43,13 @@ const r2Client = new S3Client({
     secretAccessKey: R2_SECRET_ACCESS_KEY,
   },
   forcePathStyle: true,
+  requestHandler: new NodeHttpHandler({
+    httpsAgent: new https.Agent({
+      secureProtocol: 'TLS_method',
+      rejectUnauthorized: true,
+      keepAlive: true,
+    }),
+  }),
 });
 
 console.log('✅ Cloudflare R2 Client Initialized');
@@ -327,3 +336,4 @@ bot.on('message', async (msg) => {
     bot.sendMessage(chatId, `❌ <b>Error:</b> <code>${escapeHtml(err.message)}</code>`, { parse_mode: 'HTML' });
   }
 });
+    
