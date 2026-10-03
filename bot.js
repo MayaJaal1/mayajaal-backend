@@ -13,7 +13,7 @@ const { Upload } = require('@aws-sdk/lib-storage');
 process.on('uncaughtException', (err) => console.error('[UncaughtException]:', err.message));
 process.on('unhandledRejection', (reason) => console.error('[UnhandledRejection]:', reason));
 
-// 1. Initial Storage Setup
+// 1. Storage Setup
 let redis;
 try {
   redis = Redis.fromEnv();
@@ -64,7 +64,7 @@ app.use((req, res, next) => {
 app.get('/', (req, res) => res.send('Stream Engine Online'));
 app.get('/health', (req, res) => res.json({ status: 'ok', uptime: process.uptime() }));
 
-// Web Player Route (Hybrid: R2 MP4 Stream + Diskwala Embed Engine)
+// Web Player Route (Direct Native HTML5 Player with Auto-Redirect Fallback)
 app.get('/v/:id', async (req, res) => {
   try {
     const id = req.params.id;
@@ -78,36 +78,10 @@ app.get('/v/:id', async (req, res) => {
     if (!data) return res.status(404).send('Video not found or link expired');
 
     const videoTitle = data.name || 'Video Player';
+    const isDiskwala = Boolean(data.isDiskwala);
+    const diskwalaUrl = data.diskwalaUrl || '';
+    const r2StreamUrl = `${BASE_URL}/stream/${id}`;
 
-    // Scenario A: Diskwala Embed Player
-    if (data.isDiskwala && data.diskwalaUrl) {
-      return res.send(`
-        <!DOCTYPE html>
-        <html lang="hi">
-        <head>
-          <meta charset="UTF-8">
-          <meta name="viewport" content="width=device-width, initial-scale=1.0">
-          <title>${videoTitle}</title>
-          <style>
-            * { box-sizing: border-box; margin: 0; padding: 0; }
-            body { background: #000; color: #fff; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; overflow: hidden; padding: 8px; }
-            .player-container { width: 100%; max-width: 960px; height: 88vh; display: flex; flex-direction: column; }
-            iframe { width: 100%; height: 100%; border: none; border-radius: 12px; background: #111; box-shadow: 0 10px 30px rgba(0,0,0,0.9); }
-            .title { padding: 10px 5px; font-size: 1.05rem; color: #00ff88; word-break: break-all; }
-          </style>
-        </head>
-        <body>
-          <div class="player-container">
-            <iframe src="${data.diskwalaUrl}" allowfullscreen allow="autoplay; encrypted-media; fullscreen"></iframe>
-            <div class="title">🎬 ${videoTitle}</div>
-          </div>
-        </body>
-        </html>
-      `);
-    }
-
-    // Scenario B: Cloudflare R2 Direct MP4 Player
-    const streamUrl = `${BASE_URL}/stream/${id}`;
     res.send(`
       <!DOCTYPE html>
       <html lang="hi">
@@ -117,20 +91,62 @@ app.get('/v/:id', async (req, res) => {
         <title>${videoTitle}</title>
         <style>
           * { box-sizing: border-box; margin: 0; padding: 0; }
-          body { background: #000; color: #fff; font-family: sans-serif; display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 100vh; padding: 12px; }
-          .player-box { width: 100%; max-width: 900px; padding: 10px; }
-          video { width: 100%; max-height: 80vh; border-radius: 12px; background: #111; outline: none; box-shadow: 0 10px 30px rgba(0,0,0,0.8); }
-          .title { margin-top: 15px; font-size: 1.1rem; color: #00ff88; word-break: break-all; }
+          body { background: #0a0a0c; color: #fff; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 100vh; padding: 12px; }
+          .player-card { width: 100%; max-width: 950px; background: #141419; border-radius: 16px; overflow: hidden; box-shadow: 0 15px 40px rgba(0,0,0,0.9); border: 1px solid #23232e; }
+          .media-container { position: relative; width: 100%; padding-top: 56.25%; background: #000; }
+          video { position: absolute; top: 0; left: 0; width: 100%; height: 100%; outline: none; }
+          .status-layer { position: absolute; top: 0; left: 0; width: 100%; height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; background: rgba(10,10,12,0.92); z-index: 10; gap: 14px; padding: 20px; text-align: center; }
+          .spinner { width: 45px; height: 45px; border: 4px solid #2a2a35; border-top-color: #00ff88; border-radius: 50%; animation: spin 0.8s linear infinite; }
+          @keyframes spin { to { transform: rotate(360deg); } }
+          .play-btn { background: #00ff88; color: #000; font-weight: bold; border: none; padding: 12px 24px; border-radius: 8px; font-size: 1rem; cursor: pointer; text-decoration: none; display: inline-block; }
+          .info-area { padding: 16px 20px; }
+          .title { font-size: 1.05rem; font-weight: 600; color: #00ff88; word-break: break-all; }
         </style>
       </head>
       <body>
-        <div class="player-box">
-          <video controls autoplay playsinline preload="metadata">
-            <source src="${streamUrl}" type="video/mp4">
-            Aapka browser HTML5 video support nahi karta.
-          </video>
-          <div class="title">🎬 ${videoTitle}</div>
+        <div class="player-card">
+          <div class="media-container">
+            <video id="videoElement" controls playsinline preload="auto"></video>
+            <div id="loaderLayer" class="status-layer">
+              <div class="spinner" id="spin"></div>
+              <p id="msg">Video stream shuru ho rahi hai...</p>
+              <a id="directBtn" href="#" class="play-btn" style="display:none;" target="_blank">Direct Web Player Mein Dekhein</a>
+            </div>
+          </div>
+          <div class="info-area">
+            <div class="title">🎬 ${videoTitle}</div>
+          </div>
         </div>
+
+        <script>
+          const video = document.getElementById('videoElement');
+          const loader = document.getElementById('loaderLayer');
+          const spin = document.getElementById('spin');
+          const msg = document.getElementById('msg');
+          const directBtn = document.getElementById('directBtn');
+
+          const isDiskwala = ${isDiskwala};
+          const r2Url = "${r2StreamUrl}";
+          const targetUrl = "${diskwalaUrl}";
+
+          if (!isDiskwala) {
+            // Direct Cloudflare R2 Stream
+            video.src = r2Url;
+            video.addEventListener('canplay', () => { loader.style.display = 'none'; });
+            video.play().catch(() => {});
+          } else {
+            // Diskwala Smart Stream Resolver
+            directBtn.href = targetUrl;
+            directBtn.style.display = 'inline-block';
+            spin.style.display = 'none';
+            msg.innerHTML = "Diskwala security ke kaaran iframe block karta hai.<br>Seedha niche diye gaye button par click karke stream karein:";
+
+            // Client-side auto redirect for seamless mobile playback
+            setTimeout(() => {
+              window.location.href = targetUrl;
+            }, 1200);
+          }
+        </script>
       </body>
       </html>
     `);
@@ -139,7 +155,7 @@ app.get('/v/:id', async (req, res) => {
   }
 });
 
-// Domain Streaming Route
+// Domain Streaming Route (R2 Chunk Streaming)
 app.get('/stream/:id', async (req, res) => {
   try {
     const id = req.params.id;
@@ -190,8 +206,8 @@ function escapeHtml(str = '') {
 bot.onText(/\/start/, (msg) => {
   bot.sendMessage(msg.chat.id,
     `🎬 <b>Stream Converter Bot</b>\n\n` +
-    `• <b>Direct Video:</b> File bhejein, R2 par save hokar play link banega.\n` +
-    `• <b>Diskwala Link:</b> Link bhejein, aapke custom domain player link me turant convert ho jayega.`,
+    `• <b>Direct Video:</b> File bhejein, R2 par save hokar direct play link banega.\n` +
+    `• <b>Diskwala Link:</b> Link bhejein, aapke custom domain player me turant convert ho jayega.`,
     { parse_mode: 'HTML' }
   );
 });
@@ -201,7 +217,7 @@ bot.on('message', async (msg) => {
   const chatId = msg.chat.id;
   const uploaderName = msg.from?.username ? `@${msg.from.username}` : (msg.from?.first_name || 'User');
 
-  // 1. Direct Telegram video file handling
+  // Direct Telegram Video File
   const videoObj = msg.video || msg.document || (msg.animation ? msg.animation : null);
   if (videoObj) {
     const fileId = videoObj.file_id;
@@ -250,7 +266,7 @@ bot.on('message', async (msg) => {
     }
   }
 
-  // 2. Link receive
+  // Link receive
   const incomingText = (msg.text || '').trim();
   if (!incomingText || incomingText.startsWith('/')) return;
 
@@ -273,13 +289,13 @@ bot.on('message', async (msg) => {
         return bot.sendMessage(chatId, `❌ <b>Error:</b> Diskwala link se ID extract nahi ho saki.`, { parse_mode: 'HTML' });
       }
 
-      const diskwalaEmbedUrl = `https://www.diskwala.com/app/${fileId}`;
+      const diskwalaWebUrl = `https://www.diskwala.com/app/${fileId}`;
       const shortId = crypto.randomBytes(4).toString('hex');
 
       const payload = {
         name: `Diskwala Video (${fileId})`,
         isDiskwala: true,
-        diskwalaUrl: diskwalaEmbedUrl,
+        diskwalaUrl: diskwalaWebUrl,
         uploader: uploaderName
       };
 
@@ -300,4 +316,3 @@ bot.on('message', async (msg) => {
     }
   }
 });
-    
