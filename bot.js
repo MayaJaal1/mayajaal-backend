@@ -13,7 +13,7 @@ const { Upload } = require('@aws-sdk/lib-storage');
 process.on('uncaughtException', (err) => console.error('[UncaughtException]:', err.message));
 process.on('unhandledRejection', (reason) => console.error('[UnhandledRejection]:', reason));
 
-// 1. Initial Config
+// 1. Initial Config & Fallback Redis Setup
 let redis;
 try {
   redis = Redis.fromEnv();
@@ -28,7 +28,7 @@ const BASE_URL = process.env.CUSTOM_DOMAIN
   ? (process.env.CUSTOM_DOMAIN.startsWith('http') ? process.env.CUSTOM_DOMAIN : `https://${process.env.CUSTOM_DOMAIN}`)
   : 'https://mayajaal.online';
 
-// 2. Cloudflare R2 Client Setup (Keys Added Directly)
+// 2. Cloudflare R2 Client Setup
 const R2_ACCOUNT_ID = String(process.env.R2_ACCOUNT_ID || '9a17e6f8a4af372b6b0ab1ad1cdb982d').trim();
 const R2_ACCESS_KEY_ID = String(process.env.R2_ACCESS_KEY_ID || 'fe0370e7a3f380c0dee831d6c37fd851').trim();
 const R2_SECRET_ACCESS_KEY = String(process.env.R2_SECRET_ACCESS_KEY || '').trim();
@@ -151,7 +151,7 @@ app.get('/stream/:id', async (req, res) => {
     }
 
     const headers = {
-      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
       'Cookie': rawCookie,
       'Accept': '*/*'
     };
@@ -177,46 +177,73 @@ app.get('/stream/:id', async (req, res) => {
 });
 
 app.listen(PORT, () => console.log(`🚀 Server running on port ${PORT}`));
-// 4. Link Resolvers
+// 4. Link Resolvers (Supports terasharefile.com and multiple mirrors)
 async function extractTeraboxLink(rawUrl) {
   try {
-    let resolvedUrl = rawUrl;
+    let resolvedUrl = rawUrl.trim();
+
     try {
-      const resp = await axios.get(rawUrl, {
-        maxRedirects: 5,
-        headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)' },
-        timeout: 8000
+      const resp = await axios.get(resolvedUrl, {
+        maxRedirects: 10,
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+          'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8'
+        },
+        timeout: 10000
       });
-      if (resp.request?.res?.responseUrl) resolvedUrl = resp.request.res.responseUrl;
+      if (resp.request?.res?.responseUrl) {
+        resolvedUrl = resp.request.res.responseUrl;
+      }
     } catch (e) {}
 
-    const match = resolvedUrl.match(/\/(s|sharing\/link\?surl=)([a-zA-Z0-9_-]+)/i) || 
-                  resolvedUrl.match(/surl=([a-zA-Z0-9_-]+)/i) ||
-                  rawUrl.match(/\/s\/([a-zA-Z0-9_-]+)/i);
+    const match = resolvedUrl.match(/\/(?:s|sharing\/link\?surl=)([a-zA-Z0-9_-]+)/i) || 
+                  resolvedUrl.match(/[?&]surl=([a-zA-Z0-9_-]+)/i) ||
+                  rawUrl.match(/\/(?:s|sharing\/link\?surl=)([a-zA-Z0-9_-]+)/i) ||
+                  rawUrl.match(/[?&]surl=([a-zA-Z0-9_-]+)/i);
 
-    let shorturl = match ? (match[2] || match[1]) : '';
-    if (!shorturl && resolvedUrl.includes('/s/')) shorturl = resolvedUrl.split('/s/')[1].split(/[?&#]/)[0];
+    let shorturl = match ? match[1] : '';
+    
+    if (!shorturl && resolvedUrl.includes('/s/')) {
+      const parts = resolvedUrl.split('/s/')[1];
+      if (parts) shorturl = parts.split(/[?&#/]/)[0];
+    }
+
     if (!shorturl) return null;
 
     const formattedKey = shorturl.startsWith('1') ? shorturl.substring(1) : shorturl;
+    
     let rawCookie = process.env.TERABOX_COOKIE || '';
-    if (rawCookie && !rawCookie.includes('ndus=')) rawCookie = `ndus=${rawCookie.trim()};`;
+    if (rawCookie && !rawCookie.includes('ndus=')) {
+      rawCookie = `ndus=${rawCookie.trim()};`;
+    }
 
-    for (const k of [formattedKey, shorturl]) {
+    const apiEndpoints = [
+      `https://www.1024tera.com/share/list?app_id=250528&shorturl=${formattedKey}&root=1`,
+      `https://www.1024tera.com/share/list?app_id=250528&shorturl=${shorturl}&root=1`,
+      `https://www.terabox.app/share/list?app_id=250528&shorturl=${formattedKey}&root=1`,
+      `https://www.terabox.com/share/list?app_id=250528&shorturl=${formattedKey}&root=1`
+    ];
+
+    for (const endpoint of apiEndpoints) {
       try {
-        const res = await axios.get(`https://www.1024tera.com/share/list?app_id=250528&shorturl=${k}&root=1`, {
+        const res = await axios.get(endpoint, {
           headers: {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)',
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
             'Referer': 'https://www.1024tera.com/',
             'Cookie': rawCookie
           },
-          timeout: 8000
+          timeout: 10000
         });
 
         if (res.data?.errno === 0 && res.data?.list?.length > 0) {
           const file = res.data.list[0];
           const streamUrl = file.dlink || file.direct_link || file.url;
-          if (streamUrl) return { url: streamUrl, name: file.server_filename || 'Video' };
+          if (streamUrl) {
+            return { 
+              url: streamUrl, 
+              name: file.server_filename || 'Video' 
+            };
+          }
         }
       } catch (err) {}
     }
@@ -240,8 +267,8 @@ function escapeHtml(str = '') {
 bot.onText(/\/start/, (msg) => {
   bot.sendMessage(msg.chat.id,
     `🎬 <b>Stream Converter Bot</b>\n\n` +
-    `• <b>Video Upload:</b> Video send karein, R2 me upload hokar domain play link banega.\n` +
-    `• <b>Link Convert:</b> Terabox link bhej kar stream link banayein.`,
+    `• <b>Video Upload:</b> Video bhejein, R2 me upload hokar domain play link banega.\n` +
+    `• <b>Link Convert:</b> Terabox / Terasharefile link bhej kar stream link banayein.`,
     { parse_mode: 'HTML' }
   );
 });
@@ -313,7 +340,9 @@ bot.on('message', async (msg) => {
   try {
     const targetUrl = urls[0];
     let extracted = await extractTeraboxLink(targetUrl);
-    if (!extracted) extracted = { url: targetUrl, name: 'Web Video' };
+    if (!extracted) {
+      extracted = { url: targetUrl, name: 'Web Video' };
+    }
 
     const shortId = crypto.randomBytes(4).toString('hex');
     const payload = { name: extracted.name, url: extracted.url, uploader: uploaderName };
@@ -330,3 +359,4 @@ bot.on('message', async (msg) => {
     bot.sendMessage(chatId, `❌ <b>Error:</b> <code>${escapeHtml(err.message)}</code>`, { parse_mode: 'HTML' });
   }
 });
+    
