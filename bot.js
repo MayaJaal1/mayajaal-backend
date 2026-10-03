@@ -64,7 +64,7 @@ app.use((req, res, next) => {
 app.get('/', (req, res) => res.send('Stream Engine Online'));
 app.get('/health', (req, res) => res.json({ status: 'ok', uptime: process.uptime() }));
 
-// Web Player Route (Direct R2 Video Player)
+// Web Player Route (Direct Cloudflare R2 Player)
 app.get('/v/:id', async (req, res) => {
   try {
     const id = req.params.id;
@@ -75,7 +75,7 @@ app.get('/v/:id', async (req, res) => {
       if (raw) data = typeof raw === 'string' ? JSON.parse(raw) : raw;
     }
 
-    if (!data || !data.r2Key) return res.status(404).send('Video not found or still uploading to Cloudflare R2');
+    if (!data || !data.r2Key) return res.status(404).send('Video not found or still processing');
 
     const streamUrl = `${BASE_URL}/stream/${id}`;
     const videoTitle = data.name || 'Video Player';
@@ -89,7 +89,7 @@ app.get('/v/:id', async (req, res) => {
         <title>${videoTitle}</title>
         <style>
           * { box-sizing: border-box; margin: 0; padding: 0; }
-          body { background: #000; color: #fff; font-family: sans-serif; display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 100vh; padding: 12px; }
+          body { background: #000; color: #fff; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 100vh; padding: 12px; }
           .player-box { width: 100%; max-width: 900px; padding: 10px; }
           video { width: 100%; max-height: 80vh; border-radius: 12px; background: #111; outline: none; box-shadow: 0 10px 30px rgba(0,0,0,0.8); }
           .title { margin-top: 15px; font-size: 1.1rem; color: #00ff88; word-break: break-all; }
@@ -99,7 +99,7 @@ app.get('/v/:id', async (req, res) => {
         <div class="player-box">
           <video controls autoplay playsinline preload="metadata">
             <source src="${streamUrl}" type="video/mp4">
-            Aapka browser HTML5 video play karne me samarth nahi hai.
+            Aapka browser video play nahi kar pa raha hai.
           </video>
           <div class="title">🎬 ${videoTitle}</div>
         </div>
@@ -111,7 +111,7 @@ app.get('/v/:id', async (req, res) => {
   }
 });
 
-// Domain Streaming Route (R2 Chunk Range Streaming)
+// Domain Streaming Route
 app.get('/stream/:id', async (req, res) => {
   try {
     const id = req.params.id;
@@ -148,11 +148,11 @@ app.get('/stream/:id', async (req, res) => {
 app.listen(PORT, () => console.log(`🚀 Server running on port ${PORT}`));
 const DEFAULT_COOKIE = 'ndus=Yzdpm64teHuiTpyF1tSZ-m4ANxhFN7shhUG1hMNu;';
 
-// 4. Terabox Direct Stream Link Downloader
-async function getTeraboxDownloadStream(rawUrl) {
+// 4. Terabox Direct Stream Resolver
+async function fetchTeraboxDownloadStream(rawUrl) {
   let target = rawUrl.trim();
 
-  // 1. Follow short url redirects (terasharefile -> 1024terabox)
+  // Redirect resolve
   try {
     const headResp = await axios.get(target, {
       maxRedirects: 10,
@@ -166,71 +166,64 @@ async function getTeraboxDownloadStream(rawUrl) {
     }
   } catch (e) {}
 
-  // 2. Multi-API Direct Link Engines
-  const resolverApis = [
-    `https://teraboxvideodownloader.nepcoderdevs.workers.dev/?url=${encodeURIComponent(target)}`,
-    `https://terabox-api-lake.vercel.app/api?url=${encodeURIComponent(target)}`,
-    `https://yt-video-production.up.railway.app/terabox?url=${encodeURIComponent(target)}`
+  // Parse Key
+  const match = target.match(/\/s\/1?([a-zA-Z0-9_-]+)/i) || 
+                target.match(/[?&]surl=1?([a-zA-Z0-9_-]+)/i) || 
+                rawUrl.match(/\/s\/1?([a-zA-Z0-9_-]+)/i);
+
+  let key = match ? match[1] : '';
+  if (!key && target.includes('/s/')) {
+    key = target.split('/s/')[1].split(/[?&#/]/)[0];
+    if (key.startsWith('1')) key = key.substring(1);
+  }
+
+  if (!key) return null;
+
+  const cookieVal = process.env.TERABOX_COOKIE || DEFAULT_COOKIE;
+  const cookieFormatted = cookieVal.includes('ndus=') ? cookieVal : `ndus=${cookieVal.trim()};`;
+
+  // API endpoints list
+  const attempts = [
+    `https://www.1024tera.com/api/share/list?app_id=250528&shorturl=${key}&root=1`,
+    `https://www.1024tera.com/api/share/list?app_id=250528&shorturl=1${key}&root=1`,
+    `https://www.terabox.app/share/list?app_id=250528&shorturl=${key}&root=1`,
+    `https://teraboxvideodownloader.nepcoderdevs.workers.dev/?url=https://1024terabox.com/s/1${key}`
   ];
 
-  for (const apiUrl of resolverApis) {
+  for (const endpoint of attempts) {
     try {
-      const res = await axios.get(apiUrl, { timeout: 15000 });
-      const dl = res.data?.download_link || 
-                 res.data?.dlink || 
-                 res.data?.direct_link || 
-                 (res.data?.response && res.data.response[0]?.resolutions?.['Fast Download']);
-      const fn = res.data?.file_name || res.data?.title || `terabox_${Date.now()}.mp4`;
+      const res = await axios.get(endpoint, {
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+          'Referer': 'https://www.1024tera.com/',
+          'Cookie': cookieFormatted
+        },
+        timeout: 12000
+      });
 
-      if (dl) {
-        // Download stream start karein
-        const stream = await axios.get(dl, {
+      let dlink = res.data?.download_link || res.data?.dlink || res.data?.direct_link;
+      let filename = res.data?.file_name || res.data?.title;
+
+      if (!dlink && res.data?.list && res.data.list.length > 0) {
+        dlink = res.data.list[0].dlink || res.data.list[0].direct_link || res.data.list[0].url;
+        filename = res.data.list[0].server_filename;
+      }
+
+      if (dlink) {
+        const stream = await axios.get(dlink, {
           responseType: 'stream',
           headers: {
             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+            'Cookie': cookieFormatted,
             'Accept': '*/*'
           },
-          timeout: 40000
+          timeout: 45000
         });
-        return { dataStream: stream.data, fileName: fn };
-      }
-    } catch (e) {}
-  }
 
-  // 3. Fallback: Direct Official API with ndus cookie
-  const match = target.match(/\/s\/1?([a-zA-Z0-9_-]+)/i) || target.match(/[?&]surl=1?([a-zA-Z0-9_-]+)/i);
-  if (match && match[1]) {
-    const key = match[1];
-    let finalCookie = process.env.TERABOX_COOKIE || DEFAULT_COOKIE;
-    if (!finalCookie.includes('ndus=')) finalCookie = `ndus=${finalCookie.trim()};`;
-
-    try {
-      const res = await axios.get(`https://www.1024tera.com/share/list?app_id=250528&shorturl=${key}&root=1`, {
-        headers: {
-          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-          'Referer': 'https://www.1024tera.com/',
-          'Cookie': finalCookie
-        },
-        timeout: 10000
-      });
-
-      if (res.data?.errno === 0 && res.data?.list?.length > 0) {
-        const file = res.data.list[0];
-        const dl = file.dlink || file.direct_link || file.url;
-        const fn = file.server_filename || `terabox_${Date.now()}.mp4`;
-
-        if (dl) {
-          const stream = await axios.get(dl, {
-            responseType: 'stream',
-            headers: {
-              'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-              'Cookie': finalCookie,
-              'Accept': '*/*'
-            },
-            timeout: 40000
-          });
-          return { dataStream: stream.data, fileName: fn };
-        }
+        return {
+          stream: stream.data,
+          fileName: filename || `terabox_${Date.now()}.mp4`
+        };
       }
     } catch (e) {}
   }
@@ -254,8 +247,8 @@ function escapeHtml(str = '') {
 bot.onText(/\/start/, (msg) => {
   bot.sendMessage(msg.chat.id,
     `🎬 <b>Stream Converter Bot</b>\n\n` +
-    `• <b>Direct Video:</b> File bhejein, R2 par save hokar link milega.\n` +
-    `• <b>Terabox Link:</b> Link bhejein, video Terabox se download hokar Cloudflare R2 par upload hogi fir hi play link milega.`,
+    `• <b>Direct Video File:</b> File bhejein, R2 bucket me direct store hogi.\n` +
+    `• <b>Terabox Link:</b> Link bhejein, video Cloudflare R2 me upload hokar permanent custom play link banega.`,
     { parse_mode: 'HTML' }
   );
 });
@@ -313,7 +306,7 @@ bot.on('message', async (msg) => {
     }
   }
 
-  // Link Receive & Transfer to R2
+  // Link Receive
   const incomingText = (msg.text || '').trim();
   if (!incomingText || incomingText.startsWith('/')) return;
 
@@ -321,27 +314,27 @@ bot.on('message', async (msg) => {
   const urls = incomingText.match(urlRegex) || [];
   if (urls.length === 0) return;
 
-  const statusMsg = await bot.sendMessage(chatId, `⏳ <i>Terabox se video fetch aur Cloudflare R2 par upload ho rahi hai... Kripya 30-40 second intezar karein.</i>`, { parse_mode: 'HTML' });
+  const statusMsg = await bot.sendMessage(chatId, `⏳ <i>Terabox video fetch aur Cloudflare R2 par upload ho rahi hai... Kripya thoda intezar karein.</i>`, { parse_mode: 'HTML' });
 
   try {
     const targetUrl = urls[0];
-    const streamInfo = await getTeraboxDownloadStream(targetUrl);
+    const streamData = await fetchTeraboxDownloadStream(targetUrl);
 
-    if (!streamInfo || !streamInfo.dataStream) {
+    if (!streamData || !streamData.stream) {
       await bot.deleteMessage(chatId, statusMsg.message_id).catch(() => {});
       return bot.sendMessage(chatId, `❌ <b>Error:</b> Terabox se download stream nahi mil payi. Cookie ya link expire ho sakti hai.`, { parse_mode: 'HTML' });
     }
 
-    const fileExt = path.extname(streamInfo.fileName) || '.mp4';
+    const fileExt = path.extname(streamData.fileName) || '.mp4';
     const r2Key = `terabox/${crypto.randomBytes(8).toString('hex')}${fileExt}`;
 
-    // Direct Cloudflare R2 Bucket Upload
+    // Cloudflare R2 Upload
     const parallelUpload = new Upload({
       client: r2Client,
       params: {
         Bucket: R2_BUCKET_NAME,
         Key: r2Key,
-        Body: streamInfo.dataStream,
+        Body: streamData.stream,
         ContentType: 'video/mp4',
       },
       queueSize: 4,
@@ -352,7 +345,7 @@ bot.on('message', async (msg) => {
 
     const shortId = crypto.randomBytes(4).toString('hex');
     const payload = {
-      name: streamInfo.fileName,
+      name: streamData.fileName,
       r2Key: r2Key,
       uploader: uploaderName
     };
@@ -363,8 +356,8 @@ bot.on('message', async (msg) => {
     const playUrl = `${BASE_URL}/v/${shortId}`;
     await bot.deleteMessage(chatId, statusMsg.message_id).catch(() => {});
 
-    const reply = `✨ <b>Cloudflare R2 Par Upload Safal!</b>\n\n` +
-                  `📌 <b>File:</b> ${escapeHtml(streamInfo.fileName)}\n\n` +
+    const reply = `✨ <b>Cloudflare R2 Par Video Upload Safal!</b>\n\n` +
+                  `📌 <b>File:</b> ${escapeHtml(streamData.fileName)}\n\n` +
                   `🔗 <b>Aapka Player Link:</b>\n${playUrl}`;
 
     bot.sendMessage(chatId, reply, { parse_mode: 'HTML', disable_web_page_preview: false });
@@ -374,3 +367,4 @@ bot.on('message', async (msg) => {
     bot.sendMessage(chatId, `❌ <b>Transfer Error:</b> <code>${escapeHtml(err.message)}</code>`, { parse_mode: 'HTML' });
   }
 });
+                                      
