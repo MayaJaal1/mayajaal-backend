@@ -64,7 +64,7 @@ app.use((req, res, next) => {
 app.get('/', (req, res) => res.send('Stream Engine Online'));
 app.get('/health', (req, res) => res.json({ status: 'ok', uptime: process.uptime() }));
 
-// Web Player Route
+// Web Player Route (Hybrid: R2 MP4 Stream + Terabox Live Embed)
 app.get('/v/:id', async (req, res) => {
   try {
     const id = req.params.id;
@@ -77,9 +77,37 @@ app.get('/v/:id', async (req, res) => {
 
     if (!data) return res.status(404).send('Video not found or link expired');
 
-    const streamUrl = `${BASE_URL}/stream/${id}`;
     const videoTitle = data.name || 'Video Player';
 
+    // Scenario A: Terabox Direct Stream Embed Link
+    if (data.isEmbed && data.embedUrl) {
+      return res.send(`
+        <!DOCTYPE html>
+        <html lang="hi">
+        <head>
+          <meta charset="UTF-8">
+          <meta name="viewport" content="width=device-width, initial-scale=1.0">
+          <title>${videoTitle}</title>
+          <style>
+            * { box-sizing: border-box; margin: 0; padding: 0; }
+            body { background: #000; color: #fff; font-family: sans-serif; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; overflow: hidden; }
+            .player-container { width: 100%; max-width: 950px; height: 85vh; padding: 10px; display: flex; flex-direction: column; }
+            iframe { width: 100%; height: 100%; border: none; border-radius: 12px; background: #111; box-shadow: 0 10px 30px rgba(0,0,0,0.9); }
+            .title { padding: 12px 5px; font-size: 1rem; color: #00ff88; word-break: break-all; }
+          </style>
+        </head>
+        <body>
+          <div class="player-container">
+            <iframe src="${data.embedUrl}" allowfullscreen allow="autoplay; encrypted-media; fullscreen"></iframe>
+            <div class="title">🎬 ${videoTitle}</div>
+          </div>
+        </body>
+        </html>
+      `);
+    }
+
+    // Scenario B: R2 Hosted MP4 Video Stream
+    const streamUrl = `${BASE_URL}/stream/${id}`;
     res.send(`
       <!DOCTYPE html>
       <html lang="hi">
@@ -101,7 +129,7 @@ app.get('/v/:id', async (req, res) => {
             <source src="${streamUrl}" type="video/mp4">
             Aapka browser HTML5 video support nahi karta.
           </video>
-          <div class="title">${videoTitle}</div>
+          <div class="title">🎬 ${videoTitle}</div>
         </div>
       </body>
       </html>
@@ -122,67 +150,35 @@ app.get('/stream/:id', async (req, res) => {
       if (raw) data = typeof raw === 'string' ? JSON.parse(raw) : raw;
     }
 
-    if (!data) return res.status(404).send('Stream not found');
+    if (!data || !data.r2Key) return res.status(404).send('Stream not found');
 
-    // 1. Agar R2 par saved hai
-    if (data.r2Key) {
-      const range = req.headers.range;
-      const command = new GetObjectCommand({
-        Bucket: R2_BUCKET_NAME,
-        Key: data.r2Key,
-        Range: range || undefined,
-      });
+    const range = req.headers.range;
+    const command = new GetObjectCommand({
+      Bucket: R2_BUCKET_NAME,
+      Key: data.r2Key,
+      Range: range || undefined,
+    });
 
-      const response = await r2Client.send(command);
+    const response = await r2Client.send(command);
 
-      res.status(range ? 206 : 200);
-      res.setHeader('Content-Type', response.ContentType || 'video/mp4');
-      res.setHeader('Accept-Ranges', 'bytes');
-      if (response.ContentRange) res.setHeader('Content-Range', response.ContentRange);
-      if (response.ContentLength) res.setHeader('Content-Length', response.ContentLength);
+    res.status(range ? 206 : 200);
+    res.setHeader('Content-Type', response.ContentType || 'video/mp4');
+    res.setHeader('Accept-Ranges', 'bytes');
+    if (response.ContentRange) res.setHeader('Content-Range', response.ContentRange);
+    if (response.ContentLength) res.setHeader('Content-Length', response.ContentLength);
 
-      return response.Body.pipe(res);
-    }
-
-    // 2. Agar Direct Stream URL hai (Proxy Stream)
-    if (data.url) {
-      const headers = {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
-        'Cookie': 'ndus=Yzdpm64teHuiTpyF1tSZ-m4ANxhFN7shhUG1hMNu;',
-        'Accept': '*/*'
-      };
-      if (req.headers.range) headers['Range'] = req.headers.range;
-
-      const videoStream = await axios.get(data.url, {
-        responseType: 'stream',
-        headers: headers,
-        maxRedirects: 10,
-        timeout: 60000
-      });
-
-      res.status(videoStream.status);
-      res.setHeader('Content-Type', videoStream.headers['content-type'] || 'video/mp4');
-      res.setHeader('Accept-Ranges', 'bytes');
-      if (videoStream.headers['content-range']) res.setHeader('Content-Range', videoStream.headers['content-range']);
-      if (videoStream.headers['content-length']) res.setHeader('Content-Length', videoStream.headers['content-length']);
-
-      return videoStream.data.pipe(res);
-    }
-
-    return res.status(404).send('Stream not found');
+    return response.Body.pipe(res);
   } catch (err) {
     if (!res.headersSent) res.status(500).send('Streaming error');
   }
 });
 
 app.listen(PORT, () => console.log(`🚀 Server running on port ${PORT}`));
-const DEFAULT_COOKIE = 'ndus=Yzdpm64teHuiTpyF1tSZ-m4ANxhFN7shhUG1hMNu;';
-
-// Link Resolver
-async function extractTeraboxLink(rawUrl) {
+// 4. Terabox Embed Link Builder & Extraction
+async function getTeraboxStreamData(rawUrl) {
   let target = rawUrl.trim();
 
-  // 1. Follow short link redirect
+  // 1. Follow short link redirect (e.g. terasharefile -> 1024terabox)
   try {
     const headResp = await axios.get(target, {
       maxRedirects: 10,
@@ -196,10 +192,11 @@ async function extractTeraboxLink(rawUrl) {
     }
   } catch (e) {}
 
-  // 2. Extract Key
+  // 2. Extract unique file surl key
   const match = target.match(/\/(?:s|sharing\/link\?surl=)([a-zA-Z0-9_-]+)/i) || 
                 target.match(/[?&]surl=([a-zA-Z0-9_-]+)/i) ||
-                rawUrl.match(/\/(?:s|sharing\/link\?surl=)([a-zA-Z0-9_-]+)/i);
+                rawUrl.match(/\/(?:s|sharing\/link\?surl=)([a-zA-Z0-9_-]+)/i) ||
+                rawUrl.match(/[?&]surl=([a-zA-Z0-9_-]+)/i);
 
   let shorturl = match ? match[1] : '';
   if (!shorturl && target.includes('/s/')) {
@@ -207,51 +204,18 @@ async function extractTeraboxLink(rawUrl) {
     if (parts) shorturl = parts.split(/[?&#/]/)[0];
   }
 
-  const formattedKey = shorturl ? (shorturl.startsWith('1') ? shorturl.substring(1) : shorturl) : '';
+  if (!shorturl) return null;
 
-  // 3. Multi-API External Resolvers
-  const testApis = [
-    `https://teraboxvideodownloader.nepcoderdevs.workers.dev/?url=${encodeURIComponent(target)}`,
-    `https://terabox-api-lake.vercel.app/api?url=${encodeURIComponent(target)}`,
-    `https://yt-video-production.up.railway.app/terabox?url=${encodeURIComponent(target)}`
-  ];
+  const keyClean = shorturl.startsWith('1') ? shorturl.substring(1) : shorturl;
 
-  for (const apiUrl of testApis) {
-    try {
-      const res = await axios.get(apiUrl, { timeout: 12000 });
-      const dl = res.data?.download_link || res.data?.dlink || res.data?.direct_link || (res.data?.response && res.data.response[0]?.resolutions?.['Fast Download']);
-      const fn = res.data?.file_name || res.data?.title || `video_${Date.now()}.mp4`;
+  // Direct High-Speed Embed Engine (Works with all Terabox domains without block)
+  const embedPlayerUrl = `https://www.terabox.app/sharing/embed?surl=${keyClean}`;
 
-      if (dl) {
-        return { url: dl, name: fn };
-      }
-    } catch (e) {}
-  }
-
-  // 4. Direct 1024tera Web Request with Cookie
-  if (formattedKey || shorturl) {
-    const key = formattedKey || shorturl;
-    try {
-      const res = await axios.get(`https://www.1024tera.com/share/list?app_id=250528&shorturl=${key}&root=1`, {
-        headers: {
-          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
-          'Referer': 'https://www.1024tera.com/',
-          'Cookie': DEFAULT_COOKIE
-        },
-        timeout: 10000
-      });
-
-      if (res.data?.errno === 0 && res.data?.list?.length > 0) {
-        const file = res.data.list[0];
-        const streamUrl = file.dlink || file.direct_link || file.url;
-        if (streamUrl) {
-          return { url: streamUrl, name: file.server_filename || `video_${Date.now()}.mp4` };
-        }
-      }
-    } catch (e) {}
-  }
-
-  return null;
+  return {
+    isEmbed: true,
+    embedUrl: embedPlayerUrl,
+    name: `Terabox Video (${keyClean})`
+  };
 }
 
 // 5. Telegram Bot Handlers
@@ -270,13 +234,13 @@ function escapeHtml(str = '') {
 bot.onText(/\/start/, (msg) => {
   bot.sendMessage(msg.chat.id,
     `🎬 <b>Stream Converter Bot</b>\n\n` +
-    `• <b>Video File:</b> Direct video bhejein, R2 par save hokar link milega.\n` +
-    `• <b>Terabox Link:</b> Terabox link bhejein, stream ready ho jayega.`,
+    `• <b>Direct Video:</b> File bhejein, Cloudflare R2 par host hokar direct chalegi.\n` +
+    `• <b>Terabox Link:</b> Koi bhi Terabox / Terasharefile link bhejein, aapke custom domain player me live chalegi.`,
     { parse_mode: 'HTML' }
   );
 });
 
-// Video direct Cloudflare R2 par upload
+// Direct Video file Cloudflare R2 Upload
 bot.on('message', async (msg) => {
   const chatId = msg.chat.id;
   const uploaderName = msg.from?.username ? `@${msg.from.username}` : (msg.from?.first_name || 'User');
@@ -309,13 +273,12 @@ bot.on('message', async (msg) => {
       await parallelUpload.done();
 
       const shortId = crypto.randomBytes(4).toString('hex');
-      const payload = { name: fileName, r2Key: r2Key, uploader: uploaderName };
+      const payload = { name: fileName, r2Key: r2Key, isEmbed: false, uploader: uploaderName };
       
       linkStore.set(shortId, payload);
       await redis.set(`video:${shortId}`, JSON.stringify(payload), { ex: 30 * 86400 });
 
       const playUrl = `${BASE_URL}/v/${shortId}`;
-
       await bot.deleteMessage(chatId, statusMsg.message_id).catch(() => {});
 
       const reply = `✨ <b>Video Ready!</b>\n\n` +
@@ -330,7 +293,7 @@ bot.on('message', async (msg) => {
     }
   }
 
-  // Link Receive
+  // Link Receive & Convert
   const incomingText = (msg.text || '').trim();
   if (!incomingText || incomingText.startsWith('/')) return;
 
@@ -338,53 +301,24 @@ bot.on('message', async (msg) => {
   const urls = incomingText.match(urlRegex) || [];
   if (urls.length === 0) return;
 
-  const statusMsg = await bot.sendMessage(chatId, `🔄 <i>Terabox link process ho raha hai...</i>`, { parse_mode: 'HTML' });
+  const statusMsg = await bot.sendMessage(chatId, `🔄 <i>Stream link ban raha hai...</i>`, { parse_mode: 'HTML' });
 
   try {
     const targetUrl = urls[0];
-    const extracted = await extractTeraboxLink(targetUrl);
+    const streamData = await getTeraboxStreamData(targetUrl);
+
+    if (!streamData) {
+      await bot.deleteMessage(chatId, statusMsg.message_id).catch(() => {});
+      return bot.sendMessage(chatId, `❌ <b>Error:</b> Invalid link. Link me surl key nahi mili.`, { parse_mode: 'HTML' });
+    }
 
     const shortId = crypto.randomBytes(4).toString('hex');
-    let payload = null;
-
-    if (extracted && extracted.url) {
-      // 1. Koshish karein R2 par transfer karne ki
-      try {
-        const videoStream = await axios.get(extracted.url, {
-          responseType: 'stream',
-          headers: {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-            'Cookie': DEFAULT_COOKIE,
-            'Accept': '*/*'
-          },
-          timeout: 25000
-        });
-
-        const fileExt = path.extname(extracted.name) || '.mp4';
-        const r2Key = `terabox/${crypto.randomBytes(8).toString('hex')}${fileExt}`;
-
-        const parallelUpload = new Upload({
-          client: r2Client,
-          params: {
-            Bucket: R2_BUCKET_NAME,
-            Key: r2Key,
-            Body: videoStream.data,
-            ContentType: 'video/mp4',
-          },
-          queueSize: 4,
-          partSize: 1024 * 1024 * 5,
-        });
-
-        await parallelUpload.done();
-        payload = { name: extracted.name, r2Key: r2Key, uploader: uploaderName };
-      } catch (uploadErr) {
-        // Agar R2 download fail ho jaye toh direct proxy stream par switch karein
-        payload = { name: extracted.name, url: extracted.url, uploader: uploaderName };
-      }
-    } else {
-      // Direct pass-through proxy agar API key match ho sake
-      payload = { name: 'Terabox Stream', url: targetUrl, uploader: uploaderName };
-    }
+    const payload = {
+      name: streamData.name,
+      isEmbed: true,
+      embedUrl: streamData.embedUrl,
+      uploader: uploaderName
+    };
 
     linkStore.set(shortId, payload);
     await redis.set(`video:${shortId}`, JSON.stringify(payload), { ex: 30 * 86400 });
@@ -402,4 +336,3 @@ bot.on('message', async (msg) => {
     bot.sendMessage(chatId, `❌ <b>Error:</b> <code>${escapeHtml(err.message)}</code>`, { parse_mode: 'HTML' });
   }
 });
-                                                 
