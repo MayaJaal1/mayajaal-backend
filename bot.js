@@ -27,11 +27,11 @@ if (!TOKEN) {
   process.exit(1);
 }
 
-// 2. Cloudflare R2 Client
-const R2_ACCOUNT_ID = process.env.R2_ACCOUNT_ID;
-const R2_ACCESS_KEY_ID = process.env.R2_ACCESS_KEY_ID;
-const R2_SECRET_ACCESS_KEY = process.env.R2_SECRET_ACCESS_KEY;
-const R2_BUCKET_NAME = process.env.R2_BUCKET_NAME;
+// 2. Cloudflare R2 Client Setup
+const R2_ACCOUNT_ID = String(process.env.R2_ACCOUNT_ID || '').trim();
+const R2_ACCESS_KEY_ID = String(process.env.R2_ACCESS_KEY_ID || '').trim();
+const R2_SECRET_ACCESS_KEY = String(process.env.R2_SECRET_ACCESS_KEY || '').trim();
+const R2_BUCKET_NAME = String(process.env.R2_BUCKET_NAME || '').trim();
 
 const r2Client = new S3Client({
   region: 'auto',
@@ -40,6 +40,7 @@ const r2Client = new S3Client({
     accessKeyId: R2_ACCESS_KEY_ID,
     secretAccessKey: R2_SECRET_ACCESS_KEY,
   },
+  forcePathStyle: true,
 });
 
 console.log('✅ Cloudflare R2 Client Initialized');
@@ -62,7 +63,7 @@ app.use((req, res, next) => {
 app.get('/', (req, res) => res.send('Stream Engine Online'));
 app.get('/health', (req, res) => res.json({ status: 'ok', uptime: process.uptime() }));
 
-// Web Player Route
+// Web Player Route (Custom Domain Player)
 app.get('/v/:id', async (req, res) => {
   try {
     const id = req.params.id;
@@ -89,7 +90,7 @@ app.get('/v/:id', async (req, res) => {
           * { box-sizing: border-box; margin: 0; padding: 0; }
           body { background: #000; color: #fff; font-family: sans-serif; display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 100vh; }
           .player-box { width: 100%; max-width: 900px; padding: 16px; }
-          video { width: 100%; max-height: 80vh; border-radius: 12px; background: #111; outline: none; }
+          video { width: 100%; max-height: 80vh; border-radius: 12px; background: #111; outline: none; box-shadow: 0 10px 30px rgba(0,0,0,0.8); }
           .title { margin-top: 15px; font-size: 1.1rem; color: #00ff88; word-break: break-all; }
         </style>
       </head>
@@ -326,4 +327,3 @@ bot.on('message', async (msg) => {
     bot.sendMessage(chatId, `❌ <b>Error:</b> <code>${escapeHtml(err.message)}</code>`, { parse_mode: 'HTML' });
   }
 });
-        
