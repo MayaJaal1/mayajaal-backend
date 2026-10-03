@@ -27,10 +27,10 @@ if (!TOKEN) {
   process.exit(1);
 }
 
-// 2. Cloudflare R2 Client Setup (Direct Hardcoded Endpoint - No SSL Failure)
+// 2. Cloudflare R2 Client Setup (Fixed 32-Char Access Key)
 const R2_ACCOUNT_ID = '9a17e6f8a4af372b6b0ab1ad1cdb982d';
 const R2_BUCKET_NAME = 'mayajaal-storage';
-const R2_ACCESS_KEY_ID = String(process.env.R2_ACCESS_KEY_ID || process.env.R2_ACCESS_KEY || '').trim();
+const R2_ACCESS_KEY_ID = 'fe0370e7a3f380c0dee831d6c37fd851';
 const R2_SECRET_ACCESS_KEY = String(process.env.R2_SECRET_ACCESS_KEY || process.env.R2_SECRET_KEY || '').trim();
 
 const r2Client = new S3Client({
@@ -42,7 +42,7 @@ const r2Client = new S3Client({
   },
 });
 
-console.log('✅ Cloudflare R2 Direct Client Initialized');
+console.log('✅ Cloudflare R2 Client Initialized');
 
 // 3. Express Web Engine
 const app = express();
@@ -326,3 +326,4 @@ bot.on('message', async (msg) => {
     bot.sendMessage(chatId, `❌ <b>Error:</b> <code>${escapeHtml(err.message)}</code>`, { parse_mode: 'HTML' });
   }
 });
+            
