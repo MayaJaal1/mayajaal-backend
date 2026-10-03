@@ -1,380 +1,329 @@
-require("dotenv").config();
-const TelegramBot = require("node-telegram-bot-api");
-const express = require("express");
-const axios = require("axios");
-const fs = require("fs");
-const path = require("path");
+require('dotenv').config();
 
-const {
-  BOT_TOKEN,
-  TELEGRAM_CHANNEL_ID,
-  TELEGRAM_BOT_API_BASE_URL = "http://127.0.0.1:8081",
-  CUSTOM_DOMAIN = "https://mayajaal.online",
-  UPSTASH_REDIS_REST_URL,
-  UPSTASH_REDIS_REST_TOKEN,
-  TERABOX_COOKIE
-} = process.env;
+const express = require('express');
+const TelegramBot = require('node-telegram-bot-api');
+const axios = require('axios');
+const crypto = require('crypto');
+const { Redis } = require('@upstash/redis');
+const path = require('path');
+const fs = require('fs');
+const { S3Client, GetObjectCommand } = require('@aws-sdk/client-s3');
+const { Upload } = require('@aws-sdk/lib-storage');
 
-if (!BOT_TOKEN) {
-  throw new Error("BOT_TOKEN is missing");
+process.on('uncaughtException', (err) => console.error('[UncaughtException]:', err.message));
+process.on('unhandledRejection', (reason) => console.error('[UnhandledRejection]:', reason));
+
+// 1. Initial Config
+const redis = Redis.fromEnv();
+const linkStore = new Map();
+
+const TOKEN = process.env.BOT_TOKEN;
+const BASE_URL = process.env.CUSTOM_DOMAIN 
+  ? (process.env.CUSTOM_DOMAIN.startsWith('http') ? process.env.CUSTOM_DOMAIN : `https://${process.env.CUSTOM_DOMAIN}`)
+  : 'https://mayajaal.online';
+
+if (!TOKEN) {
+  console.error('BOT_TOKEN missing!');
+  process.exit(1);
 }
-if (!TELEGRAM_CHANNEL_ID) {
-  throw new Error("TELEGRAM_CHANNEL_ID is missing");
-}
 
-// Đã bật polling để bot nhận tin nhắn
-const bot = new TelegramBot(BOT_TOKEN, {
-  polling: true,
-  baseApiUrl: TELEGRAM_BOT_API_BASE_URL
+// 2. Cloudflare R2 Client
+const R2_ACCOUNT_ID = process.env.R2_ACCOUNT_ID;
+const R2_ACCESS_KEY_ID = process.env.R2_ACCESS_KEY_ID;
+const R2_SECRET_ACCESS_KEY = process.env.R2_SECRET_ACCESS_KEY;
+const R2_BUCKET_NAME = process.env.R2_BUCKET_NAME;
+
+const r2Client = new S3Client({
+  region: 'auto',
+  endpoint: `https://${R2_ACCOUNT_ID}.r2.cloudflarestorage.com`,
+  credentials: {
+    accessKeyId: R2_ACCESS_KEY_ID,
+    secretAccessKey: R2_SECRET_ACCESS_KEY,
+  },
 });
 
+console.log('Cloudflare R2 Client Initialized');
+
+// 3. Express Web Engine
 const app = express();
 const PORT = process.env.PORT || 8080;
-const BASE_URL = CUSTOM_DOMAIN.replace(/\/+$/, "");
 
-console.log("========================================");
-console.log(" MayaJaal Bot Starting...");
-console.log("========================================");
-console.log(" Telegram Channel:", TELEGRAM_CHANNEL_ID);
-console.log(" Local Bot API:", TELEGRAM_BOT_API_BASE_URL);
-console.log(" Player Domain:", BASE_URL);
-console.log(" Video storage: Telegram Channel");
-console.log(" Cloudflare R2 video upload: DISABLED");
-console.log("========================================");
+app.use(express.json());
+app.use(express.static(__dirname));
 
-// Redis helpers
-async function redisCommand(command) {
-  if (!UPSTASH_REDIS_REST_URL || !UPSTASH_REDIS_REST_TOKEN) {
-    return null;
-  }
-  const response = await axios.post(
-    UPSTASH_REDIS_REST_URL,
-    command,
-    {
-      headers: {
-        Authorization: `Bearer ${UPSTASH_REDIS_REST_TOKEN}`,
-        "Content-Type": "application/json"
-      },
-      timeout: 15000
-    }
-  );
-  return response.data;
-}
+app.use((req, res, next) => {
+  res.header('Access-Control-Allow-Origin', '*');
+  res.header('Access-Control-Allow-Headers', '*');
+  res.header('Access-Control-Allow-Methods', 'GET, POST, OPTIONS, HEAD');
+  if (req.method === 'OPTIONS') return res.sendStatus(200);
+  next();
+});
 
-async function redisSet(key, value) {
-  try {
-    return await redisCommand([
-      "SET",
-      key,
-      JSON.stringify(value)
-    ]);
-  } catch (error) {
-    console.error("Redis SET error:", error.message);
-    return null;
-  }
-}
+app.get('/', (req, res) => res.send('Stream Engine Online'));
+app.get('/health', (req, res) => res.json({ status: 'ok', uptime: process.uptime() }));
 
-async function redisGet(key) {
-  try {
-    const result = await redisCommand([
-      "GET",
-      key
-    ]);
-    if (!result || result.result == null) {
-      return null;
-    }
-    return JSON.parse(result.result);
-  } catch (error) {
-    console.error("Redis GET error:", error.message);
-    return null;
-  }
-}
-
-// In-memory cache
-const videoCache = new Map();
-
-async function saveVideo(id, data) {
-  videoCache.set(id, data);
-  await redisSet(`video:${id}`, data);
-}
-
-async function getVideo(id) {
-  if (videoCache.has(id)) {
-    return videoCache.get(id);
-  }
-  const data = await redisGet(`video:${id}`);
-  if (data) {
-    videoCache.set(id, data);
-  }
-  return data;
-}
-
-// ID generator
-function generateId(length = 10) {
-  const chars = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
-  let result = "";
-  for (let i = 0; i < length; i++) {
-    result += chars.charAt(Math.floor(Math.random() * chars.length));
-  }
-  return result;
-}
-
-// HTML escape
-function escapeHtml(value) {
-  return String(value || "")
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;")
-    .replace(/'/g, "&#039;");
-}
-
-// Player page
-app.get("/v/:id", async (req, res) => {
+// Web Player Route
+app.get('/v/:id', async (req, res) => {
   try {
     const id = req.params.id;
-    const data = await getVideo(id);
+    let data = linkStore.get(id);
+
     if (!data) {
-      return res.status(404).send("Video not found");
+      const raw = (await redis.get(`video:${id}`)) || (await redis.get(`terabox:${id}`));
+      if (raw) data = typeof raw === 'string' ? JSON.parse(raw) : raw;
     }
 
-    const title = escapeHtml(data.name || "MayaJaal Video");
-    const streamUrl = `${BASE_URL}/stream/${encodeURIComponent(id)}`;
+    if (!data) return res.status(404).send('Video not found or link expired');
 
-    res.setHeader("Content-Type", "text/html; charset=utf-8");
-    res.send(`<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>${title}</title>
-  <style>
-    html, body {
-      margin: 0;
-      padding: 0;
-      width: 100%;
-      height: 100%;
-      background: #000;
-      overflow: hidden;
-    }
-    body {
-      display: flex;
-      align-items: center;
-      justify-content: center;
-    }
-    video {
-      width: 100%;
-      height: 100%;
-      object-fit: contain;
-      background: #000;
-    }
-  </style>
-</head>
-<body>
-  <video controls autoplay playsinline preload="metadata">
-    <source src="${streamUrl}" type="${escapeHtml(data.mimeType || "video/mp4")}">
-    Your browser does not support HTML5 video.
-  </video>
-</body>
-</html>`);
-  } catch (error) {
-    console.error("Player error:", error);
-    res.status(500).send("Player error");
+    const streamUrl = `${BASE_URL}/stream/${id}`;
+    const videoTitle = data.name || 'Video Player';
+
+    res.send(`
+      <!DOCTYPE html>
+      <html lang="hi">
+      <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>${videoTitle}</title>
+        <style>
+          * { box-sizing: border-box; margin: 0; padding: 0; }
+          body { background: #000; color: #fff; font-family: sans-serif; display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 100vh; }
+          .player-box { width: 100%; max-width: 900px; padding: 16px; }
+          video { width: 100%; max-height: 80vh; border-radius: 12px; background: #111; outline: none; }
+          .title { margin-top: 15px; font-size: 1.1rem; color: #00ff88; word-break: break-all; }
+        </style>
+      </head>
+      <body>
+        <div class="player-box">
+          <video controls autoplay playsinline preload="metadata">
+            <source src="${streamUrl}" type="video/mp4">
+            Aapka browser HTML5 video play karne me samarth nahi hai.
+          </video>
+          <div class="title">${videoTitle}</div>
+        </div>
+      </body>
+      </html>
+    `);
+  } catch (err) {
+    res.status(500).send('Player error: ' + err.message);
   }
 });
 
-// Health check
-app.get("/", (req, res) => {
-  res.json({
-    status: "online",
-    bot: "MayaJaal",
-    storage: "Telegram Channel",
-    r2: false,
-    localBotApi: TELEGRAM_BOT_API_BASE_URL,
-    player: BASE_URL
-  });
-});
-// Video streaming route
-app.get("/stream/:id", async (req, res) => {
+// Domain Streaming Route
+app.get('/stream/:id', async (req, res) => {
   try {
     const id = req.params.id;
-    const data = await getVideo(id);
+    let data = linkStore.get(id);
 
     if (!data) {
-      return res.status(404).send("Video not found");
+      const raw = (await redis.get(`video:${id}`)) || (await redis.get(`terabox:${id}`));
+      if (raw) data = typeof raw === 'string' ? JSON.parse(raw) : raw;
     }
 
-    // Telegram video streaming via Local Bot API
-    if (data.telegramFileId) {
-      const fileInfo = await bot.getFile(data.telegramFileId);
+    if (!data) return res.status(404).send('Stream not found');
 
-      if (!fileInfo || !fileInfo.file_path) {
-        return res.status(404).send("Telegram file path unavailable");
-      }
-
-      const filePath = fileInfo.file_path;
-
-      if (!path.isAbsolute(filePath)) {
-        return res.status(500).send("Local Bot API did not return an absolute file path");
-      }
-
-      if (!fs.existsSync(filePath)) {
-        return res.status(404).send("Telegram local file is not available");
-      }
-
-      const stat = fs.statSync(filePath);
-      const fileSize = stat.size;
+    if (data.r2Key) {
       const range = req.headers.range;
-
-      res.setHeader("Accept-Ranges", "bytes");
-      res.setHeader("Content-Type", data.mimeType || "video/mp4");
-      res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate");
-
-      if (range) {
-        const match = range.match(/bytes=(\d+)-(\d*)/);
-        if (!match) {
-          return res.status(416).send("Invalid Range");
-        }
-
-        let start = parseInt(match[1], 10);
-        let end = match[2] ? parseInt(match[2], 10) : fileSize - 1;
-
-        if (start >= fileSize) {
-          res.setHeader("Content-Range", `bytes */${fileSize}`);
-          return res.status(416).end();
-        }
-
-        if (end >= fileSize) {
-          end = fileSize - 1;
-        }
-
-        const chunkSize = end - start + 1;
-
-        res.status(206);
-        res.setHeader("Content-Range", `bytes ${start}-${end}/${fileSize}`);
-        res.setHeader("Content-Length", chunkSize);
-
-        const stream = fs.createReadStream(filePath, { start, end });
-        stream.on("error", (error) => {
-          console.error("Telegram stream error:", error.message);
-          if (!res.headersSent) {
-            res.status(500).end();
-          } else {
-            res.destroy();
-          }
-        });
-        return stream.pipe(res);
-      }
-
-      res.status(200);
-      res.setHeader("Content-Length", fileSize);
-
-      const stream = fs.createReadStream(filePath);
-      stream.on("error", (error) => {
-        console.error("Telegram stream error:", error.message);
-        if (!res.headersSent) {
-          res.status(500).end();
-        } else {
-          res.destroy();
-        }
-      });
-      return stream.pipe(res);
-    }
-
-    // TeraBox streaming fallback
-    if (data.url) {
-      const headers = {};
-      if (req.headers.range) {
-        headers["Range"] = req.headers.range;
-      }
-      if (TERABOX_COOKIE) {
-        headers["Cookie"] = TERABOX_COOKIE;
-      }
-
-      const response = await axios({
-        method: "GET",
-        url: data.url,
-        headers,
-        responseType: "stream",
-        validateStatus: () => true
+      const command = new GetObjectCommand({
+        Bucket: R2_BUCKET_NAME,
+        Key: data.r2Key,
+        Range: range || undefined,
       });
 
-      res.status(response.status);
+      const response = await r2Client.send(command);
 
-      if (response.headers["content-type"]) {
-        res.setHeader("Content-Type", response.headers["content-type"]);
-      }
-      if (response.headers["content-length"]) {
-        res.setHeader("Content-Length", response.headers["content-length"]);
-      }
-      if (response.headers["content-range"]) {
-        res.setHeader("Content-Range", response.headers["content-range"]);
-      }
+      res.status(range ? 206 : 200);
+      res.setHeader('Content-Type', response.ContentType || 'video/mp4');
+      res.setHeader('Accept-Ranges', 'bytes');
+      if (response.ContentRange) res.setHeader('Content-Range', response.ContentRange);
+      if (response.ContentLength) res.setHeader('Content-Length', response.ContentLength);
 
-      res.setHeader("Accept-Ranges", "bytes");
-      return response.data.pipe(res);
+      return response.Body.pipe(res);
     }
 
-    return res.status(404).send("No playable source found");
-  } catch (error) {
-    console.error("Stream error:", error.message);
-    if (!res.headersSent) {
-      return res.status(500).send("Unable to stream video");
+    if (!data.url) return res.status(404).send('Stream expired');
+
+    let rawCookie = process.env.TERABOX_COOKIE || '';
+    if (rawCookie && !rawCookie.includes('ndus=')) {
+      rawCookie = `ndus=${rawCookie.trim()};`;
     }
-    res.destroy();
+
+    const headers = {
+      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+      'Cookie': rawCookie,
+      'Accept': '*/*'
+    };
+    if (req.headers.range) headers['Range'] = req.headers.range;
+
+    const videoStream = await axios.get(data.url, {
+      responseType: 'stream',
+      headers: headers,
+      maxRedirects: 10,
+      timeout: 60000
+    });
+
+    res.status(videoStream.status);
+    res.setHeader('Content-Type', videoStream.headers['content-type'] || 'video/mp4');
+    res.setHeader('Accept-Ranges', 'bytes');
+    if (videoStream.headers['content-range']) res.setHeader('Content-Range', videoStream.headers['content-range']);
+    if (videoStream.headers['content-length']) res.setHeader('Content-Length', videoStream.headers['content-length']);
+
+    videoStream.data.pipe(res);
+  } catch (err) {
+    if (!res.headersSent) res.status(500).send('Streaming error');
   }
 });
 
-// Telegram bot message handler
-bot.on("message", async (msg) => {
+app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
+// 4. Link Resolvers
+async function extractTeraboxLink(rawUrl) {
   try {
-    const chatId = msg.chat.id;
+    let resolvedUrl = rawUrl;
+    try {
+      const resp = await axios.get(rawUrl, {
+        maxRedirects: 5,
+        headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)' },
+        timeout: 8000
+      });
+      if (resp.request?.res?.responseUrl) resolvedUrl = resp.request.res.responseUrl;
+    } catch (e) {}
 
-    // Handle incoming video or document
-    const file = msg.video || (msg.document && msg.document.mime_type && msg.document.mime_type.startsWith("video/") ? msg.document : null);
+    const match = resolvedUrl.match(/\/(s|sharing\/link\?surl=)([a-zA-Z0-9_-]+)/i) || 
+                  resolvedUrl.match(/surl=([a-zA-Z0-9_-]+)/i) ||
+                  rawUrl.match(/\/s\/([a-zA-Z0-9_-]+)/i);
 
-    if (file) {
-      const statusMsg = await bot.sendMessage(chatId, "⏳ Processing your video...");
+    let shorturl = match ? (match[2] || match[1]) : '';
+    if (!shorturl && resolvedUrl.includes('/s/')) shorturl = resolvedUrl.split('/s/')[1].split(/[?&#]/)[0];
+    if (!shorturl) return null;
 
-      // Forward or copy video to Telegram channel for permanent storage
-      const forwarded = await bot.forwardMessage(TELEGRAM_CHANNEL_ID, chatId, msg.message_id);
-      const storedFileId = (forwarded.video && forwarded.video.file_id) || (forwarded.document && forwarded.document.file_id) || file.file_id;
+    const formattedKey = shorturl.startsWith('1') ? shorturl.substring(1) : shorturl;
+    let rawCookie = process.env.TERABOX_COOKIE || '';
+    if (rawCookie && !rawCookie.includes('ndus=')) rawCookie = `ndus=${rawCookie.trim()};`;
 
-      const videoId = generateId(8);
-      const videoData = {
-        id: videoId,
-        telegramFileId: storedFileId,
-        name: msg.caption || file.file_name || "video.mp4",
-        mimeType: file.mime_type || "video/mp4",
-        size: file.file_size || 0,
-        createdAt: new Date().toISOString()
-      };
+    for (const k of [formattedKey, shorturl]) {
+      try {
+        const res = await axios.get(`https://www.1024tera.com/share/list?app_id=250528&shorturl=${k}&root=1`, {
+          headers: {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)',
+            'Referer': 'https://www.1024tera.com/',
+            'Cookie': rawCookie
+          },
+          timeout: 8000
+        });
 
-      await saveVideo(videoId, videoData);
+        if (res.data?.errno === 0 && res.data?.list?.length > 0) {
+          const file = res.data.list[0];
+          const streamUrl = file.dlink || file.direct_link || file.url;
+          if (streamUrl) return { url: streamUrl, name: file.server_filename || 'Video' };
+        }
+      } catch (err) {}
+    }
+  } catch (e) {}
+  return null;
+}
 
-      const playerUrl = `${BASE_URL}/v/${videoId}`;
-      const streamUrl = `${BASE_URL}/stream/${videoId}`;
+// 5. Telegram Bot Handlers
+const bot = new TelegramBot(TOKEN, { polling: { autoStart: true, params: { timeout: 10 } } });
+
+bot.on('polling_error', async (error) => {
+  if (error.message && error.message.includes('409 Conflict')) await new Promise(r => setTimeout(r, 4000));
+});
+
+function escapeHtml(str = '') {
+  return String(str).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+}
+
+bot.onText(/\/start/, (msg) => {
+  bot.sendMessage(msg.chat.id,
+    `🎬 <b>Stream Converter Bot</b>\n\n` +
+    `• <b>Video Upload:</b> Koi bhi video file bhejein, wo Cloudflare par upload hokar aapke domain se chalegi.\n` +
+    `• <b>Link Convert:</b> Terabox link bhej kar stream link banayein.`,
+    { parse_mode: 'HTML' }
+  );
+});
+
+// Video direct Cloudflare R2 par upload karne ka block
+bot.on('message', async (msg) => {
+  const chatId = msg.chat.id;
+  const uploaderName = msg.from?.username ? `@${msg.from.username}` : (msg.from?.first_name || 'User');
+
+  const videoObj = msg.video || msg.document || (msg.animation ? msg.animation : null);
+  if (videoObj) {
+    const fileId = videoObj.file_id;
+    const fileName = videoObj.file_name || `video_${Date.now()}.mp4`;
+    const statusMsg = await bot.sendMessage(chatId, `⚡ <i>Video Cloudflare R2 par upload ho rahi hai...</i>`, { parse_mode: 'HTML' });
+
+    try {
+      const fileLink = await bot.getFileLink(fileId);
+      const videoDownloadStream = await axios.get(fileLink, { responseType: 'stream' });
+
+      const fileExt = path.extname(fileName) || '.mp4';
+      const r2Key = `uploads/${crypto.randomBytes(8).toString('hex')}${fileExt}`;
+
+      // Multipart upload
+      const parallelUpload = new Upload({
+        client: r2Client,
+        params: {
+          Bucket: R2_BUCKET_NAME,
+          Key: r2Key,
+          Body: videoDownloadStream.data,
+          ContentType: videoObj.mime_type || 'video/mp4',
+        },
+        queueSize: 4,
+        partSize: 1024 * 1024 * 5,
+      });
+
+      await parallelUpload.done();
+
+      const shortId = crypto.randomBytes(4).toString('hex');
+      const payload = { name: fileName, r2Key: r2Key, uploader: uploaderName };
+      
+      linkStore.set(shortId, payload);
+      await redis.set(`video:${shortId}`, JSON.stringify(payload), { ex: 30 * 86400 });
+
+      const playUrl = `${BASE_URL}/v/${shortId}`;
 
       await bot.deleteMessage(chatId, statusMsg.message_id).catch(() => {});
 
-      return bot.sendMessage(
-        chatId,
-        `✅ *Video Ready!*\n\n🌐 *Player Link:*\n${playerUrl}\n\n⚡ *Stream Link:*\n${streamUrl}`,
-        { parse_mode: "Markdown" }
-      );
-    }
+      const reply = `✨ <b>Video Ready!</b>\n\n` +
+                    `📌 <b>File:</b> ${escapeHtml(fileName)}\n\n` +
+                    `🔗 <b>Aapka Domain Player Link:</b>\n${playUrl}`;
 
-    // Default response for text
-    if (msg.text && !msg.text.startsWith("/")) {
-      bot.sendMessage(chatId, "Send me any video to generate a high-speed web player link!");
+      return bot.sendMessage(chatId, reply, { parse_mode: 'HTML', disable_web_page_preview: false });
+
+    } catch (err) {
+      await bot.deleteMessage(chatId, statusMsg.message_id).catch(() => {});
+      return bot.sendMessage(chatId, `❌ <b>Upload Error:</b> <code>${escapeHtml(err.message)}</code>`, { parse_mode: 'HTML' });
     }
-  } catch (error) {
-    console.error("Bot message error:", error);
-    bot.sendMessage(msg.chat.id, "❌ Error processing request: " + error.message).catch(() => {});
   }
-});
 
-// Start Express server
-app.listen(PORT, "0.0.0.0", () => {
-  console.log(`Server running on port ${PORT}`);
+  // Link receive karne ka block
+  const incomingText = (msg.text || '').trim();
+  if (!incomingText || incomingText.startsWith('/')) return;
+
+  const urlRegex = /(https?:\/\/[^\s<>"']+)/gi;
+  const urls = incomingText.match(urlRegex) || [];
+  if (urls.length === 0) return;
+
+  const statusMsg = await bot.sendMessage(chatId, `🔄 <i>Link process ho raha hai...</i>`, { parse_mode: 'HTML' });
+
+  try {
+    const targetUrl = urls[0];
+    let extracted = await extractTeraboxLink(targetUrl);
+    if (!extracted) extracted = { url: targetUrl, name: 'Web Video' };
+
+    const shortId = crypto.randomBytes(4).toString('hex');
+    const payload = { name: extracted.name, url: extracted.url, uploader: uploaderName };
+    
+    linkStore.set(shortId, payload);
+    await redis.set(`video:${shortId}`, JSON.stringify(payload), { ex: 30 * 86400 });
+
+    const playUrl = `${BASE_URL}/v/${shortId}`;
+    await bot.deleteMessage(chatId, statusMsg.message_id).catch(() => {});
+
+    bot.sendMessage(chatId, `✨ <b>Aapka Stream Link:</b>\n${playUrl}`, { parse_mode: 'HTML' });
+  } catch (err) {
+    await bot.deleteMessage(chatId, statusMsg.message_id).catch(() => {});
+    bot.sendMessage(chatId, `❌ <b>Error:</b> <code>${escapeHtml(err.message)}</code>`, { parse_mode: 'HTML' });
+  }
 });
