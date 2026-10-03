@@ -12,6 +12,7 @@ const { Upload } = require('@aws-sdk/lib-storage');
 process.on('uncaughtException', (err) => console.error('[UncaughtException]:', err.message));
 process.on('unhandledRejection', (reason) => console.error('[UnhandledRejection]:', reason));
 
+// 1. Redis Cache Setup
 let redis;
 try {
   redis = Redis.fromEnv();
@@ -25,6 +26,7 @@ const BASE_URL = process.env.CUSTOM_DOMAIN
   ? (process.env.CUSTOM_DOMAIN.startsWith('http') ? process.env.CUSTOM_DOMAIN : `https://${process.env.CUSTOM_DOMAIN}`)
   : 'https://mayajaal.online';
 
+// 2. Cloudflare R2 S3 Client Setup
 const R2_ACCOUNT_ID = String(process.env.R2_ACCOUNT_ID || '9a17e6f8a4af372b6b0ab1ad1cdb982d').trim();
 const R2_ACCESS_KEY_ID = String(process.env.R2_ACCESS_KEY_ID || 'fe0370e7a3f380c0dee831d6c37fd851').trim();
 const R2_SECRET_ACCESS_KEY = String(process.env.R2_SECRET_ACCESS_KEY || '').trim();
@@ -42,6 +44,7 @@ const r2Client = new S3Client({
 
 console.log('✅ Cloudflare R2 Initialized');
 
+// 3. Express Web Engine
 const app = express();
 const PORT = process.env.PORT || 8080;
 
@@ -56,10 +59,10 @@ app.use((req, res, next) => {
   next();
 });
 
-app.get('/', (req, res) => res.send('Stream Engine Online - Local 2GB Bot API Active'));
+app.get('/', (req, res) => res.send('Stream Engine Online - 2GB Local Render API Active'));
 app.get('/health', (req, res) => res.json({ status: 'ok', uptime: process.uptime() }));
 
-// Video Player Page
+// HTML5 Video Player
 app.get('/v/:id', async (req, res) => {
   try {
     const id = req.params.id;
@@ -143,7 +146,7 @@ app.get('/stream/:id', async (req, res) => {
 });
 
 app.listen(PORT, () => console.log(`🚀 Web Server running on port ${PORT}`));
-      // Render Local Bot API Configuration (Bypasses 20MB -> Unlocks 2GB)
+// 4. Render Local Bot API Client (Unlocks 2GB Limit)
 const LOCAL_API_URL = process.env.LOCAL_BOT_API_URL 
   ? process.env.LOCAL_BOT_API_URL.trim().replace(/\/$/, '') 
   : 'https://tg-local-api-gxrv.onrender.com';
@@ -153,7 +156,7 @@ const botOptions = {
   baseApiUrl: LOCAL_API_URL
 };
 
-console.log(`🔗 Connecting to 2GB Local Bot API: ${LOCAL_API_URL}`);
+console.log(`🔗 Connecting to 2GB Local Bot API Server: ${LOCAL_API_URL}`);
 
 const bot = new TelegramBot(TOKEN, botOptions);
 
@@ -171,7 +174,7 @@ bot.onText(/\/start/, (msg) => {
   bot.sendMessage(msg.chat.id,
     `🎬 <b>MayaJaal Stream Converter Bot (2GB Active)</b>\n\n` +
     `⚡ <b>Local API Server Connected!</b>\n` +
-    `Ab aap <b>50MB, 500MB ya 2GB tak</b> ki video direct Telegram par bhejein, direct Cloudflare R2 par upload hokar play link banegi!`,
+    `Ab aap <b>50MB, 500MB, 1GB ya 2GB tak</b> ki video file direct Telegram par bhejein, direct Cloudflare R2 par upload hokar play link banegi!`,
     { parse_mode: 'HTML' }
   );
 });
@@ -189,7 +192,7 @@ bot.on('message', async (msg) => {
 
     try {
       const fileLink = await bot.getFileLink(fileId);
-      console.log(`[Media Download]: Fetching from server -> ${fileLink}`);
+      console.log(`[Media Download]: Fetching file -> ${fileLink}`);
 
       const videoDownloadStream = await axios.get(fileLink, {
         responseType: 'stream',
