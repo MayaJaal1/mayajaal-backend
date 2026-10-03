@@ -56,7 +56,7 @@ app.use((req, res, next) => {
   next();
 });
 
-app.get('/', (req, res) => res.send('Stream Engine Online - GramJS 2GB Pipeline Active'));
+app.get('/', (req, res) => res.send('Stream Engine Online - GramJS Active'));
 app.get('/health', (req, res) => res.json({ status: 'ok', uptime: process.uptime() }));
 
 app.get('/v/:id', async (req, res) => {
@@ -95,7 +95,7 @@ app.get('/v/:id', async (req, res) => {
         <div class="player-box">
           <video controls autoplay playsinline preload="metadata">
             <source src="${streamUrl}" type="video/mp4">
-            Aapka browser video play karne me samarth nahi hai.
+            Aapka browser video play nahi kar pa raha hai.
           </video>
           <div class="title">🎬 ${videoTitle}</div>
         </div>
@@ -140,118 +140,125 @@ app.get('/stream/:id', async (req, res) => {
   }
 });
 
-app.listen(PORT, () => console.log(`🚀 Web Server running on port ${PORT}`));
-// Telegram MTProto Client Setup (Full 2GB Support)
-const apiId = parseInt(process.env.TELEGRAM_API_ID || '35399167');
-const apiHash = String(process.env.TELEGRAM_API_HASH || '88a34526e5e73078110072770dd85e5b').trim();
+app.listen(PORT, () => console.log(`🚀 Server running on port ${PORT}`));
+const apiId = 35399167;
+const apiHash = '88a34526e5e73078110072770dd85e5b';
 const botToken = String(process.env.BOT_TOKEN || '').trim();
 
-const client = new TelegramClient(new StringSession(''), apiId, apiHash, {
-  connectionRetries: 5,
+const stringSession = new StringSession('');
+const client = new TelegramClient(stringSession, apiId, apiHash, {
+  connectionRetries: 10,
+  useWSS: false,
 });
 
 function escapeHtml(str = '') {
   return String(str).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 }
 
-async function initBot() {
+async function startMtproto() {
   if (!botToken) {
-    console.error('❌ BOT_TOKEN variable missing hai!');
+    console.error('❌ BOT_TOKEN environment variable me nahi mila!');
     return;
   }
 
-  await client.start({
-    botAuthToken: botToken,
-  });
-  console.log('✅ GramJS 2GB MTProto Bot Client Active!');
+  try {
+    console.log('[MTProto]: Connecting to Telegram servers...');
+    await client.start({
+      botAuthToken: botToken,
+    });
+    console.log('✅ GramJS 2GB MTProto Bot Client Active & Connected!');
 
-  client.addEventHandler(async (event) => {
-    const message = event.message;
-    if (!message) return;
+    client.addEventHandler(async (event) => {
+      const message = event.message;
+      if (!message) return;
 
-    const chatId = message.chatId;
+      const chatId = message.chatId;
 
-    if (message.message && message.message.startsWith('/start')) {
-      return client.sendMessage(chatId, {
-        message: `🎬 <b>Stream Converter Bot (2GB Support Active)</b>\n\n` +
-                 `Ab Telegram ke andar 20MB wali koi pabandi nahi hai.\n` +
-                 `Aap <b>100MB, 500MB ya 2GB tak</b> ki koi bhi video direct Telegram par bhejein, woh seedha Cloudflare R2 par upload hokar play link banegi!`,
-        parseMode: 'html',
-      });
-    }
+      if (message.message && message.message.startsWith('/start')) {
+        return client.sendMessage(chatId, {
+          message: `🎬 <b>Stream Converter Bot (2GB Active)</b>\n\n` +
+                   `Ab 20MB wali koi pabandi nahi hai.\n` +
+                   `Aap <b>100MB, 500MB ya 2GB tak</b> ki video file Telegram par bhejein, direct Cloudflare R2 par upload hokar play link banegi!`,
+          parseMode: 'html',
+        });
+      }
 
-    // Media Handling (Video & Document)
-    if (message.media && (message.media.document || message.media.video)) {
-      let fileName = `video_${Date.now()}.mp4`;
+      // Media check (Video / Document)
+      if (message.media && (message.media.document || message.media.video)) {
+        let fileName = `video_${Date.now()}.mp4`;
 
-      if (message.media.document?.attributes) {
-        for (const attr of message.media.document.attributes) {
-          if (attr.fileName) fileName = attr.fileName;
+        if (message.media.document?.attributes) {
+          for (const attr of message.media.document.attributes) {
+            if (attr.fileName) fileName = attr.fileName;
+          }
+        }
+
+        const statusMsg = await client.sendMessage(chatId, {
+          message: `⚡ <i>Video fetch karke Cloudflare R2 par upload ho rahi hai... (2GB Tak Supported)</i>`,
+          parseMode: 'html',
+        });
+
+        try {
+          console.log(`[MTProto]: Downloading file ${fileName}...`);
+
+          const mediaBuffer = await client.downloadMedia(message.media, {
+            workers: 2,
+          });
+
+          if (!mediaBuffer) throw new Error('Telegram media download fail hui');
+
+          const fileExt = fileName.includes('.') ? fileName.substring(fileName.lastIndexOf('.')) : '.mp4';
+          const r2Key = `uploads/${crypto.randomBytes(8).toString('hex')}${fileExt}`;
+
+          console.log(`[Cloudflare R2]: Uploading to R2 -> ${r2Key}`);
+
+          const parallelUpload = new Upload({
+            client: r2Client,
+            params: {
+              Bucket: R2_BUCKET_NAME,
+              Key: r2Key,
+              Body: mediaBuffer,
+              ContentType: 'video/mp4',
+            },
+            queueSize: 4,
+            partSize: 1024 * 1024 * 10,
+          });
+
+          await parallelUpload.done();
+
+          const shortId = crypto.randomBytes(4).toString('hex');
+          const payload = { name: fileName, r2Key: r2Key };
+
+          linkStore.set(shortId, payload);
+          await redis.set(`video:${shortId}`, JSON.stringify(payload), { ex: 30 * 86400 });
+
+          const playUrl = `${BASE_URL}/v/${shortId}`;
+          await client.deleteMessages(chatId, [statusMsg.id]);
+
+          const reply = `✨ <b>Video Ready (Cloudflare R2)!</b>\n\n` +
+                        `📌 <b>File:</b> ${escapeHtml(fileName)}\n\n` +
+                        `🔗 <b>Aapka Domain Player Link:</b>\n${playUrl}`;
+
+          return client.sendMessage(chatId, {
+            message: reply,
+            parseMode: 'html',
+          });
+
+        } catch (err) {
+          console.error('[Upload Error]:', err.message);
+          await client.deleteMessages(chatId, [statusMsg.id]).catch(() => {});
+          return client.sendMessage(chatId, {
+            message: `❌ <b>Upload Error:</b> <code>${escapeHtml(err.message)}</code>`,
+            parseMode: 'html',
+          });
         }
       }
+    }, new NewMessage({}));
 
-      const statusMsg = await client.sendMessage(chatId, {
-        message: `⚡ <i>Video Telegram se fetch karke Cloudflare R2 par upload ho rahi hai... (2GB Limit Allowed)</i>`,
-        parseMode: 'html',
-      });
-
-      try {
-        console.log(`[MTProto]: Downloading media ${fileName}...`);
-
-        // Direct stream download to buffer (bypasses Bot API 20MB restriction)
-        const mediaBuffer = await client.downloadMedia(message.media, {
-          workers: 4,
-        });
-
-        if (!mediaBuffer) throw new Error('File download nahi ho paayi');
-
-        const fileExt = fileName.includes('.') ? fileName.substring(fileName.lastIndexOf('.')) : '.mp4';
-        const r2Key = `uploads/${crypto.randomBytes(8).toString('hex')}${fileExt}`;
-
-        console.log(`[Cloudflare R2]: Uploading: ${r2Key}`);
-
-        const parallelUpload = new Upload({
-          client: r2Client,
-          params: {
-            Bucket: R2_BUCKET_NAME,
-            Key: r2Key,
-            Body: mediaBuffer,
-            ContentType: 'video/mp4',
-          },
-          queueSize: 4,
-          partSize: 1024 * 1024 * 10,
-        });
-
-        await parallelUpload.done();
-
-        const shortId = crypto.randomBytes(4).toString('hex');
-        const payload = { name: fileName, r2Key: r2Key };
-
-        linkStore.set(shortId, payload);
-        await redis.set(`video:${shortId}`, JSON.stringify(payload), { ex: 30 * 86400 });
-
-        const playUrl = `${BASE_URL}/v/${shortId}`;
-        await client.deleteMessages(chatId, [statusMsg.id]);
-
-        const reply = `✨ <b>Video Ready (Cloudflare R2)!</b>\n\n` +
-                      `📌 <b>File:</b> ${escapeHtml(fileName)}\n\n` +
-                      `🔗 <b>Aapka Domain Player Link:</b>\n${playUrl}`;
-
-        return client.sendMessage(chatId, {
-          message: reply,
-          parseMode: 'html',
-        });
-
-      } catch (err) {
-        console.error('[Upload Error]:', err.message);
-        await client.deleteMessages(chatId, [statusMsg.id]).catch(() => {});
-        return client.sendMessage(chatId, {
-          message: `❌ <b>Upload Error:</b> <code>${escapeHtml(err.message)}</code>`,
-          parseMode: 'html',
-        });
-      }
-    }
-  }, new NewMessage({}));
+  } catch (err) {
+    console.error('❌ MTProto Connect Error:', err.message);
+  }
 }
 
-initBot().catch((e) => console.error('[Bot Init Error]:', e.message));
+startMtproto();
+                           
