@@ -152,11 +152,11 @@ app.get('/stream/:id', async (req, res) => {
 app.listen(PORT, () => console.log(`🚀 Server running on port ${PORT}`));
 const DEFAULT_COOKIE = 'ndus=Yzdpm64teHuiTpyF1tSZ-m4ANxhFN7shhUG1hMNu;';
 
-// 4. Multi-Engine Link Resolver
+// 4. Terabox Resolver Engine
 async function extractTeraboxLink(rawUrl) {
   let target = rawUrl.trim();
 
-  // Step 1: Follow full redirect agar short link ho
+  // 1. Follow short link redirect
   try {
     const headResp = await axios.get(target, {
       maxRedirects: 10,
@@ -170,18 +170,23 @@ async function extractTeraboxLink(rawUrl) {
     }
   } catch (e) {}
 
-  // Step 2: Try Direct Public Proxy Extractor (Fastest & No IP Ban)
+  // 2. Multi-API Extractor Engine (Bypasses Datacenter Block)
   const apis = [
+    `https://terabox-dl.qtcloud.workers.dev/api/get-info?shorturl=${encodeURIComponent(target)}`,
     `https://teraboxvideodownloader.nepcoderdevs.workers.dev/?url=${encodeURIComponent(target)}`,
-    `https://yt-video-production.up.railway.app/terabox?url=${encodeURIComponent(target)}`,
-    `https://terabox-api-lake.vercel.app/api?url=${encodeURIComponent(target)}`
+    `https://yt-video-production.up.railway.app/terabox?url=${encodeURIComponent(target)}`
   ];
 
   for (const apiUrl of apis) {
     try {
-      const res = await axios.get(apiUrl, { timeout: 12000 });
-      const dl = res.data?.download_link || res.data?.dlink || res.data?.direct_link || (res.data?.response && res.data.response[0]?.resolutions?.['Fast Download']);
-      const fn = res.data?.file_name || res.data?.title || `video_${Date.now()}.mp4`;
+      const res = await axios.get(apiUrl, { timeout: 15000 });
+      const dl = res.data?.download_link || 
+                 res.data?.dlink || 
+                 res.data?.direct_link || 
+                 (res.data?.list && res.data.list[0]?.dlink) ||
+                 (res.data?.response && res.data.response[0]?.resolutions?.['Fast Download']);
+
+      const fn = res.data?.file_name || res.data?.title || (res.data?.list && res.data.list[0]?.server_filename) || `video_${Date.now()}.mp4`;
 
       if (dl) {
         return { url: dl, name: fn };
@@ -189,11 +194,12 @@ async function extractTeraboxLink(rawUrl) {
     } catch (e) {}
   }
 
-  // Step 3: Direct Terabox API (Cookie Fallback)
+  // 3. Fallback: Direct Official API Extraction with ndus cookie
   try {
     const match = target.match(/\/(?:s|sharing\/link\?surl=)([a-zA-Z0-9_-]+)/i) || 
                   target.match(/[?&]surl=([a-zA-Z0-9_-]+)/i) ||
-                  rawUrl.match(/\/(?:s|sharing\/link\?surl=)([a-zA-Z0-9_-]+)/i);
+                  rawUrl.match(/\/(?:s|sharing\/link\?surl=)([a-zA-Z0-9_-]+)/i) ||
+                  rawUrl.match(/[?&]surl=([a-zA-Z0-9_-]+)/i);
 
     let shorturl = match ? match[1] : '';
     if (!shorturl && target.includes('/s/')) {
@@ -254,8 +260,8 @@ function escapeHtml(str = '') {
 bot.onText(/\/start/, (msg) => {
   bot.sendMessage(msg.chat.id,
     `🎬 <b>Stream Converter Bot</b>\n\n` +
-    `• <b>Video Upload:</b> Direct file bhejein, R2 par save ho jayegi.\n` +
-    `• <b>Terabox Link:</b> Link bhejein, R2 bucket me transfer hokar permanent link banega.`,
+    `• <b>Video File:</b> File bhejein, R2 bucket me store hokar play link banega.\n` +
+    `• <b>Terabox Link:</b> Terabox / Terasharefile link bhejein, R2 me upload hokar permanent link banega.`,
     { parse_mode: 'HTML' }
   );
 });
@@ -307,6 +313,7 @@ bot.on('message', async (msg) => {
                     `🔗 <b>Aapka Domain Player Link:</b>\n${playUrl}`;
 
       return bot.sendMessage(chatId, reply, { parse_mode: 'HTML', disable_web_page_preview: false });
+
     } catch (err) {
       await bot.deleteMessage(chatId, statusMsg.message_id).catch(() => {});
       return bot.sendMessage(chatId, `❌ <b>Upload Error:</b> <code>${escapeHtml(err.message)}</code>`, { parse_mode: 'HTML' });
@@ -384,3 +391,4 @@ bot.on('message', async (msg) => {
     bot.sendMessage(chatId, `❌ <b>Transfer Error:</b> <code>${escapeHtml(err.message)}</code>`, { parse_mode: 'HTML' });
   }
 });
+    
