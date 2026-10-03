@@ -2,14 +2,12 @@ require('dotenv').config();
 
 const express = require('express');
 const TelegramBot = require('node-telegram-bot-api');
-const { TelegramClient, Api } = require('telegram');
-const { StringSession } = require('telegram/sessions');
-const bigInt = require('big-integer');
 const axios = require('axios');
 const crypto = require('crypto');
 const { Redis } = require('@upstash/redis');
 const path = require('path');
 const fs = require('fs');
+const { S3Client, PutObjectCommand } = require('@aws-sdk/client-s3');
 
 process.on('uncaughtException', (err) => console.error('[UncaughtException]:', err.message));
 process.on('unhandledRejection', (reason) => console.error('[UnhandledRejection]:', reason));
@@ -21,11 +19,6 @@ const redis = Redis.fromEnv();
 const linkStore = new Map();
 
 const TOKEN = process.env.BOT_TOKEN;
-const rawApiId = process.env.TELEGRAM_API_ID || process.env.API_ID || '35399167';
-const API_ID = parseInt(String(rawApiId).trim(), 10);
-const API_HASH = String(process.env.TELEGRAM_API_HASH || process.env.API_HASH || '88a34526a5e73078110072770dd85e5b').trim();
-const STORAGE_CHANNEL_ID = String(process.env.STORAGE_CHANNEL_ID || process.env.CHANNEL_ID || '').trim();
-
 const BASE_URL = process.env.CUSTOM_DOMAIN 
   ? (process.env.CUSTOM_DOMAIN.startsWith('http') ? process.env.CUSTOM_DOMAIN : `https://${process.env.CUSTOM_DOMAIN}`)
   : 'https://mayajaal.online';
@@ -36,27 +29,24 @@ if (!TOKEN) {
 }
 
 // ═══════════════════════════════════════════
-// 1. GRAMJS BOT-TOKEN MTPROTO AUTH
+// 1. CLOUDFLARE R2 CLIENT SETUP
 // ═══════════════════════════════════════════
-let tgClient = null;
+const R2_ACCOUNT_ID = process.env.R2_ACCOUNT_ID;
+const R2_ACCESS_KEY_ID = process.env.R2_ACCESS_KEY_ID;
+const R2_SECRET_ACCESS_KEY = process.env.R2_SECRET_ACCESS_KEY;
+const R2_BUCKET_NAME = process.env.R2_BUCKET_NAME;
+const R2_PUBLIC_DOMAIN = process.env.R2_PUBLIC_DOMAIN;
 
-if (!isNaN(API_ID) && API_ID > 0 && API_HASH && TOKEN) {
-  tgClient = new TelegramClient(
-    new StringSession(''),
-    API_ID,
-    API_HASH,
-    { connectionRetries: 5 }
-  );
+const r2Client = new S3Client({
+  region: 'auto',
+  endpoint: `https://${R2_ACCOUNT_ID}.r2.cloudflarestorage.com`,
+  credentials: {
+    accessKeyId: R2_ACCESS_KEY_ID,
+    secretAccessKey: R2_SECRET_ACCESS_KEY,
+  },
+});
 
-  (async () => {
-    try {
-      await tgClient.start({ botAuthToken: TOKEN });
-      console.log('✅ Telegram MTProto Bot Vault Connected! 2GB Superfast Active!');
-    } catch (e) {
-      console.error('❌ MTProto Auth Error:', e.message);
-    }
-  })();
-}
+console.log('✅ Cloudflare R2 Engine Initialized!');
 
 // ═══════════════════════════════════════════
 // 2. EXPRESS HTTP SERVER CONFIG
@@ -105,7 +95,6 @@ app.get('/verify-key/:key', async (req, res) => {
   }
 });
 
-// ✅ NAYA: API Key Generation Page (Jo missing tha)
 app.get('/key', async (req, res) => {
   try {
     const tgId = req.query.tg;
@@ -124,18 +113,13 @@ app.get('/key', async (req, res) => {
           body { background: #07090e; color: #00ff88; font-family: sans-serif; text-align: center; padding: 50px; }
           .card { background: #0f172a; border: 1px solid #1e293b; border-radius: 16px; padding: 24px; display: inline-block; max-width: 90%; }
           .key-box { background: #1e293b; padding: 15px; border-radius: 8px; font-size: 16px; margin: 20px 0; word-break: break-all; color: #fff; }
-          .btn { background: #00ff88; color: #000; padding: 10px 20px; text-decoration: none; border-radius: 6px; font-weight: bold; display: inline-block; margin-top: 10px;}
         </style>
       </head>
       <body>
         <div class="card">
           <h2>🔑 MayaJaal API Key Generated!</h2>
-          <p>Aapki API Key yeh hai:</p>
           <div class="key-box"><code>${key}</code></div>
-          <p>Is key ko copy karke bot par bhejein:</p>
-          <code>/api ${key}</code>
-          <br><br>
-          <a href="https://t.me/YourBotUsername" class="btn">Bot Kholo</a>
+          <p>Is key ko bot par bhejein: <code>/api ${key}</code></p>
         </div>
       </body>
       </html>
@@ -143,9 +127,9 @@ app.get('/key', async (req, res) => {
   } catch (err) {
     res.status(500).send('Error generating key: ' + err.message);
   }
-});// ───────────────────────────────────────────
-// 3. ZERO-BUFFER RANGE 206 STREAMING ENGINE
-// ───────────────────────────────────────────
+});
+
+// 3. Streaming Engine
 app.get('/stream/:id', async (req, res) => {
   try {
     const id = req.params.id;
@@ -156,83 +140,14 @@ app.get('/stream/:id', async (req, res) => {
       if (raw) data = typeof raw === 'string' ? JSON.parse(raw) : raw;
     }
 
-    if (!data) return res.status(404).send('Stream not found');
-
-    // ═══════════════════════════════════════
-    // Case 1: Telegram Channel 2GB MTProto Chunk Streamer
-    // ═══════════════════════════════════════
-    if (data.channel_id && data.msg_id && tgClient && tgClient.connected) {
-      try {
-        const rawPeer = String(data.channel_id).trim();
-        const peerEntity = await tgClient.getEntity(
-          rawPeer.startsWith('@') ? rawPeer : (rawPeer.startsWith('-100') ? BigInt(rawPeer) : rawPeer)
-        );
-
-        const messages = await tgClient.getMessages(peerEntity, { ids: [parseInt(data.msg_id, 10)] });
-        const media = messages?.[0]?.media;
-        const doc = media?.document || media?.video;
-
-        if (doc) {
-          const fileSize = Number(doc.size);
-          const range = req.headers.range;
-
-          let start = 0;
-          let end = fileSize - 1;
-
-          if (range) {
-            const parts = range.replace(/bytes=/, "").split("-");
-            start = parseInt(parts[0], 10);
-            end = parts[1] ? parseInt(parts[1], 10) : end;
-          }
-
-          const chunkSize = (end - start) + 1;
-          res.writeHead(range ? 206 : 200, {
-            'Content-Range': `bytes ${start}-${end}/${fileSize}`,
-            'Accept-Ranges': 'bytes',
-            'Content-Length': chunkSize,
-            'Content-Type': doc.mimeType || 'video/mp4',
-            'Cache-Control': 'public, max-age=86400'
-          });
-
-          const fileLocation = new Api.InputDocumentFileLocation({
-            id: doc.id,
-            accessHash: doc.accessHash,
-            fileReference: doc.fileReference,
-            thumbSize: ""
-          });
-
-          const CHUNK_SIZE = 512 * 1024;
-          let currentOffset = start;
-
-          while (currentOffset <= end && !res.writableEnded && !res.destroyed) {
-            const bytesToFetch = Math.min(CHUNK_SIZE, end - currentOffset + 1);
-            const result = await tgClient.invoke(
-              new Api.upload.GetFile({
-                location: fileLocation,
-                offset: bigInt(currentOffset),
-                limit: bytesToFetch,
-                precise: true
-              })
-            );
-
-            if (!result || !result.bytes || result.bytes.length === 0) break;
-            res.write(result.bytes);
-            currentOffset += result.bytes.length;
-            if (result.bytes.length < bytesToFetch) break;
-          }
-          return res.end();
-        }
-      } catch (tgErr) {
-        console.error('[Telegram Stream Error]:', tgErr.message);
-      }
-    }
-
-    // ═══════════════════════════════════════
-    // Case 2: External Proxy Stream (Terabox / Terasharefile / Diskwala)
-    // ═══════════════════════════════════════
-    if (!data.url) return res.status(404).send('Stream expired');
+    if (!data || !data.url) return res.status(404).send('Stream not found');
 
     const targetUrl = data.url;
+
+    if (targetUrl.includes('r2.cloudflarestorage.com') || (R2_PUBLIC_DOMAIN && targetUrl.includes(R2_PUBLIC_DOMAIN))) {
+      return res.redirect(targetUrl);
+    }
+
     let rawCookie = process.env.TERABOX_COOKIE || '';
     if (rawCookie && !rawCookie.includes('ndus=')) {
       rawCookie = `ndus=${rawCookie.trim()};`;
@@ -271,7 +186,8 @@ app.get('/stream/:id', async (req, res) => {
   }
 });
 
-app.listen(PORT, () => console.log(`✅ MayaJaal Web Engine running on port ${PORT}`));// ═══════════════════════════════════════════
+app.listen(PORT, () => console.log(`✅ MayaJaal Web Engine running on port ${PORT}`));
+// ═══════════════════════════════════════════
 // 4. LINK RESOLVERS
 // ═══════════════════════════════════════════
 async function extractTeraboxLink(rawUrl) {
@@ -375,8 +291,8 @@ bot.onText(/\/start/, (msg) => {
   bot.sendMessage(msg.chat.id,
     `🎬 <b>MayaJaal Ultra Stream Engine</b>\n\n` +
     `• <b>Bulk Converter:</b> Terabox, Terasharefile, Diskwala links bhejein\n` +
-    `• <b>Telegram Video Upload:</b> Vault storage + fast Cloudflare 206 play\n` +
-    `• <b>API Setup:</b> <code>/api</code> command se connect karein`,
+    `• <b>Cloudflare Upload:</b> Video send karein seedhe R2 par upload hogi\n` +
+    `• <b>API Setup:</b> <code>/api</code> command use karein`,
     { parse_mode: 'HTML' }
   );
 });
@@ -393,49 +309,65 @@ bot.onText(/\/api(?:\s+(.+))?/, async (msg, match) => {
   const keyUrl = `${BASE_URL}/key?tg=${chatId}`;
   bot.sendMessage(chatId,
     `🔑 <b>MayaJaal API Portal:</b>\n\n` +
-    `Tap karein apni key pane ke liye:\n${keyUrl}\n\n` +
-    `Key milne par send karein:\n<code>/api YOUR_KEY</code>`,
+    `Key pane ke liye link kholein:\n${keyUrl}\n\n` +
+    `Key milne par bhein:\n<code>/api YOUR_KEY</code>`,
     { parse_mode: 'HTML', disable_web_page_preview: true }
   );
 });
 
+// Video Handler (Uploads directly to Cloudflare R2)
 bot.on('message', async (msg) => {
   const chatId = msg.chat.id;
   const user = await getUser(chatId);
   const uploaderName = msg.from?.username ? `@${msg.from.username}` : (msg.from?.first_name || 'MayaJaal Cloud');
 
-  // 1. Direct Video / File Upload (Telegram Storage Vault)
   const videoObj = msg.video || msg.document || (msg.animation ? msg.animation : null);
   if (videoObj) {
+    const fileId = videoObj.file_id;
     const fileName = videoObj.file_name || `video_${Date.now()}.mp4`;
-    const statusMsg = await bot.sendMessage(chatId, `⚡ <i>Video Telegram Storage Vault mein save ho rahi hai...</i>`, { parse_mode: 'HTML' });
+    const statusMsg = await bot.sendMessage(chatId, `⚡ <i>Video Cloudflare R2 par upload ho rahi hai...</i>`, { parse_mode: 'HTML' });
+
     try {
-      let channelMsgId = null;
-      if (STORAGE_CHANNEL_ID) {
-        const rawPeer = STORAGE_CHANNEL_ID.trim();
-        const peer = rawPeer.startsWith('@') ? rawPeer : (rawPeer.startsWith('-100') ? parseInt(rawPeer, 10) : rawPeer);
-        const forwarded = await bot.forwardMessage(peer, chatId, msg.message_id);
-        channelMsgId = forwarded.message_id;
-      }
+      const fileLink = await bot.getFileLink(fileId);
+      const videoStream = await axios.get(fileLink, { responseType: 'stream' });
+
+      const fileExt = path.extname(fileName) || '.mp4';
+      const r2Key = `videos/${crypto.randomBytes(8).toString('hex')}${fileExt}`;
+
+      const uploadCommand = new PutObjectCommand({
+        Bucket: R2_BUCKET_NAME,
+        Key: r2Key,
+        Body: videoStream.data,
+        ContentType: videoObj.mime_type || 'video/mp4',
+      });
+
+      await r2Client.send(uploadCommand);
+
+      const r2PublicUrl = R2_PUBLIC_DOMAIN 
+        ? `https://${R2_PUBLIC_DOMAIN.replace(/^https?:\/\//, '')}/${r2Key}`
+        : `https://${R2_ACCOUNT_ID}.r2.cloudflarestorage.com/${R2_BUCKET_NAME}/${r2Key}`;
+
       const shortId = crypto.randomBytes(4).toString('hex');
-      const payload = { name: fileName, channel_id: STORAGE_CHANNEL_ID, msg_id: channelMsgId, uploader: uploaderName };
+      const payload = { name: fileName, url: r2PublicUrl, uploader: uploaderName };
       linkStore.set(shortId, payload);
       await redis.set(`video:${shortId}`, JSON.stringify(payload), { ex: 30 * 86400 });
 
       const playUrl = `${BASE_URL}/v/${shortId}`;
       await bot.deleteMessage(chatId, statusMsg.message_id).catch(() => {});
+
       let reply = `✨ <b>MayaJaal Stream Ready!</b>\n\n`;
       if (user.header && user.enableText) reply = `<b>${escapeHtml(user.header)}</b>\n\n` + reply;
-      reply += `📌 <b>File:</b> ${escapeHtml(fileName)}\n\n🔗 <b>Cloudflare Player Link:</b>\n${playUrl}\n\n⚡ <i>Telegram Vault Saved & Zero-Buffer Playback Active!</i>`;
+      reply += `📌 <b>File:</b> ${escapeHtml(fileName)}\n\n🔗 <b>Cloudflare Player Link:</b>\n${playUrl}\n\n⚡ <i>Cloudflare R2 Ultra-Fast Streaming Active!</i>`;
       if (user.footer && user.enableText) reply += `\n\n<b>${escapeHtml(user.footer)}</b>`;
       return bot.sendMessage(chatId, reply, { parse_mode: 'HTML', disable_web_page_preview: false });
+
     } catch (err) {
       await bot.deleteMessage(chatId, statusMsg.message_id).catch(() => {});
-      return bot.sendMessage(chatId, `❌ <b>Error:</b> <code>${escapeHtml(err.message)}</code>`, { parse_mode: 'HTML' });
+      return bot.sendMessage(chatId, `❌ <b>Upload Error:</b> <code>${escapeHtml(err.message)}</code>`, { parse_mode: 'HTML' });
     }
   }
 
-  // 2. Parallel Bulk Link Converter
+  // URL Converter
   const incomingText = (msg.text || msg.caption || '').trim();
   if (!incomingText || incomingText.startsWith('/')) return;
 
@@ -478,7 +410,7 @@ bot.on('message', async (msg) => {
     });
 
     if (successList.length === 0) {
-      return bot.sendMessage(chatId, `❌ <b>Links convert nahi ho sake (Link invalid ya expired hai).</b>`, { parse_mode: 'HTML' });
+      return bot.sendMessage(chatId, `❌ <b>Links convert nahi ho sake.</b>`, { parse_mode: 'HTML' });
     }
 
     let finalMsg = `✨ <b>Converted Stream Links (${successList.length}):</b>\n\n` + successList.join('\n\n');
@@ -489,3 +421,4 @@ bot.on('message', async (msg) => {
     bot.sendMessage(chatId, `❌ <b>Error:</b> <code>${escapeHtml(err.message)}</code>`, { parse_mode: 'HTML' });
   }
 });
+    
