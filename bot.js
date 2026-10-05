@@ -12,7 +12,7 @@ const { Upload } = require('@aws-sdk/lib-storage');
 process.on('uncaughtException', (e) => console.error('[Uncaught]', e.stack || e.message));
 process.on('unhandledRejection', (e) => console.error('[Unhandled]', e?.stack || e));
 
-// ================= DEBUG: ENV CHECK =================
+// ================= ENV CHECK =================
 console.log('=== ENV DEBUG START ===');
 console.log('PORT:', process.env.PORT);
 console.log('BOT_TOKEN set?', !!process.env.BOT_TOKEN);
@@ -22,8 +22,6 @@ console.log('R2_ACCOUNT_ID set?', !!process.env.R2_ACCOUNT_ID);
 console.log('R2_ACCESS_KEY_ID set?', !!process.env.R2_ACCESS_KEY_ID);
 console.log('R2_SECRET_ACCESS_KEY set?', !!process.env.R2_SECRET_ACCESS_KEY);
 console.log('R2_BUCKET_NAME set?', !!process.env.R2_BUCKET_NAME);
-console.log('All R2_* keys:', Object.keys(process.env).filter(k => k.startsWith('R2_')));
-console.log('All keys count:', Object.keys(process.env).length);
 console.log('=== ENV DEBUG END ===');
 
 // ================= CONFIG =================
@@ -34,8 +32,7 @@ const BASE_URL = process.env.CUSTOM_DOMAIN
       : `https://${process.env.CUSTOM_DOMAIN}`)
   : 'https://mayajaal.online';
 
-const LOCAL_API_URL = (process.env.LOCAL_API_URL || 'https://tg-local-api-gxrv.onrender.com')
-  .trim().replace(/\/$/, '');
+const LOCAL_API_URL = (process.env.LOCAL_API_URL || '').trim().replace(/\/$/, '');
 
 const R2_ACCOUNT_ID = (process.env.R2_ACCOUNT_ID || '').trim();
 const R2_ACCESS_KEY_ID = (process.env.R2_ACCESS_KEY_ID || '').trim();
@@ -45,10 +42,9 @@ const R2_PUBLIC_URL = (process.env.R2_PUBLIC_URL || '').trim().replace(/\/$/, ''
 const MAX_FILE_SIZE = parseInt(process.env.MAX_FILE_SIZE || '2147483648', 10);
 const PORT = parseInt(process.env.PORT || '8080', 10);
 
-// Soft check - crash nahi karega, sirf warning dega
 if (!TOKEN) console.error('⚠️ BOT_TOKEN missing');
 if (!R2_ACCOUNT_ID || !R2_ACCESS_KEY_ID || !R2_SECRET_ACCESS_KEY || !R2_BUCKET_NAME) {
-  console.error('⚠️ R2 config incomplete. Bot chalega par upload fail hoga.');
+  console.error('⚠️ R2 config incomplete');
 }
 
 // ================= REDIS =================
@@ -57,7 +53,6 @@ try {
   redis = Redis.fromEnv();
   console.log('✅ Redis connected');
 } catch (e) {
-  console.warn('⚠️ Redis not available, using memory store');
   redis = { get: async () => null, set: async () => null };
 }
 
@@ -94,7 +89,7 @@ if (R2_ACCOUNT_ID && R2_ACCESS_KEY_ID && R2_SECRET_ACCESS_KEY && R2_BUCKET_NAME)
   });
   console.log('✅ R2 initialized for bucket:', R2_BUCKET_NAME);
 } else {
-  console.error('❌ R2 NOT initialized - check env variables');
+  console.error('❌ R2 NOT initialized');
 }
 
 // ================= EXPRESS =================
@@ -194,13 +189,12 @@ function pickMedia(msg) {
 
 // ================= BOT =================
 if (!TOKEN) {
-  console.error('❌ BOT_TOKEN missing — bot start nahi hoga');
+  console.error('❌ BOT_TOKEN missing');
   process.exit(1);
 }
 
 const bot = new TelegramBot(TOKEN, {
   polling: { autoStart: true, params: { timeout: 10 } },
-  baseApiUrl: LOCAL_API_URL,
 });
 
 bot.on('polling_error', async (e) => {
@@ -211,17 +205,18 @@ bot.on('polling_error', async (e) => {
 bot.onText(/\/start/, (msg) => {
   bot.sendMessage(msg.chat.id,
     `🎬 <b>MayaJaal Stream Bot</b>\n\n` +
-    `⚡ File bhejo → 2GB tak support → R2 direct upload.`,
+    `⚡ File bhejo → R2 direct upload.`,
     { parse_mode: 'HTML' });
 });
 
+// ================= UPLOAD HANDLER =================
 bot.on('message', async (msg) => {
   const chatId = msg.chat.id;
   const media = pickMedia(msg);
   if (!media) return;
 
   if (!r2) {
-    return bot.sendMessage(chatId, '❌ R2 config missing. Admin ko bolo.');
+    return bot.sendMessage(chatId, '❌ R2 config missing.');
   }
 
   const uploader = msg.from?.username
@@ -241,30 +236,54 @@ bot.on('message', async (msg) => {
   const status = await bot.sendMessage(chatId, `⚡ <i>Uploading...</i>`, { parse_mode: 'HTML' });
 
   try {
+    // Step 1: Telegram se file path lo
     const info = await bot.getFile(fileId);
     if (!info?.file_path) throw new Error('file_path not returned');
 
     let fp = info.file_path.split(TOKEN).pop();
     fp = fp.replace(/^\/+/, '');
 
-    const downloadUrl = `${LOCAL_API_URL}/file/bot${TOKEN}/${fp}`;
-    console.log('[⬇️]', downloadUrl);
+    // Step 2: File download karo — pehle official, phir local
+    const urlsToTry = [
+      `https://api.telegram.org/file/bot${TOKEN}/${fp}`,
+    ];
+    if (LOCAL_API_URL) {
+      urlsToTry.push(`${LOCAL_API_URL}/file/bot${TOKEN}/${fp}`);
+    }
 
-    const resp = await axios.get(downloadUrl, {
-      responseType: 'stream',
-      maxContentLength: Infinity,
-      maxBodyLength: Infinity,
-      timeout: 0,
-      validateStatus: (s) => s >= 200 && s < 400,
-    });
-    const stream = resp.data;
-    stream.on('error', (e) => console.error('[TG stream err]', e.message));
+    let stream = null;
+    let lastErr = null;
 
+    for (const url of urlsToTry) {
+      try {
+        console.log('[⬇️] Trying:', url);
+        const resp = await axios.get(url, {
+          responseType: 'stream',
+          maxContentLength: Infinity,
+          maxBodyLength: Infinity,
+          timeout: 120000,
+          validateStatus: (s) => s >= 200 && s < 400,
+        });
+        stream = resp.data;
+        stream.on('error', (e) => console.error('[TG stream err]', e.message));
+        console.log('[✅] Download from:', url);
+        break;
+      } catch (e) {
+        lastErr = e;
+        console.warn('[❌] Failed:', url, '→', e.message);
+      }
+    }
+
+    if (!stream) {
+      throw new Error(`Download failed: ${lastErr?.message || 'All URLs failed'}`);
+    }
+
+    // Step 3: R2 pe upload karo
     const ext = path.extname(fileName) || (mime.startsWith('video') ? '.mp4' : '');
     const r2Key = `uploads/${crypto.randomBytes(8).toString('hex')}${ext}`;
     const isLarge = size > 100 * 1024 * 1024;
 
-    console.log('[⬆️]', r2Key, `(${(size / 1024 / 1024).toFixed(2)} MB)`);
+    console.log('[⬆️] Uploading to R2:', r2Key, `(${(size / 1024 / 1024).toFixed(2)} MB)`);
 
     const upload = new Upload({
       client: r2,
@@ -285,7 +304,9 @@ bot.on('message', async (msg) => {
     });
 
     await upload.done();
+    console.log('[✅] Uploaded to R2:', r2Key);
 
+    // Step 4: Metadata save karo
     const shortId = crypto.randomBytes(4).toString('hex');
     await saveMeta(shortId, {
       name: fileName, mime, r2Key,
