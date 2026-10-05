@@ -79,7 +79,7 @@ async function getTeraboxDirectLink(shareUrl) {
     headers: { 'User-Agent': UA, 'Cookie': TERABOX_COOKIE },
     timeout: 30000, maxRedirects: 5,
   });
-  const html = pageResp.data;
+  const html = String(pageResp.data);
   let shareid = null, uk = null, sign = null, timestamp = null, fs_id = null;
   let server_filename = 'video.mp4', size = 0;
 
