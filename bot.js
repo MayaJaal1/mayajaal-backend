@@ -12,19 +12,7 @@ const { Upload } = require('@aws-sdk/lib-storage');
 process.on('uncaughtException', (e) => console.error('[Uncaught]', e.stack || e.message));
 process.on('unhandledRejection', (e) => console.error('[Unhandled]', e?.stack || e));
 
-// ================= ENV CHECK =================
-console.log('=== ENV DEBUG START ===');
-console.log('PORT:', process.env.PORT);
-console.log('BOT_TOKEN set?', !!process.env.BOT_TOKEN);
-console.log('CUSTOM_DOMAIN:', process.env.CUSTOM_DOMAIN);
-console.log('LOCAL_API_URL:', process.env.LOCAL_API_URL);
-console.log('R2_ACCOUNT_ID set?', !!process.env.R2_ACCOUNT_ID);
-console.log('R2_ACCESS_KEY_ID set?', !!process.env.R2_ACCESS_KEY_ID);
-console.log('R2_SECRET_ACCESS_KEY set?', !!process.env.R2_SECRET_ACCESS_KEY);
-console.log('R2_BUCKET_NAME set?', !!process.env.R2_BUCKET_NAME);
-console.log('=== ENV DEBUG END ===');
-
-// ================= CONFIG =================
+// ================= ENV =================
 const TOKEN = (process.env.BOT_TOKEN || '').trim();
 const BASE_URL = process.env.CUSTOM_DOMAIN
   ? (process.env.CUSTOM_DOMAIN.startsWith('http')
@@ -42,9 +30,18 @@ const R2_PUBLIC_URL = (process.env.R2_PUBLIC_URL || '').trim().replace(/\/$/, ''
 const MAX_FILE_SIZE = parseInt(process.env.MAX_FILE_SIZE || '2147483648', 10);
 const PORT = parseInt(process.env.PORT || '8080', 10);
 
-if (!TOKEN) console.error('⚠️ BOT_TOKEN missing');
+const TERABOX_COOKIE = (process.env.TERABOX_COOKIE || '').trim();
+
+// Debug
+console.log('=== ENV CHECK ===');
+console.log('BOT_TOKEN:', !!TOKEN);
+console.log('R2 ready:', !!(R2_ACCOUNT_ID && R2_ACCESS_KEY_ID && R2_SECRET_ACCESS_KEY && R2_BUCKET_NAME));
+console.log('Terabox cookie:', !!TERABOX_COOKIE);
+console.log('=================');
+
+if (!TOKEN) throw new Error('❌ BOT_TOKEN missing');
 if (!R2_ACCOUNT_ID || !R2_ACCESS_KEY_ID || !R2_SECRET_ACCESS_KEY || !R2_BUCKET_NAME) {
-  console.error('⚠️ R2 config incomplete');
+  throw new Error('❌ R2 config missing');
 }
 
 // ================= REDIS =================
@@ -53,6 +50,7 @@ try {
   redis = Redis.fromEnv();
   console.log('✅ Redis connected');
 } catch (e) {
+  console.warn('⚠️ Redis not available');
   redis = { get: async () => null, set: async () => null };
 }
 
@@ -76,41 +74,30 @@ async function getMeta(id) {
   return null;
 }
 
-// ================= R2 CLIENT =================
-let r2 = null;
-if (R2_ACCOUNT_ID && R2_ACCESS_KEY_ID && R2_SECRET_ACCESS_KEY && R2_BUCKET_NAME) {
-  r2 = new S3Client({
-    region: 'auto',
-    endpoint: `https://${R2_ACCOUNT_ID}.r2.cloudflarestorage.com`,
-    credentials: {
-      accessKeyId: R2_ACCESS_KEY_ID,
-      secretAccessKey: R2_SECRET_ACCESS_KEY,
-    },
-  });
-  console.log('✅ R2 initialized for bucket:', R2_BUCKET_NAME);
-} else {
-  console.error('❌ R2 NOT initialized');
-}
+// ================= R2 =================
+const r2 = new S3Client({
+  region: 'auto',
+  endpoint: `https://${R2_ACCOUNT_ID}.r2.cloudflarestorage.com`,
+  credentials: {
+    accessKeyId: R2_ACCESS_KEY_ID,
+    secretAccessKey: R2_SECRET_ACCESS_KEY,
+  },
+});
+console.log('✅ R2 initialized:', R2_BUCKET_NAME);
 
 // ================= EXPRESS =================
 const app = express();
 app.use(express.json());
 
-app.get('/', (req, res) => res.send('Stream Engine Online'));
+app.get('/', (req, res) => res.send('MayaJaal Stream Engine Online'));
 app.get('/health', (req, res) => res.json({
   ok: true,
   uptime: process.uptime(),
-  r2Ready: !!r2,
-  env: {
-    botToken: !!TOKEN,
-    r2Account: !!R2_ACCOUNT_ID,
-    r2AccessKey: !!R2_ACCESS_KEY_ID,
-    r2Secret: !!R2_SECRET_ACCESS_KEY,
-    r2Bucket: !!R2_BUCKET_NAME,
-  },
+  r2Ready: true,
+  teraboxCookie: !!TERABOX_COOKIE,
 }));
 
-// ================= PLAYER PAGE =================
+// Player page
 app.get('/v/:id', async (req, res) => {
   try {
     const meta = await getMeta(req.params.id);
@@ -146,10 +133,9 @@ video{width:100%;max-height:80vh;border-radius:14px;background:#000}
   }
 });
 
-// ================= STREAM FROM R2 =================
+// Stream from R2
 app.get('/stream/:id', async (req, res) => {
   try {
-    if (!r2) return res.status(500).send('R2 not configured');
     const meta = await getMeta(req.params.id);
     if (!meta?.r2Key) return res.status(404).send('Not found');
 
@@ -187,12 +173,96 @@ function pickMedia(msg) {
   return msg.video || msg.document || msg.audio || msg.animation || null;
 }
 
-// ================= BOT =================
-if (!TOKEN) {
-  console.error('❌ BOT_TOKEN missing');
-  process.exit(1);
+function detectTeraboxUrl(text) {
+  if (!text) return null;
+  const regex = /https?:\/\/[^\s]*(terabox\.(app|com|link|club|fun|app)|1024tera\.com|4funbox\.com|mirrobox\.com|nephobox\.com|momerybox\.com|tibibox\.com|teraboxapp\.com|terasharelink\.com)[^\s]*/i;
+  const m = text.match(regex);
+  return m ? m[0] : null;
 }
 
+// ================= TERABOX DIRECT LINK =================
+async function getTeraboxDirectLink(shareUrl) {
+  console.log('[Terabox] Fetching:', shareUrl);
+
+  const pageResp = await axios.get(shareUrl, {
+    headers: {
+      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+      'Cookie': TERABOX_COOKIE,
+      'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+      'Accept-Language': 'en-US,en;q=0.9',
+    },
+    timeout: 30000,
+    maxRedirects: 5,
+  });
+
+  const html = pageResp.data;
+  console.log('[Terabox] HTML length:', html.length);
+
+  // yunData nikaalo
+  const yunMatch = html.match(/window\.yunData\s*=\s*(\{[\s\S]+?\});?\s*<\/script>/);
+  if (!yunMatch) {
+    throw new Error('yunData nahi mila. Cookie expire ya invalid link.');
+  }
+
+  let yunData;
+  try {
+    yunData = JSON.parse(yunMatch[1]);
+  } catch (e) {
+    // kabhi kabhi string escaped hoti hai
+    throw new Error('yunData parse fail');
+  }
+
+  const shareid = yunData.shareid;
+  const uk = yunData.uk;
+  const sign = yunData.sign;
+  const timestamp = yunData.timestamp;
+  const fileList = yunData.file_list || [];
+  const firstFile = fileList[0];
+
+  if (!shareid || !uk || !firstFile) {
+    throw new Error('Share info incomplete. Cookie refresh karo.');
+  }
+
+  const fs_id = firstFile.fs_id;
+  const fileName = firstFile.server_filename || `terabox_${Date.now()}.mp4`;
+  const size = firstFile.size || 0;
+
+  console.log(`[Terabox] File: ${fileName} (${(size/1024/1024).toFixed(2)} MB)`);
+
+  // Direct link API
+  const params = new URLSearchParams({
+    shareid: shareid,
+    uk: uk,
+    sign: sign,
+    timestamp: timestamp,
+    fs_id: fs_id,
+    channel: 'dubox',
+    web: '1',
+    app_id: '250528',
+  });
+
+  const dlResp = await axios.get(`https://www.terabox.com/share/download?${params}`, {
+    headers: {
+      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+      'Cookie': TERABOX_COOKIE,
+      'Referer': shareUrl,
+      'Accept': 'application/json, text/plain, */*',
+    },
+    timeout: 30000,
+  });
+
+  const dlink = dlResp.data?.dlink;
+  if (!dlink) {
+    throw new Error('Direct link nahi mila. Cookie expire ho gayi.');
+  }
+
+  const finalUrl = Array.isArray(dlink) ? dlink[0] : dlink;
+  console.log('[Terabox] Direct link mil gaya');
+
+  return { url: finalUrl, fileName, size };
+}
+
+// ================= BOT =================
 const bot = new TelegramBot(TOKEN, {
   polling: { autoStart: true, params: { timeout: 10 } },
 });
@@ -205,19 +275,114 @@ bot.on('polling_error', async (e) => {
 bot.onText(/\/start/, (msg) => {
   bot.sendMessage(msg.chat.id,
     `🎬 <b>MayaJaal Stream Bot</b>\n\n` +
-    `⚡ File bhejo → R2 direct upload.`,
+    `📤 <b>2 tarike:</b>\n` +
+    `1️⃣ Direct file/video bhejo (20MB tak)\n` +
+    `2️⃣ Terabox link paste karo\n\n` +
+    `⚡ Dono ka player link milega!`,
     { parse_mode: 'HTML' });
 });
 
-// ================= UPLOAD HANDLER =================
+// ================= MAIN HANDLER =================
 bot.on('message', async (msg) => {
   const chatId = msg.chat.id;
+  const text = msg.text || '';
+
+  // ========== TERABOX LINK ==========
+  const teraboxUrl = detectTeraboxUrl(text);
+  if (teraboxUrl) {
+    if (!TERABOX_COOKIE) {
+      return bot.sendMessage(chatId, '❌ Terabox cookie set nahi hai. Admin se bolo.');
+    }
+
+    const status = await bot.sendMessage(chatId,
+      `🔍 <i>Terabox link detect hua, direct link nikal raha hoon...</i>`,
+      { parse_mode: 'HTML' });
+
+    try {
+      const info = await getTeraboxDirectLink(teraboxUrl);
+
+      await bot.editMessageText(
+        `⬇️ <i>Download + upload chal raha hai...</i>\n📌 ${escapeHtml(info.fileName)}\n📦 ${(info.size/1024/1024).toFixed(2)} MB`,
+        { chat_id: chatId, message_id: status.message_id, parse_mode: 'HTML' }
+      );
+
+      // Stream download from Terabox
+      const resp = await axios.get(info.url, {
+        responseType: 'stream',
+        maxContentLength: Infinity,
+        maxBodyLength: Infinity,
+        timeout: 0,
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+          'Cookie': TERABOX_COOKIE,
+          'Referer': teraboxUrl,
+        },
+      });
+
+      const ext = path.extname(info.fileName) || '.mp4';
+      const r2Key = `uploads/${crypto.randomBytes(8).toString('hex')}${ext}`;
+      const isLarge = info.size > 100 * 1024 * 1024;
+
+      console.log('[⬆️] R2 upload:', r2Key);
+
+      const upload = new Upload({
+        client: r2,
+        params: {
+          Bucket: R2_BUCKET_NAME,
+          Key: r2Key,
+          Body: resp.data,
+          ContentType: 'video/mp4',
+          CacheControl: 'public, max-age=31536000, immutable',
+          Metadata: {
+            source: 'terabox',
+            uploader: msg.from?.username || 'user',
+            originalname: encodeURIComponent(info.fileName),
+          },
+        },
+        queueSize: isLarge ? 4 : 1,
+        partSize: isLarge ? 10 * 1024 * 1024 : 5 * 1024 * 1024,
+        leavePartsOnError: false,
+      });
+
+      await upload.done();
+      console.log('[✅] R2 upload done');
+
+      const shortId = crypto.randomBytes(4).toString('hex');
+      await saveMeta(shortId, {
+        name: info.fileName,
+        mime: 'video/mp4',
+        r2Key,
+        uploader: msg.from?.username || 'user',
+        size: info.size,
+        ts: Date.now(),
+        source: 'terabox',
+      });
+
+      const playUrl = `${BASE_URL}/v/${shortId}`;
+      const directUrl = R2_PUBLIC_URL ? `${R2_PUBLIC_URL}/${r2Key}` : null;
+
+      await bot.deleteMessage(chatId, status.message_id).catch(() => {});
+
+      let reply = `✅ <b>Terabox → Your Domain Ready!</b>\n\n` +
+                  `📌 <b>${escapeHtml(info.fileName)}</b>\n` +
+                  `📦 ${(info.size/1024/1024).toFixed(2)} MB\n\n` +
+                  `▶️ <b>Player Link:</b>\n${playUrl}`;
+      if (directUrl) reply += `\n\n⬇️ <b>Direct:</b>\n${directUrl}`;
+
+      return bot.sendMessage(chatId, reply, { parse_mode: 'HTML' });
+
+    } catch (e) {
+      console.error('[Terabox Error]', e.stack || e.message);
+      await bot.deleteMessage(chatId, status.message_id).catch(() => {});
+      return bot.sendMessage(chatId,
+        `❌ <b>Terabox Error:</b>\n<code>${escapeHtml(e.message)}</code>`,
+        { parse_mode: 'HTML' });
+    }
+  }
+
+  // ========== DIRECT TELEGRAM FILE ==========
   const media = pickMedia(msg);
   if (!media) return;
-
-  if (!r2) {
-    return bot.sendMessage(chatId, '❌ R2 config missing.');
-  }
 
   const uploader = msg.from?.username
     ? `@${msg.from.username}`
@@ -236,14 +401,12 @@ bot.on('message', async (msg) => {
   const status = await bot.sendMessage(chatId, `⚡ <i>Uploading...</i>`, { parse_mode: 'HTML' });
 
   try {
-    // Step 1: Telegram se file path lo
     const info = await bot.getFile(fileId);
     if (!info?.file_path) throw new Error('file_path not returned');
 
     let fp = info.file_path.split(TOKEN).pop();
     fp = fp.replace(/^\/+/, '');
 
-    // Step 2: File download karo — pehle official, phir local
     const urlsToTry = [
       `https://api.telegram.org/file/bot${TOKEN}/${fp}`,
     ];
@@ -278,12 +441,11 @@ bot.on('message', async (msg) => {
       throw new Error(`Download failed: ${lastErr?.message || 'All URLs failed'}`);
     }
 
-    // Step 3: R2 pe upload karo
     const ext = path.extname(fileName) || (mime.startsWith('video') ? '.mp4' : '');
     const r2Key = `uploads/${crypto.randomBytes(8).toString('hex')}${ext}`;
     const isLarge = size > 100 * 1024 * 1024;
 
-    console.log('[⬆️] Uploading to R2:', r2Key, `(${(size / 1024 / 1024).toFixed(2)} MB)`);
+    console.log('[⬆️] R2:', r2Key);
 
     const upload = new Upload({
       client: r2,
@@ -304,9 +466,7 @@ bot.on('message', async (msg) => {
     });
 
     await upload.done();
-    console.log('[✅] Uploaded to R2:', r2Key);
 
-    // Step 4: Metadata save karo
     const shortId = crypto.randomBytes(4).toString('hex');
     await saveMeta(shortId, {
       name: fileName, mime, r2Key,
@@ -316,7 +476,7 @@ bot.on('message', async (msg) => {
     const playUrl = `${BASE_URL}/v/${shortId}`;
     const directUrl = R2_PUBLIC_URL ? `${R2_PUBLIC_URL}/${r2Key}` : null;
 
-    await bot.deleteMessage(chatId, status.message_id).catch(() => { });
+    await bot.deleteMessage(chatId, status.message_id).catch(() => {});
 
     let reply = `✅ <b>Upload complete</b>\n\n` +
       `📌 <b>${escapeHtml(fileName)}</b>\n` +
@@ -328,7 +488,7 @@ bot.on('message', async (msg) => {
 
   } catch (e) {
     console.error('[❌]', e.stack || e.message);
-    await bot.deleteMessage(chatId, status.message_id).catch(() => { });
+    await bot.deleteMessage(chatId, status.message_id).catch(() => {});
     bot.sendMessage(chatId,
       `❌ <b>Error:</b>\n<code>${escapeHtml(e.message)}</code>`,
       { parse_mode: 'HTML' });
