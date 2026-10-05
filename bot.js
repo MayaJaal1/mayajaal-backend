@@ -4,25 +4,29 @@ const express = require('express');
 const TelegramBot = require('node-telegram-bot-api');
 const axios = require('axios');
 const crypto = require('crypto');
-const { Redis } = require('@upstash/redis');
 const path = require('path');
+const { Redis } = require('@upstash/redis');
 const { S3Client, GetObjectCommand } = require('@aws-sdk/client-s3');
 const { Upload } = require('@aws-sdk/lib-storage');
 
-process.on('uncaughtException', (err) => console.error('[UncaughtException]:', err.message));
-process.on('unhandledRejection', (reason) => console.error('[UnhandledRejection]:', reason));
+process.on('uncaughtException', (e) => console.error('[Uncaught]', e.stack || e.message));
+process.on('unhandledRejection', (e) => console.error('[Unhandled]', e?.stack || e));
 
-// ================= Redis =================
-let redis;
-try {
-  redis = Redis.fromEnv();
-} catch (e) {
-  redis = { get: async () => null, set: async () => null };
-}
+// ================= DEBUG: ENV CHECK =================
+console.log('=== ENV DEBUG START ===');
+console.log('PORT:', process.env.PORT);
+console.log('BOT_TOKEN set?', !!process.env.BOT_TOKEN);
+console.log('CUSTOM_DOMAIN:', process.env.CUSTOM_DOMAIN);
+console.log('LOCAL_API_URL:', process.env.LOCAL_API_URL);
+console.log('R2_ACCOUNT_ID set?', !!process.env.R2_ACCOUNT_ID);
+console.log('R2_ACCESS_KEY_ID set?', !!process.env.R2_ACCESS_KEY_ID);
+console.log('R2_SECRET_ACCESS_KEY set?', !!process.env.R2_SECRET_ACCESS_KEY);
+console.log('R2_BUCKET_NAME set?', !!process.env.R2_BUCKET_NAME);
+console.log('All R2_* keys:', Object.keys(process.env).filter(k => k.startsWith('R2_')));
+console.log('All keys count:', Object.keys(process.env).length);
+console.log('=== ENV DEBUG END ===');
 
-const linkStore = new Map();
-
-// ================= ENV =================
+// ================= CONFIG =================
 const TOKEN = (process.env.BOT_TOKEN || '').trim();
 const BASE_URL = process.env.CUSTOM_DOMAIN
   ? (process.env.CUSTOM_DOMAIN.startsWith('http')
@@ -30,278 +34,284 @@ const BASE_URL = process.env.CUSTOM_DOMAIN
       : `https://${process.env.CUSTOM_DOMAIN}`)
   : 'https://mayajaal.online';
 
-const LOCAL_API_URL = (process.env.LOCAL_BOT_API_URL || 'https://tg-local-api-gxrv.onrender.com')
+const LOCAL_API_URL = (process.env.LOCAL_API_URL || 'https://tg-local-api-gxrv.onrender.com')
   .trim().replace(/\/$/, '');
 
-const R2_ACCOUNT_ID          = process.env.R2_ACCOUNT_ID;
-const R2_ACCESS_KEY_ID       = process.env.R2_ACCESS_KEY_ID;
-const R2_SECRET_ACCESS_KEY   = process.env.R2_SECRET_ACCESS_KEY;
-const R2_BUCKET_NAME         = process.env.R2_BUCKET_NAME;
-const R2_PUBLIC_URL          = (process.env.R2_PUBLIC_URL || '').replace(/\/$/, '');
-const MAX_FILE_SIZE          = parseInt(process.env.MAX_FILE_SIZE || '2147483648', 10);
+const R2_ACCOUNT_ID = (process.env.R2_ACCOUNT_ID || '').trim();
+const R2_ACCESS_KEY_ID = (process.env.R2_ACCESS_KEY_ID || '').trim();
+const R2_SECRET_ACCESS_KEY = (process.env.R2_SECRET_ACCESS_KEY || '').trim();
+const R2_BUCKET_NAME = (process.env.R2_BUCKET_NAME || '').trim();
+const R2_PUBLIC_URL = (process.env.R2_PUBLIC_URL || '').trim().replace(/\/$/, '');
+const MAX_FILE_SIZE = parseInt(process.env.MAX_FILE_SIZE || '2147483648', 10);
+const PORT = parseInt(process.env.PORT || '8080', 10);
 
+// Soft check - crash nahi karega, sirf warning dega
+if (!TOKEN) console.error('⚠️ BOT_TOKEN missing');
 if (!R2_ACCOUNT_ID || !R2_ACCESS_KEY_ID || !R2_SECRET_ACCESS_KEY || !R2_BUCKET_NAME) {
-  throw new Error('❌ R2 env vars missing. Check .env');
+  console.error('⚠️ R2 config incomplete. Bot chalega par upload fail hoga.');
 }
 
-// ================= R2 Client =================
-const r2Client = new S3Client({
-  region: 'auto',
-  endpoint: `https://${R2_ACCOUNT_ID}.r2.cloudflarestorage.com`,
-  credentials: {
-    accessKeyId: R2_ACCESS_KEY_ID,
-    secretAccessKey: R2_SECRET_ACCESS_KEY,
-  },
-});
+// ================= REDIS =================
+let redis;
+try {
+  redis = Redis.fromEnv();
+  console.log('✅ Redis connected');
+} catch (e) {
+  console.warn('⚠️ Redis not available, using memory store');
+  redis = { get: async () => null, set: async () => null };
+}
 
-console.log('✅ Cloudflare R2 Initialized');
+const memStore = new Map();
 
-// ================= Express =================
+async function saveMeta(id, payload) {
+  memStore.set(id, payload);
+  try { await redis.set(`v:${id}`, JSON.stringify(payload), { ex: 30 * 86400 }); } catch (e) { }
+}
+
+async function getMeta(id) {
+  if (memStore.has(id)) return memStore.get(id);
+  try {
+    const raw = await redis.get(`v:${id}`);
+    if (raw) {
+      const data = typeof raw === 'string' ? JSON.parse(raw) : raw;
+      memStore.set(id, data);
+      return data;
+    }
+  } catch (e) { }
+  return null;
+}
+
+// ================= R2 CLIENT =================
+let r2 = null;
+if (R2_ACCOUNT_ID && R2_ACCESS_KEY_ID && R2_SECRET_ACCESS_KEY && R2_BUCKET_NAME) {
+  r2 = new S3Client({
+    region: 'auto',
+    endpoint: `https://${R2_ACCOUNT_ID}.r2.cloudflarestorage.com`,
+    credentials: {
+      accessKeyId: R2_ACCESS_KEY_ID,
+      secretAccessKey: R2_SECRET_ACCESS_KEY,
+    },
+  });
+  console.log('✅ R2 initialized for bucket:', R2_BUCKET_NAME);
+} else {
+  console.error('❌ R2 NOT initialized - check env variables');
+}
+
+// ================= EXPRESS =================
 const app = express();
-const PORT = process.env.PORT || 8080;
-
 app.use(express.json());
-app.use(express.static(__dirname));
-
-app.use((req, res, next) => {
-  res.header('Access-Control-Allow-Origin', '*');
-  res.header('Access-Control-Allow-Headers', '*');
-  res.header('Access-Control-Allow-Methods', 'GET, POST, OPTIONS, HEAD');
-  if (req.method === 'OPTIONS') return res.sendStatus(200);
-  next();
-});
 
 app.get('/', (req, res) => res.send('Stream Engine Online'));
-app.get('/health', (req, res) => res.json({ status: 'ok', uptime: process.uptime() }));
+app.get('/health', (req, res) => res.json({
+  ok: true,
+  uptime: process.uptime(),
+  r2Ready: !!r2,
+  env: {
+    botToken: !!TOKEN,
+    r2Account: !!R2_ACCOUNT_ID,
+    r2AccessKey: !!R2_ACCESS_KEY_ID,
+    r2Secret: !!R2_SECRET_ACCESS_KEY,
+    r2Bucket: !!R2_BUCKET_NAME,
+  },
+}));
 
-// ================= Player Page =================
+// ================= PLAYER PAGE =================
 app.get('/v/:id', async (req, res) => {
   try {
-    const id = req.params.id;
-    let data = linkStore.get(id);
+    const meta = await getMeta(req.params.id);
+    if (!meta) return res.status(404).send('Not found');
 
-    if (!data) {
-      const raw = await redis.get(`video:${id}`);
-      if (raw) data = typeof raw === 'string' ? JSON.parse(raw) : raw;
-    }
+    const streamUrl = `${BASE_URL}/stream/${req.params.id}`;
+    const title = escapeHtml(meta.name || 'Video');
 
-    if (!data || !data.r2Key) {
-      return res.status(404).send('Video not found or processing');
-    }
-
-    const streamUrl = `${BASE_URL}/stream/${id}`;
-    const videoTitle = data.name || 'Video Player';
-
-    res.send(`
-      <!DOCTYPE html>
-      <html lang="hi">
-      <head>
-        <meta charset="UTF-8">
-        <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>${videoTitle}</title>
-        <link rel="stylesheet" href="https://cdn.plyr.io/3.7.8/plyr.css" />
-        <style>
-          * { box-sizing: border-box; margin: 0; padding: 0; }
-          body { background:#000; color:#fff; font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif; min-height:100vh; display:flex; flex-direction:column; align-items:center; justify-content:center; padding:12px; }
-          .player-box { width:100%; max-width:900px; padding:10px; }
-          video { width:100%; max-height:80vh; border-radius:12px; background:#111; outline:none; }
-          .title { margin-top:15px; font-size:1.05rem; color:#00ff88; word-break:break-all; }
-        </style>
-      </head>
-      <body>
-        <div class="player-box">
-          <video id="player" controls autoplay playsinline preload="metadata">
-            <source src="${streamUrl}" type="video/mp4">
-          </video>
-          <div class="title">🎬 ${videoTitle}</div>
-        </div>
-        <script src="https://cdn.plyr.io/3.7.8/plyr.polyfilled.js"></script>
-        <script>new Plyr('#player');</script>
-      </body>
-      </html>
-    `);
-  } catch (err) {
-    res.status(500).send('Player error: ' + err.message);
+    res.send(`<!DOCTYPE html>
+<html lang="hi"><head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>${title}</title>
+<link rel="stylesheet" href="https://cdn.plyr.io/3.7.8/plyr.css">
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:#0a0a0a;color:#fff;font-family:-apple-system,sans-serif;min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:12px}
+.box{width:100%;max-width:960px}
+video{width:100%;max-height:80vh;border-radius:14px;background:#000}
+.t{margin-top:14px;font-size:1rem;color:#00ff88;word-break:break-all;opacity:.9}
+</style></head><body>
+<div class="box">
+<video id="p" controls autoplay playsinline preload="metadata">
+<source src="${streamUrl}" type="${meta.mime || 'video/mp4'}">
+</video>
+<div class="t">🎬 ${title}</div>
+</div>
+<script src="https://cdn.plyr.io/3.7.8/plyr.polyfilled.js"></script>
+<script>new Plyr('#p');</script>
+</body></html>`);
+  } catch (e) {
+    res.status(500).send('err: ' + e.message);
   }
 });
 
-// ================= R2 Range Streaming =================
+// ================= STREAM FROM R2 =================
 app.get('/stream/:id', async (req, res) => {
   try {
-    const id = req.params.id;
-    let data = linkStore.get(id);
+    if (!r2) return res.status(500).send('R2 not configured');
+    const meta = await getMeta(req.params.id);
+    if (!meta?.r2Key) return res.status(404).send('Not found');
 
-    if (!data) {
-      const raw = await redis.get(`video:${id}`);
-      if (raw) data = typeof raw === 'string' ? JSON.parse(raw) : raw;
-    }
-    if (!data?.r2Key) return res.status(404).send('Not found');
-
-    const range = req.headers.range;
-
-    const out = await r2Client.send(new GetObjectCommand({
+    const out = await r2.send(new GetObjectCommand({
       Bucket: R2_BUCKET_NAME,
-      Key: data.r2Key,
-      Range: range || undefined,
+      Key: meta.r2Key,
+      Range: req.headers.range || undefined,
     }));
 
-    res.status(range ? 206 : 200);
-    res.setHeader('Content-Type', out.ContentType || data.mime || 'video/mp4');
+    res.status(req.headers.range ? 206 : 200);
+    res.setHeader('Content-Type', out.ContentType || meta.mime || 'video/mp4');
     res.setHeader('Accept-Ranges', 'bytes');
     res.setHeader('Cache-Control', 'public, max-age=31536000');
-    if (out.ContentRange)  res.setHeader('Content-Range', out.ContentRange);
+    if (out.ContentRange) res.setHeader('Content-Range', out.ContentRange);
     if (out.ContentLength) res.setHeader('Content-Length', out.ContentLength);
-    if (out.ETag)          res.setHeader('ETag', out.ETag);
+    if (out.ETag) res.setHeader('ETag', out.ETag);
 
-    out.Body.on('error', (e) => {
-      console.error('[R2 stream error]', e.message);
-      if (!res.headersSent) res.status(500);
-      res.end();
-    });
-
+    out.Body.on('error', () => { if (!res.headersSent) res.status(500); res.end(); });
     out.Body.pipe(res);
-  } catch (err) {
-    console.error('[stream]', err.message);
-    if (!res.headersSent) res.status(500).send('Streaming error');
+  } catch (e) {
+    console.error('[stream]', e.message);
+    if (!res.headersSent) res.status(500).send('err');
   }
 });
 
-app.listen(PORT, () => console.log(`🚀 Web Server running on port ${PORT}`));
-// ================= Bot Init =================
+app.listen(PORT, () => console.log(`🚀 Web on port ${PORT}`));
+
+// ================= HELPERS =================
+function escapeHtml(s = '') {
+  return String(s).replace(/[&<>"']/g, c =>
+    ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+}
+
+function pickMedia(msg) {
+  return msg.video || msg.document || msg.audio || msg.animation || null;
+}
+
+// ================= BOT =================
+if (!TOKEN) {
+  console.error('❌ BOT_TOKEN missing — bot start nahi hoga');
+  process.exit(1);
+}
+
 const bot = new TelegramBot(TOKEN, {
   polling: { autoStart: true, params: { timeout: 10 } },
   baseApiUrl: LOCAL_API_URL,
 });
 
-bot.on('polling_error', async (error) => {
-  if (error.message && error.message.includes('409 Conflict')) {
-    await new Promise(r => setTimeout(r, 4000));
-  }
+bot.on('polling_error', async (e) => {
+  console.error('[polling_error]', e.message);
+  if (e.message?.includes('409')) await new Promise(r => setTimeout(r, 4000));
 });
-
-function escapeHtml(str = '') {
-  return String(str).replace(/[&<>"']/g, (c) =>
-    ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c])
-  );
-}
 
 bot.onText(/\/start/, (msg) => {
   bot.sendMessage(msg.chat.id,
-    `🎬 <b>MayaJaal Stream Converter Bot</b>\n\n` +
-    `⚡ Direct file send karein, streaming link ban jayegi!`,
-    { parse_mode: 'HTML' }
-  );
+    `🎬 <b>MayaJaal Stream Bot</b>\n\n` +
+    `⚡ File bhejo → 2GB tak support → R2 direct upload.`,
+    { parse_mode: 'HTML' });
 });
 
-// ================= File Upload Handler =================
 bot.on('message', async (msg) => {
   const chatId = msg.chat.id;
+  const media = pickMedia(msg);
+  if (!media) return;
+
+  if (!r2) {
+    return bot.sendMessage(chatId, '❌ R2 config missing. Admin ko bolo.');
+  }
+
   const uploader = msg.from?.username
     ? `@${msg.from.username}`
     : (msg.from?.first_name || 'User');
 
-  const mediaObj = msg.video || msg.document || msg.audio || msg.animation || null;
-  if (!mediaObj) return;
-
-  const fileId   = mediaObj.file_id;
-  const fileName = mediaObj.file_name || `file_${Date.now()}.mp4`;
-  const mime     = mediaObj.mime_type || 'application/octet-stream';
-  const size     = mediaObj.file_size || 0;
+  const fileId = media.file_id;
+  const fileName = media.file_name || `file_${Date.now()}.mp4`;
+  const mime = media.mime_type || 'application/octet-stream';
+  const size = media.file_size || 0;
 
   if (size && size > MAX_FILE_SIZE) {
-    return bot.sendMessage(
-      chatId,
-      `❌ File too large. Max ${(MAX_FILE_SIZE/1024/1024).toFixed(0)} MB allowed.`
-    );
+    return bot.sendMessage(chatId,
+      `❌ File too large. Max ${(MAX_FILE_SIZE / 1024 / 1024).toFixed(0)} MB.`);
   }
 
-  const statusMsg = await bot.sendMessage(
-    chatId,
-    `⚡ <i>Telegram → Cloudflare R2 direct upload chal raha hai...</i>`,
-    { parse_mode: 'HTML' }
-  );
+  const status = await bot.sendMessage(chatId, `⚡ <i>Uploading...</i>`, { parse_mode: 'HTML' });
 
   try {
-    const fileInfo = await bot.getFile(fileId);
-    if (!fileInfo?.file_path) throw new Error('Telegram file_path nahi mila');
+    const info = await bot.getFile(fileId);
+    if (!info?.file_path) throw new Error('file_path not returned');
 
-    let filePath = fileInfo.file_path;
-    if (filePath.includes(TOKEN)) filePath = filePath.split(TOKEN).pop();
-    filePath = filePath.replace(/^\/+/, '');
+    let fp = info.file_path.split(TOKEN).pop();
+    fp = fp.replace(/^\/+/, '');
 
-    const urls = [
-      `https://api.telegram.org/file/bot${TOKEN}/${filePath}`,
-      `${LOCAL_API_URL}/file/bot${TOKEN}/${filePath}`,
-    ];
+    const downloadUrl = `${LOCAL_API_URL}/file/bot${TOKEN}/${fp}`;
+    console.log('[⬇️]', downloadUrl);
 
-    let stream = null, lastErr = null;
-    for (const url of urls) {
-      try {
-        const r = await axios.get(url, {
-          responseType: 'stream',
-          maxContentLength: Infinity,
-          maxBodyLength: Infinity,
-          timeout: 0,
-          validateStatus: (s) => s >= 200 && s < 400,
-        });
-        stream = r.data;
-        stream.on('error', (e) => console.error('[TG stream error]', e.message));
-        break;
-      } catch (e) {
-        lastErr = e;
-        console.warn(`[Download fail] ${url} → ${e.message}`);
-      }
-    }
-    if (!stream) throw new Error(`Download failed: ${lastErr?.message}`);
+    const resp = await axios.get(downloadUrl, {
+      responseType: 'stream',
+      maxContentLength: Infinity,
+      maxBodyLength: Infinity,
+      timeout: 0,
+      validateStatus: (s) => s >= 200 && s < 400,
+    });
+    const stream = resp.data;
+    stream.on('error', (e) => console.error('[TG stream err]', e.message));
 
     const ext = path.extname(fileName) || (mime.startsWith('video') ? '.mp4' : '');
     const r2Key = `uploads/${crypto.randomBytes(8).toString('hex')}${ext}`;
-
     const isLarge = size > 100 * 1024 * 1024;
 
-    const uploaderS3 = new Upload({
-      client: r2Client,
+    console.log('[⬆️]', r2Key, `(${(size / 1024 / 1024).toFixed(2)} MB)`);
+
+    const upload = new Upload({
+      client: r2,
       params: {
         Bucket: R2_BUCKET_NAME,
         Key: r2Key,
         Body: stream,
         ContentType: mime,
         CacheControl: 'public, max-age=31536000, immutable',
-        Metadata: { uploader, originalName: encodeURIComponent(fileName) },
+        Metadata: {
+          uploader,
+          originalname: encodeURIComponent(fileName),
+        },
       },
       queueSize: isLarge ? 4 : 1,
       partSize: isLarge ? 10 * 1024 * 1024 : 5 * 1024 * 1024,
       leavePartsOnError: false,
     });
 
-    await uploaderS3.done();
+    await upload.done();
 
     const shortId = crypto.randomBytes(4).toString('hex');
-    const payload = { name: fileName, mime, r2Key, uploader, size, ts: Date.now() };
-
-    linkStore.set(shortId, payload);
-    await redis.set(`video:${shortId}`, JSON.stringify(payload), { ex: 30 * 86400 });
+    await saveMeta(shortId, {
+      name: fileName, mime, r2Key,
+      uploader, size, ts: Date.now(),
+    });
 
     const playUrl = `${BASE_URL}/v/${shortId}`;
-    const direct  = R2_PUBLIC_URL ? `${R2_PUBLIC_URL}/${r2Key}` : null;
+    const directUrl = R2_PUBLIC_URL ? `${R2_PUBLIC_URL}/${r2Key}` : null;
 
-    await bot.deleteMessage(chatId, statusMsg.message_id).catch(() => {});
+    await bot.deleteMessage(chatId, status.message_id).catch(() => { });
 
-    let reply = `✨ <b>Upload complete</b>\n\n` +
-                `📌 <b>File:</b> ${escapeHtml(fileName)}\n` +
-                `📦 <b>Size:</b> ${(size/1024/1024).toFixed(2)} MB\n\n` +
-                `▶️ <b>Player:</b>\n${playUrl}`;
-    if (direct) reply += `\n\n⬇️ <b>Direct:</b>\n${direct}`;
+    let reply = `✅ <b>Upload complete</b>\n\n` +
+      `📌 <b>${escapeHtml(fileName)}</b>\n` +
+      `📦 ${(size / 1024 / 1024).toFixed(2)} MB\n\n` +
+      `▶️ <b>Player:</b>\n${playUrl}`;
+    if (directUrl) reply += `\n\n⬇️ <b>Direct:</b>\n${directUrl}`;
 
-    return bot.sendMessage(chatId, reply, { parse_mode: 'HTML' });
+    bot.sendMessage(chatId, reply, { parse_mode: 'HTML' });
 
-  } catch (err) {
-    console.error('[Upload Error]:', err.stack || err.message);
-    await bot.deleteMessage(chatId, statusMsg.message_id).catch(() => {});
-    return bot.sendMessage(
-      chatId,
-      `❌ <b>Upload Error:</b>\n<code>${escapeHtml(err.message)}</code>`,
-      { parse_mode: 'HTML' }
-    );
+  } catch (e) {
+    console.error('[❌]', e.stack || e.message);
+    await bot.deleteMessage(chatId, status.message_id).catch(() => { });
+    bot.sendMessage(chatId,
+      `❌ <b>Error:</b>\n<code>${escapeHtml(e.message)}</code>`,
+      { parse_mode: 'HTML' });
   }
 });
+
+console.log('🤖 Bot started');
