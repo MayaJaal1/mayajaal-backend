@@ -21,6 +21,7 @@ const BASE_URL = process.env.CUSTOM_DOMAIN
   : 'https://mayajaal.online';
 
 const LOCAL_API_URL = (process.env.LOCAL_API_URL || '').trim().replace(/\/$/, '');
+const TERABOX_GATEWAY = (process.env.TERABOX_GATEWAY_URL || '').trim().replace(/\/$/, '');
 
 const R2_ACCOUNT_ID = (process.env.R2_ACCOUNT_ID || '').trim();
 const R2_ACCESS_KEY_ID = (process.env.R2_ACCESS_KEY_ID || '').trim();
@@ -30,12 +31,10 @@ const R2_PUBLIC_URL = (process.env.R2_PUBLIC_URL || '').trim().replace(/\/$/, ''
 const MAX_FILE_SIZE = parseInt(process.env.MAX_FILE_SIZE || '2147483648', 10);
 const PORT = parseInt(process.env.PORT || '8080', 10);
 
-const TERABOX_COOKIE = (process.env.TERABOX_COOKIE || '').trim();
-
 console.log('=== ENV CHECK ===');
 console.log('BOT_TOKEN:', !!TOKEN);
 console.log('R2 ready:', !!(R2_ACCOUNT_ID && R2_ACCESS_KEY_ID && R2_SECRET_ACCESS_KEY && R2_BUCKET_NAME));
-console.log('Terabox cookie:', !!TERABOX_COOKIE);
+console.log('Terabox gateway:', TERABOX_GATEWAY || '❌ NOT SET');
 console.log('=================');
 
 if (!TOKEN) throw new Error('❌ BOT_TOKEN missing');
@@ -93,7 +92,7 @@ app.get('/health', (req, res) => res.json({
   ok: true,
   uptime: process.uptime(),
   r2Ready: true,
-  teraboxCookie: !!TERABOX_COOKIE,
+  teraboxGateway: !!TERABOX_GATEWAY,
 }));
 
 // Player page
@@ -172,7 +171,7 @@ function pickMedia(msg) {
   return msg.video || msg.document || msg.audio || msg.animation || null;
 }
 
-// ============ TERABOX URL DETECT (saare domains) ============
+// ============ TERABOX URL DETECT ============
 function detectTeraboxUrl(text) {
   if (!text) return null;
 
@@ -188,9 +187,10 @@ function detectTeraboxUrl(text) {
     'terafileshare\\.com', 'terashare\\.com', 'terasharelink\\.com',
     'terasharefile\\.com', 'freeterabox\\.com', 'gearbox\\.app',
     'teraboxcdn\\.com', 'terabox\\.store', 'terabox\\.site',
-    'terabox\\.space', 'terabox\\.website', 'terasharefile\\.com',
+    'terabox\\.space', 'terabox\\.website',
     'teraboxnew\\.com', 'teraboxdrive\\.com', 'teraboxfiles\\.com',
-    'dubox\\.com', 'terabox\\.icu', 'terabox\\.xyz'
+    'dubox\\.com', 'terabox\\.icu', 'terabox\\.xyz',
+    '1024terabox\\.com', 'teraboxshare\\.com'
   ];
 
   const pattern = domains.join('|');
@@ -199,83 +199,62 @@ function detectTeraboxUrl(text) {
   return m ? m[0] : null;
 }
 
-// ================= TERABOX DIRECT LINK =================
+// ================= TERABOX VIA GATEWAY =================
 async function getTeraboxDirectLink(shareUrl) {
-  console.log('[Terabox] Fetching:', shareUrl);
+  if (!TERABOX_GATEWAY) {
+    throw new Error('TERABOX_GATEWAY_URL set nahi hai. Admin se bolo.');
+  }
 
-  const pageResp = await axios.get(shareUrl, {
-    headers: {
-      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-      'Cookie': TERABOX_COOKIE,
-      'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-      'Accept-Language': 'en-US,en;q=0.9',
-    },
-    timeout: 30000,
-    maxRedirects: 5,
+  console.log('[Terabox Gateway] Resolving:', shareUrl);
+
+  const apiUrl = `${TERABOX_GATEWAY}/api?url=${encodeURIComponent(shareUrl)}&resolve=true`;
+  const resp = await axios.get(apiUrl, {
+    timeout: 120000,
+    validateStatus: (s) => s >= 200 && s < 500,
   });
 
-  const html = pageResp.data;
-  console.log('[Terabox] HTML length:', html.length);
+  const data = resp.data;
 
-  const yunMatch = html.match(/window\.yunData\s*=\s*(\{[\s\S]+?\});?\s*<\/script>/);
-  if (!yunMatch) {
-    throw new Error('yunData nahi mila. Cookie expire ya invalid link.');
+  if (!data?.success) {
+    throw new Error(data?.error || 'Gateway error: ' + JSON.stringify(data).slice(0, 200));
   }
 
-  let yunData;
-  try {
-    yunData = JSON.parse(yunMatch[1]);
-  } catch (e) {
-    throw new Error('yunData parse fail');
+  const files = data.files || data.list || [];
+  if (!files.length) {
+    throw new Error('Gateway ne koi file return nahi ki');
   }
 
-  const shareid = yunData.shareid;
-  const uk = yunData.uk;
-  const sign = yunData.sign;
-  const timestamp = yunData.timestamp;
-  const fileList = yunData.file_list || [];
-  const firstFile = fileList[0];
+  const file = files[0];
+  const fileName = file.file_name || file.name || `terabox_${Date.now()}.mp4`;
+  const downloadUrl = file.download_url || file.dlink || file.download_link;
+  const sizeRaw = file.size || 0;
 
-  if (!shareid || !uk || !firstFile) {
-    throw new Error('Share info incomplete. Cookie refresh karo.');
+  if (!downloadUrl) {
+    throw new Error('Download URL nahi mila. Cookie check karo.');
   }
 
-  const fs_id = firstFile.fs_id;
-  const fileName = firstFile.server_filename || `terabox_${Date.now()}.mp4`;
-  const size = firstFile.size || 0;
-
-  console.log(`[Terabox] File: ${fileName} (${(size/1024/1024).toFixed(2)} MB)`);
-
-  const params = new URLSearchParams({
-    shareid: shareid,
-    uk: uk,
-    sign: sign,
-    timestamp: timestamp,
-    fs_id: fs_id,
-    channel: 'dubox',
-    web: '1',
-    app_id: '250528',
-  });
-
-  const dlResp = await axios.get(`https://www.terabox.com/share/download?${params}`, {
-    headers: {
-      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-      'Cookie': TERABOX_COOKIE,
-      'Referer': shareUrl,
-      'Accept': 'application/json, text/plain, */*',
-    },
-    timeout: 30000,
-  });
-
-  const dlink = dlResp.data?.dlink;
-  if (!dlink) {
-    throw new Error('Direct link nahi mila. Cookie expire ho gayi.');
+  // Size parse karo (MB string ho sakta hai)
+  let size = 0;
+  if (typeof sizeRaw === 'number') size = sizeRaw;
+  else if (typeof sizeRaw === 'string') {
+    const m = sizeRaw.match(/([\d.]+)\s*(MB|GB|KB|B)/i);
+    if (m) {
+      const n = parseFloat(m[1]);
+      const unit = m[2].toUpperCase();
+      if (unit === 'GB') size = n * 1024 * 1024 * 1024;
+      else if (unit === 'MB') size = n * 1024 * 1024;
+      else if (unit === 'KB') size = n * 1024;
+      else size = n;
+    }
   }
 
-  const finalUrl = Array.isArray(dlink) ? dlink[0] : dlink;
-  console.log('[Terabox] Direct link mil gaya');
+  console.log(`[Terabox] File: ${fileName} (${(size / 1024 / 1024).toFixed(2)} MB)`);
 
-  return { url: finalUrl, fileName, size };
+  return {
+    url: downloadUrl,
+    fileName,
+    size,
+  };
 }
 
 // ================= BOT =================
@@ -306,8 +285,8 @@ bot.on('message', async (msg) => {
   // ========== TERABOX LINK ==========
   const teraboxUrl = detectTeraboxUrl(text);
   if (teraboxUrl) {
-    if (!TERABOX_COOKIE) {
-      return bot.sendMessage(chatId, '❌ Terabox cookie set nahi hai. Admin se bolo.');
+    if (!TERABOX_GATEWAY) {
+      return bot.sendMessage(chatId, '❌ Terabox gateway set nahi hai. Admin se bolo.');
     }
 
     console.log('[Terabox] Detected URL:', teraboxUrl);
@@ -320,7 +299,7 @@ bot.on('message', async (msg) => {
       const info = await getTeraboxDirectLink(teraboxUrl);
 
       await bot.editMessageText(
-        `⬇️ <i>Download + upload chal raha hai...</i>\n📌 ${escapeHtml(info.fileName)}\n📦 ${(info.size/1024/1024).toFixed(2)} MB`,
+        `⬇️ <i>Download + upload chal raha hai...</i>\n📌 ${escapeHtml(info.fileName)}\n📦 ${(info.size / 1024 / 1024).toFixed(2)} MB`,
         { chat_id: chatId, message_id: status.message_id, parse_mode: 'HTML' }
       );
 
@@ -330,8 +309,7 @@ bot.on('message', async (msg) => {
         maxBodyLength: Infinity,
         timeout: 0,
         headers: {
-          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-          'Cookie': TERABOX_COOKIE,
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
           'Referer': teraboxUrl,
         },
       });
@@ -382,7 +360,7 @@ bot.on('message', async (msg) => {
 
       let reply = `✅ <b>Terabox → Your Domain Ready!</b>\n\n` +
                   `📌 <b>${escapeHtml(info.fileName)}</b>\n` +
-                  `📦 ${(info.size/1024/1024).toFixed(2)} MB\n\n` +
+                  `📦 ${(info.size / 1024 / 1024).toFixed(2)} MB\n\n` +
                   `▶️ <b>Player Link:</b>\n${playUrl}`;
       if (directUrl) reply += `\n\n⬇️ <b>Direct:</b>\n${directUrl}`;
 
