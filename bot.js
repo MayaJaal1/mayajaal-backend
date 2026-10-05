@@ -225,7 +225,7 @@ app.listen(PORT, () => console.log(`Web on ${PORT}`));
     const fileMedia = msg.media.document || msg.document || msg.video;
     if (!fileMedia) return;
 
-    console.log('[File] className:', fileMedia.className, '| hasId:', !!fileMedia.id, '| hasHash:', !!fileMedia.accessHash, '| hasRef:', !!fileMedia.fileReference);
+    console.log('[File] className:', fileMedia.className, '| hasId:', !!fileMedia.id, '| hasHash:', !!fileMedia.accessHash, '| hasRef:', !!fileMedia.fileReference, '| size:', fileMedia.size);
 
     let fileName = 'video.mp4', mime = 'application/octet-stream', size = 0;
     size = Number(fileMedia.size) || 0;
@@ -245,6 +245,7 @@ app.listen(PORT, () => console.log(`Web on ${PORT}`));
         parseMode: 'html',
       });
 
+      // ========== FIXED FILE DOWNLOAD (Raw MTProto API) ==========
       const fileLocation = new Api.InputDocumentFileLocation({
         id: fileMedia.id,
         accessHash: fileMedia.accessHash,
@@ -252,9 +253,26 @@ app.listen(PORT, () => console.log(`Web on ${PORT}`));
         thumbSize: '',
       });
 
+      const totalSize = Number(fileMedia.size) || 0;
+      const CHUNK = 512 * 1024;
+
       const stream = Readable.from((async function* () {
-        for await (const chunk of client.iterDownload({ file: fileLocation, requestSize: 1024 * 1024 })) {
-          yield Buffer.from(chunk);
+        let offset = 0;
+        while (offset < totalSize) {
+          let res;
+          try {
+            res = await client.invoke(new Api.upload.GetFile({
+              location: fileLocation,
+              offset: offset,
+              limit: CHUNK,
+            }));
+          } catch (err) {
+            console.error('[GetFile Error]', err.message);
+            break;
+          }
+          if (!res || !res.bytes || res.bytes.length === 0) break;
+          offset += res.bytes.length;
+          yield Buffer.from(res.bytes);
         }
       })());
 
