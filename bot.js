@@ -222,8 +222,10 @@ app.listen(PORT, () => console.log(`Web on ${PORT}`));
 
     // ========== DIRECT FILE (2GB tak) ==========
     if (!msg.media) return;
-    const fileMedia = msg.document || msg.video;
+    const fileMedia = msg.media.document || msg.document || msg.video;
     if (!fileMedia) return;
+
+    console.log('[File] className:', fileMedia.className, '| hasId:', !!fileMedia.id, '| hasHash:', !!fileMedia.accessHash, '| hasRef:', !!fileMedia.fileReference);
 
     let fileName = 'video.mp4', mime = 'application/octet-stream', size = 0;
     size = Number(fileMedia.size) || 0;
