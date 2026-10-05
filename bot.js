@@ -32,7 +32,6 @@ const PORT = parseInt(process.env.PORT || '8080', 10);
 
 const TERABOX_COOKIE = (process.env.TERABOX_COOKIE || '').trim();
 
-// Debug
 console.log('=== ENV CHECK ===');
 console.log('BOT_TOKEN:', !!TOKEN);
 console.log('R2 ready:', !!(R2_ACCOUNT_ID && R2_ACCESS_KEY_ID && R2_SECRET_ACCESS_KEY && R2_BUCKET_NAME));
@@ -173,9 +172,29 @@ function pickMedia(msg) {
   return msg.video || msg.document || msg.audio || msg.animation || null;
 }
 
+// ============ TERABOX URL DETECT (saare domains) ============
 function detectTeraboxUrl(text) {
   if (!text) return null;
-  const regex = /https?:\/\/[^\s]*(terabox\.(app|com|link|club|fun|app)|1024tera\.com|4funbox\.com|mirrobox\.com|nephobox\.com|momerybox\.com|tibibox\.com|teraboxapp\.com|terasharelink\.com)[^\s]*/i;
+
+  const domains = [
+    'terabox\\.com', 'terabox\\.app', 'terabox\\.link', 'terabox\\.club',
+    'terabox\\.fun', 'terabox\\.cc', 'terabox\\.top', 'terabox\\.online',
+    'terabox\\.apk', 'terabox\\.download', 'terabox\\.pro',
+    '1024tera\\.com', '1024terabox\\.com',
+    '4funbox\\.com', '4funbox\\.co',
+    'mirrobox\\.com', 'nephobox\\.com', 'momerybox\\.com', 'tibibox\\.com',
+    'teraboxapp\\.com', 'teraboxlink\\.com', 'teraboxshare\\.com',
+    'teraboxurl\\.com', 'teraboxdl\\.com', 'teraboxdownloader\\.com',
+    'terafileshare\\.com', 'terashare\\.com', 'terasharelink\\.com',
+    'terasharefile\\.com', 'freeterabox\\.com', 'gearbox\\.app',
+    'teraboxcdn\\.com', 'terabox\\.store', 'terabox\\.site',
+    'terabox\\.space', 'terabox\\.website', 'terasharefile\\.com',
+    'teraboxnew\\.com', 'teraboxdrive\\.com', 'teraboxfiles\\.com',
+    'dubox\\.com', 'terabox\\.icu', 'terabox\\.xyz'
+  ];
+
+  const pattern = domains.join('|');
+  const regex = new RegExp(`https?:\\/\\/[^\\s]*(${pattern})[^\\s]*`, 'i');
   const m = text.match(regex);
   return m ? m[0] : null;
 }
@@ -198,7 +217,6 @@ async function getTeraboxDirectLink(shareUrl) {
   const html = pageResp.data;
   console.log('[Terabox] HTML length:', html.length);
 
-  // yunData nikaalo
   const yunMatch = html.match(/window\.yunData\s*=\s*(\{[\s\S]+?\});?\s*<\/script>/);
   if (!yunMatch) {
     throw new Error('yunData nahi mila. Cookie expire ya invalid link.');
@@ -208,7 +226,6 @@ async function getTeraboxDirectLink(shareUrl) {
   try {
     yunData = JSON.parse(yunMatch[1]);
   } catch (e) {
-    // kabhi kabhi string escaped hoti hai
     throw new Error('yunData parse fail');
   }
 
@@ -229,7 +246,6 @@ async function getTeraboxDirectLink(shareUrl) {
 
   console.log(`[Terabox] File: ${fileName} (${(size/1024/1024).toFixed(2)} MB)`);
 
-  // Direct link API
   const params = new URLSearchParams({
     shareid: shareid,
     uk: uk,
@@ -294,6 +310,8 @@ bot.on('message', async (msg) => {
       return bot.sendMessage(chatId, '❌ Terabox cookie set nahi hai. Admin se bolo.');
     }
 
+    console.log('[Terabox] Detected URL:', teraboxUrl);
+
     const status = await bot.sendMessage(chatId,
       `🔍 <i>Terabox link detect hua, direct link nikal raha hoon...</i>`,
       { parse_mode: 'HTML' });
@@ -306,7 +324,6 @@ bot.on('message', async (msg) => {
         { chat_id: chatId, message_id: status.message_id, parse_mode: 'HTML' }
       );
 
-      // Stream download from Terabox
       const resp = await axios.get(info.url, {
         responseType: 'stream',
         maxContentLength: Infinity,
