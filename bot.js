@@ -29,7 +29,6 @@ const MAX_FILE_SIZE = parseInt(process.env.MAX_FILE_SIZE || '2147483648', 10);
 const PORT = parseInt(process.env.PORT || '8080', 10);
 const VIDEO_SECRET = (process.env.VIDEO_SECRET || '').trim();
 
-// ===== APP CONFIG =====
 const APP_NAME = process.env.APP_NAME || 'MayaJaal';
 const APP_SCHEME = process.env.APP_SCHEME || 'mayajaal';
 const APP_PACKAGE = process.env.APP_PACKAGE || 'com.mayajaal.app';
@@ -46,15 +45,14 @@ console.log('VIDEO_SECRET:', VIDEO_SECRET.length >= 20 ? 'OK' : 'MISSING/WEAK!')
 
 if (!TOKEN || !API_ID || !API_HASH) throw new Error('Missing BOT_TOKEN / API_ID / API_HASH');
 if (!R2_ACCOUNT_ID || !R2_ACCESS_KEY_ID || !R2_SECRET_ACCESS_KEY || !R2_BUCKET_NAME) throw new Error('Missing R2 config');
-if (VIDEO_SECRET.length < 20) throw new Error('VIDEO_SECRET missing or too weak (need 20+ chars)');
+if (VIDEO_SECRET.length < 20) throw new Error('VIDEO_SECRET missing or too weak');
 
-// ===== REDIS =====
 let redis;
 try { redis = Redis.fromEnv(); console.log('Redis connected'); }
 catch (e) { console.log('Redis not available, memory mode'); redis = { get: async () => null, set: async () => null }; }
 
 const memStore = new Map();
-const userKeys = new Map(); // telegramId -> { apiKey, connectedAt }
+const userKeys = new Map();
 
 async function saveMeta(id, payload) {
   memStore.set(id, payload);
@@ -69,7 +67,6 @@ async function getMeta(id) {
   return null;
 }
 
-// ===== API KEY STORAGE =====
 async function saveUserKey(tgId, apiKey) {
   const data = { apiKey, connectedAt: Date.now() };
   userKeys.set(String(tgId), data);
@@ -98,7 +95,6 @@ function escapeHtml(s = '') {
   return String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 }
 
-// ===== HMAC SIGNATURE =====
 function signVideo(videoId, expiresInHours = 720) {
   const exp = Math.floor(Date.now() / 1000) + (expiresInHours * 3600);
   const payload = `${videoId}.${exp}`;
@@ -122,6 +118,7 @@ function verifyVideoSig(videoId, token) {
 // ===== EXPRESS =====
 const app = express();
 app.use(express.json());
+
 app.use((req, res, next) => {
   res.setHeader('X-Content-Type-Options', 'nosniff');
   res.setHeader('X-Frame-Options', 'DENY');
@@ -129,10 +126,19 @@ app.use((req, res, next) => {
   next();
 });
 
+// ✅ SERVE STATIC FILES (index.html, download.html, logo.jpg, etc)
+app.use(express.static(__dirname, { index: false }));
+
+// ===== PUBLIC HTML PAGES (explicit) =====
+app.get('/index.html', (req, res) => res.sendFile(path.join(__dirname, 'index.html')));
+app.get('/download.html', (req, res) => res.sendFile(path.join(__dirname, 'download.html')));
+app.get('/player.html', (req, res) => res.sendFile(path.join(__dirname, 'player.html')));
+app.get('/logo.jpg', (req, res) => res.sendFile(path.join(__dirname, 'logo.jpg')));
+
 app.get('/', (req, res) => res.send('MayaJaal Online'));
 app.get('/health', (req, res) => res.json({ ok: true, uptime: process.uptime(), mode: 'app-only' }));
 
-// ===== SAVE API KEY (called from index.html) =====
+// ===== SAVE API KEY (from index.html) =====
 app.post('/save-key', async (req, res) => {
   try {
     const { telegram_id, key } = req.body;
@@ -169,7 +175,7 @@ app.get('/.well-known/apple-app-site-association', (req, res) => {
   }, null, 2));
 });
 
-// ===== API META (for player.html) - NO STREAM URL =====
+// ===== API META (player.html) — NO STREAM URL =====
 app.get('/api/v/:id', async (req, res) => {
   const videoId = req.params.id;
   const token = req.query.t || req.query.s || '';
@@ -178,18 +184,16 @@ app.get('/api/v/:id', async (req, res) => {
   }
   const meta = await getMeta(videoId);
   if (!meta) return res.status(404).json({ error: 'Not found' });
-  // IMPORTANT: NEVER return streamUrl here. Only return metadata for display.
   return res.json({
     id: videoId,
     name: meta.name || 'Video',
     size: meta.size || 0,
     mime: meta.mime || 'video/mp4',
     ts: meta.ts || 0,
-    // No stream URL — browser ke liye hai
   });
 });
 
-// ===== PLAYER PAGE (custom HTML, no real video) =====
+// ===== PLAYER PAGE (custom HTML) =====
 app.get('/v/:id', async (req, res) => {
   const videoId = req.params.id;
   const token = req.query.t || req.query.s || '';
@@ -198,7 +202,6 @@ app.get('/v/:id', async (req, res) => {
   }
   const meta = await getMeta(videoId);
   if (!meta) return res.status(404).send('Video not found');
-  // Serve player.html with params
   return res.sendFile(path.join(__dirname, 'player.html'));
 });
 
@@ -232,7 +235,7 @@ app.get('/stream/:id', async (req, res) => {
 
 app.get('/watch/:id', (req, res) => res.status(403).send('Browser playback disabled'));
 
-app.listen(PORT, () => console.log(`Web on ${PORT} — App-only mode`));
+app.listen(PORT, () => console.log(`Web on ${PORT} — App-only mode + static files`));
 
 // ===== TERABOX HELPERS =====
 function detectTeraboxUrl(text) {
@@ -277,12 +280,11 @@ async function getTeraboxDirectLink(shareUrl) {
     } catch (e) { }
   }
   if (!fs_id) throw new Error('fs_id nahi mila');
-  const dlResp = await axios.get(`https://www.terabox.com/share/list?shorturl=${shareUrl.split('/s/')[1]?.split('?')[0] || ''}&root=1&web=1&app_id=250528`, { headers: apiHeaders, timeout: 30000 });
-  const dlResp2 = await axios.get(`https://www.terabox.com/share/download?shareid=${shareid}&uk=${uk}&sign=${sign || ''}&timestamp=${timestamp || ''}&fs_id=${fs_id}&channel=dubox&web=1&app_id=250528`, { headers: apiHeaders, timeout: 30000 });
-  const dlink = dlResp2.data?.dlink;
+  const dlResp = await axios.get(`https://www.terabox.com/share/download?shareid=${shareid}&uk=${uk}&sign=${sign || ''}&timestamp=${timestamp || ''}&fs_id=${fs_id}&channel=dubox&web=1&app_id=250528`, { headers: apiHeaders, timeout: 30000 });
+  const dlink = dlResp.data?.dlink;
   if (!dlink) throw new Error('Direct link nahi mila');
   return { url: Array.isArray(dlink) ? dlink[0] : dlink, fileName: server_filename, size };
-        }
+}
 // ===== BOT =====
 (async () => {
   const client = new TelegramClient(new StringSession(''), API_ID, API_HASH, {
@@ -338,7 +340,6 @@ async function getTeraboxDirectLink(shareUrl) {
     });
   }
 
-  // /start
   client.addEventHandler(async (event) => {
     const msg = event.message;
     if (!msg) return;
@@ -348,7 +349,6 @@ async function getTeraboxDirectLink(shareUrl) {
     }
   }, new NewMessage({}));
 
-  // Callback buttons
   client.addEventHandler(async (event) => {
     const q = event.query;
     if (!q) return;
@@ -402,7 +402,6 @@ async function getTeraboxDirectLink(shareUrl) {
     }
   }, new CallbackQuery({}));
 
-  // Message handler
   client.addEventHandler(async (event) => {
     const msg = event.message;
     if (!msg) return;
@@ -412,7 +411,7 @@ async function getTeraboxDirectLink(shareUrl) {
 
     const uid = msg.senderId || (msg.fromId && msg.fromId.userId) || 0;
 
-    // ===== /api KEY =====
+    // /api KEY
     if (text.startsWith('/api ')) {
       const key = text.replace('/api ', '').trim();
       if (key.length < 12) {
@@ -428,7 +427,6 @@ async function getTeraboxDirectLink(shareUrl) {
       return;
     }
 
-    // ===== /resetapi =====
     if (text === '/resetapi') {
       await client.sendMessage(chatId, {
         message: `🔄 <b>Reset API Key</b>\n\n` +
@@ -443,7 +441,7 @@ async function getTeraboxDirectLink(shareUrl) {
 
     if (text === '/start') return;
 
-    // ===== API CHECK =====
+    // API CHECK
     const userData = await getUserKey(uid);
     if (!userData) {
       return client.sendMessage(chatId, {
@@ -458,7 +456,7 @@ async function getTeraboxDirectLink(shareUrl) {
       });
     }
 
-    // ===== TERABOX =====
+    // TERABOX
     const teraboxUrl = detectTeraboxUrl(text);
     if (teraboxUrl) {
       let status;
@@ -505,7 +503,7 @@ async function getTeraboxDirectLink(shareUrl) {
       }
     }
 
-    // ===== DIRECT FILE =====
+    // DIRECT FILE
     if (!msg.media) return;
     const fileMedia = msg.media.document || msg.document || msg.video;
     if (!fileMedia) return;
