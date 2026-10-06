@@ -126,10 +126,8 @@ app.use((req, res, next) => {
   next();
 });
 
-// ✅ SERVE STATIC FILES (index.html, download.html, logo.jpg, etc)
 app.use(express.static(__dirname, { index: false }));
 
-// ===== PUBLIC HTML PAGES (explicit) =====
 app.get('/index.html', (req, res) => res.sendFile(path.join(__dirname, 'index.html')));
 app.get('/download.html', (req, res) => res.sendFile(path.join(__dirname, 'download.html')));
 app.get('/player.html', (req, res) => res.sendFile(path.join(__dirname, 'player.html')));
@@ -138,7 +136,6 @@ app.get('/logo.jpg', (req, res) => res.sendFile(path.join(__dirname, 'logo.jpg')
 app.get('/', (req, res) => res.send('MayaJaal Online'));
 app.get('/health', (req, res) => res.json({ ok: true, uptime: process.uptime(), mode: 'app-only' }));
 
-// ===== SAVE API KEY (from index.html) =====
 app.post('/save-key', async (req, res) => {
   try {
     const { telegram_id, key } = req.body;
@@ -154,7 +151,6 @@ app.get('/get-key/:tgId', async (req, res) => {
   return res.json(data || { apiKey: null });
 });
 
-// ===== APP VERIFICATION FILES =====
 app.get('/.well-known/assetlinks.json', (req, res) => {
   res.type('application/json').send(JSON.stringify([{
     relation: ['delegate_permission/common.handle_all_urls'],
@@ -175,7 +171,6 @@ app.get('/.well-known/apple-app-site-association', (req, res) => {
   }, null, 2));
 });
 
-// ===== API META (player.html) — NO STREAM URL =====
 app.get('/api/v/:id', async (req, res) => {
   const videoId = req.params.id;
   const token = req.query.t || req.query.s || '';
@@ -193,7 +188,6 @@ app.get('/api/v/:id', async (req, res) => {
   });
 });
 
-// ===== PLAYER PAGE (custom HTML) =====
 app.get('/v/:id', async (req, res) => {
   const videoId = req.params.id;
   const token = req.query.t || req.query.s || '';
@@ -205,7 +199,6 @@ app.get('/v/:id', async (req, res) => {
   return res.sendFile(path.join(__dirname, 'player.html'));
 });
 
-// ===== STREAM (App only) =====
 app.get('/stream/:id', async (req, res) => {
   try {
     const videoId = req.params.id;
@@ -237,7 +230,6 @@ app.get('/watch/:id', (req, res) => res.status(403).send('Browser playback disab
 
 app.listen(PORT, () => console.log(`Web on ${PORT} — App-only mode + static files`));
 
-// ===== TERABOX HELPERS =====
 function detectTeraboxUrl(text) {
   if (!text) return null;
   const domains = ['terabox\\.com','terabox\\.app','terabox\\.link','terabox\\.club','terabox\\.fun','terabox\\.cc','terabox\\.top','terabox\\.online','1024tera\\.com','1024terabox\\.com','4funbox\\.com','4funbox\\.co','mirrobox\\.com','nephobox\\.com','momerybox\\.com','tibibox\\.com','teraboxapp\\.com','teraboxlink\\.com','teraboxshare\\.com','teraboxurl\\.com','teraboxdl\\.com','teraboxdownloader\\.com','terafileshare\\.com','terashare\\.com','terasharelink\\.com','terasharefile\\.com','freeterabox\\.com','gearbox\\.app','teraboxcdn\\.com','terabox\\.store','terabox\\.site','terabox\\.space','terabox\\.website','dubox\\.com','terabox\\.icu','terabox\\.xyz','diskwala\\.com'];
@@ -284,7 +276,7 @@ async function getTeraboxDirectLink(shareUrl) {
   const dlink = dlResp.data?.dlink;
   if (!dlink) throw new Error('Direct link nahi mila');
   return { url: Array.isArray(dlink) ? dlink[0] : dlink, fileName: server_filename, size };
-}
+  }
 // ===== BOT =====
 (async () => {
   const client = new TelegramClient(new StringSession(''), API_ID, API_HASH, {
@@ -407,7 +399,9 @@ async function getTeraboxDirectLink(shareUrl) {
     if (!msg) return;
     const chatId = msg.chatId;
     const text = msg.message || '';
-    if (!text) return;
+
+    // ===== FIX: Media hone par bhi aage badho =====
+    if (!text && !msg.media) return;
 
     const uid = msg.senderId || (msg.fromId && msg.fromId.userId) || 0;
 
@@ -507,6 +501,8 @@ async function getTeraboxDirectLink(shareUrl) {
     if (!msg.media) return;
     const fileMedia = msg.media.document || msg.document || msg.video;
     if (!fileMedia) return;
+
+    console.log('[File] className:', fileMedia.className, '| hasId:', !!fileMedia.id, '| size:', fileMedia.size);
 
     let fileName = 'video.mp4', mime = 'application/octet-stream', size = 0;
     size = Number(fileMedia.size) || 0;
