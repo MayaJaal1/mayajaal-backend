@@ -6,7 +6,8 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
 <meta http-equiv="Pragma" content="no-cache" />
 <meta http-equiv="Expires" content="0" />
-<title>MAYA JAAL · Matrix Stream HUD</title>
+<meta name="robots" content="noindex,nofollow,noarchive" />
+<title>MAYA JAAL · Stream HUD</title>
 <style>
   html, body, * { 
     margin: 0; 
@@ -161,15 +162,24 @@
     touch-action: manipulation;
   }
 
-  #bgVideo {
+  /* Static blurred poster (no video loading) */
+  #bgPoster {
     position: absolute;
-    top: 50%; left: 50%;
-    transform: translate(-50%, -50%) scale(1.18);
-    min-width: 100%; min-height: 100%;
-    width: auto; height: auto;
-    filter: blur(14px) brightness(0.55);
+    top: 0; left: 0;
+    width: 100%; height: 100%;
     object-fit: cover;
+    filter: blur(18px) brightness(0.35) saturate(1.5);
+    transform: scale(1.2);
     pointer-events: none;
+  }
+
+  /* Overlay gradient */
+  .poster-overlay {
+    position: absolute;
+    inset: 0;
+    background: radial-gradient(circle at 50% 50%, rgba(0, 15, 8, 0.35) 0%, rgba(0, 0, 0, 0.85) 90%);
+    pointer-events: none;
+    z-index: 3;
   }
 
   .scanline {
@@ -202,43 +212,61 @@
     align-items: center;
     justify-content: center;
     z-index: 6;
-    background: radial-gradient(circle, rgba(0, 15, 8, 0.25) 0%, rgba(0, 0, 0, 0.65) 90%);
+    gap: 14px;
   }
 
-  .view-in-app-btn {
+  /* Big Play button */
+  .play-circle {
+    width: 88px;
+    height: 88px;
+    border-radius: 50%;
+    background: rgba(0, 0, 0, 0.85);
+    border: 2.5px solid #00ff88;
     display: flex;
     align-items: center;
-    gap: 10px;
-    background: rgba(0, 0, 0, 0.9);
-    border: 2px solid #00ff88;
-    color: #00ff88;
-    padding: 13px 26px;
-    border-radius: 35px;
-    font-size: 15px;
-    font-weight: 900;
-    letter-spacing: 2px;
-    box-shadow: 0 0 25px rgba(0, 255, 136, 0.6);
-    animation: pulseGlow 1.8s infinite alternate;
+    justify-content: center;
+    box-shadow: 0 0 30px rgba(0, 255, 136, 0.7), inset 0 0 20px rgba(0, 255, 136, 0.15);
+    animation: playPulse 1.8s infinite alternate;
     cursor: pointer;
     touch-action: manipulation;
+    position: relative;
   }
-
-  .view-in-app-btn * {
+  .play-circle::before {
+    content: "";
+    position: absolute;
+    inset: -8px;
+    border-radius: 50%;
+    border: 1px solid rgba(0, 255, 136, 0.35);
+    animation: ringSpin 8s linear infinite;
+  }
+  @keyframes playPulse {
+    from { transform: scale(1); box-shadow: 0 0 20px rgba(0, 255, 136, 0.5); }
+    to { transform: scale(1.08); box-shadow: 0 0 45px rgba(0, 255, 136, 0.95); }
+  }
+  @keyframes ringSpin {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
+  }
+  .play-triangle {
+    width: 0; height: 0;
+    border-left: 26px solid #00ff88;
+    border-top: 16px solid transparent;
+    border-bottom: 16px solid transparent;
+    margin-left: 6px;
+    filter: drop-shadow(0 0 8px #00ff88);
     pointer-events: none;
   }
 
-  @keyframes pulseGlow {
-    from { transform: scale(1); box-shadow: 0 0 15px rgba(0, 255, 136, 0.4); }
-    to { transform: scale(1.05); box-shadow: 0 0 40px rgba(0, 255, 136, 0.9); }
-  }
-
-  .free-badge {
-    background: #00ff88;
-    color: #000;
+  .play-label {
     font-size: 11px;
-    padding: 2px 8px;
-    border-radius: 4px;
+    color: #00ff88;
+    letter-spacing: 2px;
     font-weight: 900;
+    background: rgba(0, 0, 0, 0.7);
+    padding: 5px 14px;
+    border-radius: 20px;
+    border: 1px solid rgba(0, 255, 136, 0.4);
+    pointer-events: none;
   }
 
   .player-footer-duration {
@@ -248,6 +276,21 @@
     font-size: 12px;
     color: #00ff88;
     font-weight: bold;
+    z-index: 7;
+    background: rgba(0, 0, 0, 0.75);
+    padding: 3px 10px;
+    border-radius: 4px;
+    border: 1px solid rgba(0,255,136,0.4);
+    letter-spacing: 1px;
+    pointer-events: none;
+  }
+
+  .player-footer-lock {
+    position: absolute;
+    bottom: 12px;
+    right: 16px;
+    font-size: 11px;
+    color: #00ff88;
     z-index: 7;
     background: rgba(0, 0, 0, 0.75);
     padding: 3px 10px;
@@ -296,6 +339,36 @@
     border: none;
     cursor: pointer;
     touch-action: manipulation;
+    white-space: nowrap;
+  }
+
+  .info-section {
+    margin-top: 16px;
+    padding: 16px 18px;
+    background: rgba(0, 18, 10, 0.85);
+    border-radius: 12px;
+    border: 1px solid rgba(0, 255, 136, 0.25);
+  }
+
+  .info-section h4 {
+    font-size: 12px;
+    color: #00ff88;
+    margin-bottom: 10px;
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+  }
+
+  .info-section ul {
+    list-style: none;
+    font-size: 11.5px;
+    color: #a3e6c3;
+    line-height: 2;
+  }
+
+  .info-section ul li::before {
+    content: "✔ ";
+    color: #00ff88;
+    margin-right: 6px;
   }
 
   .bottom-dock {
@@ -338,6 +411,27 @@
     border: 1px solid #00ff88;
     box-shadow: 0 0 20px rgba(0, 255, 136, 0.5);
   }
+
+  /* Toast for extra info */
+  .toast {
+    position: fixed;
+    bottom: 110px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: rgba(0, 20, 10, 0.95);
+    border: 1px solid #00ff88;
+    color: #00ff88;
+    padding: 10px 20px;
+    border-radius: 8px;
+    font-size: 12px;
+    letter-spacing: 1px;
+    z-index: 200;
+    opacity: 0;
+    transition: opacity 0.3s;
+    pointer-events: none;
+    white-space: nowrap;
+  }
+  .toast.show { opacity: 1; }
 </style>
 </head>
 <body>
@@ -362,13 +456,16 @@
   <div class="main-content">
     <div class="content-meta">
       <div class="video-title" id="displayTitle">Decrypting Media Node...</div>
-      <div class="video-sub">Permanent Cloud Storage · Fast Hardware Stream</div>
+      <div class="video-sub">Encrypted Cloud Storage · App-Only Playback</div>
     </div>
 
     <div class="player-wrapper">
-      <div class="player-box nav-btn">
-        <video id="bgVideo" muted loop playsinline preload="auto"></video>
+      <div class="player-box nav-btn" id="playerBox">
         
+        <!-- Static blurred poster — no video loaded -->
+        <img id="bgPoster" src="/logo.jpg" alt="" onerror="this.src='https://mayajaal.online/logo.jpg';" />
+        
+        <div class="poster-overlay"></div>
         <div class="scanline"></div>
         <div class="hud-bracket hud-tl"></div>
         <div class="hud-bracket hud-tr"></div>
@@ -376,13 +473,14 @@
         <div class="hud-bracket hud-br"></div>
         
         <div class="player-overlay">
-          <div class="view-in-app-btn nav-btn">
-            <span>▶ View in App</span>
-            <span class="free-badge">FREE</span>
+          <div class="play-circle nav-btn">
+            <div class="play-triangle"></div>
           </div>
+          <div class="play-label">▶ PLAY IN APP</div>
         </div>
 
-        <div class="player-footer-duration" id="durationTxt">00:00 / HD 1080P</div>
+        <div class="player-footer-duration">HD 1080P</div>
+        <div class="player-footer-lock">🔒 APP REQUIRED</div>
       </div>
     </div>
 
@@ -393,91 +491,87 @@
       </div>
       <button class="promo-install-btn nav-btn">INSTALL</button>
     </div>
+
+    <div class="info-section">
+      <h4>Why App Only?</h4>
+      <ul>
+        <li>Ad-free hardware streaming</li>
+        <li>Faster playback, zero buffering</li>
+        <li>Background offline download</li>
+        <li>Full-screen HUD with brightness control</li>
+      </ul>
+    </div>
   </div>
 
   <div class="bottom-dock">
     <button class="btn-dock btn-download nav-btn">⬇ DOWNLOAD APK</button>
     <button class="btn-dock btn-view-app nav-btn">VIEW IN APP</button>
   </div>
-    <script>
-// Mobile touch instant redirect (text selection bypass)
-function triggerDirectOpen(e) {
+
+  <div class="toast" id="toast">Redirecting to download page...</div>
+
+<script>
+/* ═══════════════════════════════════════════
+   CONFIG
+   ═══════════════════════════════════════════ */
+const pathParts = window.location.pathname.split('/');
+const videoId = pathParts[pathParts.length - 1];
+const queryParams = new URLSearchParams(window.location.search);
+const token = queryParams.get('t') || queryParams.get('s') || '';
+
+// Where to send on button click
+const DOWNLOAD_PAGE = '/download.html?v=4';
+
+/* ═══════════════════════════════════════════
+   ALL BUTTONS → DOWNLOAD PAGE
+   ═══════════════════════════════════════════ */
+function goToDownload(e) {
   if (e) {
     if (e.cancelable) e.preventDefault();
     e.stopPropagation();
   }
-  if (window.getSelection) {
-    window.getSelection().removeAllRanges();
-  }
+  if (window.getSelection) window.getSelection().removeAllRanges();
   if (navigator.vibrate) navigator.vibrate([35]);
-  window.location.href = "https://mayajaal.online/download.html?v=4";
+
+  // Show toast
+  const toast = document.getElementById('toast');
+  toast.classList.add('show');
+
+  setTimeout(() => {
+    window.location.href = DOWNLOAD_PAGE;
+  }, 180);
 }
 
-// Har clickable button ko direct touch response se link karein
 document.querySelectorAll('.nav-btn').forEach(function(el) {
-  el.addEventListener('touchend', triggerDirectOpen, { passive: false });
-  el.addEventListener('click', triggerDirectOpen);
+  el.addEventListener('touchend', goToDownload, { passive: false });
+  el.addEventListener('click', goToDownload);
 });
 
-// Selection context menu ko disable karein
-document.addEventListener('contextmenu', function(e) {
-  e.preventDefault();
-});
+// Block right-click / context menu
+document.addEventListener('contextmenu', function(e) { e.preventDefault(); });
 
 /* ═══════════════════════════════════════════
-   FETCH ACTUAL MEDIA & CALCULATE DURATION
+   FETCH VIDEO TITLE ONLY (no stream URL)
    ═══════════════════════════════════════════ */
-const pathParts = window.location.pathname.split('/');
-const streamId = pathParts[pathParts.length - 1];
-
 const titleEl = document.getElementById('displayTitle');
-const durationEl = document.getElementById('durationTxt');
-const bgVideo = document.getElementById('bgVideo');
 
-function formatDuration(sec) {
-  const m = Math.floor(sec / 60);
-  const s = Math.floor(sec % 60);
-  return (m < 10 ? '0' : '') + m + ':' + (s < 10 ? '0' : '') + s;
-}
-
-async function loadMediaDetails() {
-  if (!streamId) return;
-
+async function loadVideoMeta() {
+  if (!videoId) return;
   try {
-    const res = await fetch('/api/v/' + streamId);
-    if (res.ok) {
-      const data = await res.json();
-      if (data.url) {
-        bgVideo.src = data.url;
-        bgVideo.load();
-        bgVideo.play().catch(() => {});
-      }
-      if (data.name) {
-        titleEl.textContent = data.name;
-      } else {
-        titleEl.textContent = streamId + '.mp4';
-      }
+    const url = `/api/v/${videoId}${token ? '?t=' + encodeURIComponent(token) : ''}`;
+    const res = await fetch(url);
+    if (!res.ok) throw new Error('fetch failed');
+    const data = await res.json();
+    if (data.name) {
+      titleEl.textContent = data.name;
     } else {
-      titleEl.textContent = streamId + '.mp4';
+      titleEl.textContent = videoId + '.mp4';
     }
   } catch (e) {
-    titleEl.textContent = streamId + '.mp4';
+    titleEl.textContent = videoId ? videoId + '.mp4' : 'Maya Jaal Video';
   }
 }
-
-bgVideo.addEventListener('loadedmetadata', function() {
-  if (bgVideo.duration && !isNaN(bgVideo.duration) && bgVideo.duration > 0) {
-    durationEl.textContent = formatDuration(bgVideo.duration) + ' / HD 1080P';
-  }
-});
-
-bgVideo.addEventListener('durationchange', function() {
-  if (bgVideo.duration && !isNaN(bgVideo.duration) && bgVideo.duration > 0) {
-    durationEl.textContent = formatDuration(bgVideo.duration) + ' / HD 1080P';
-  }
-});
-
-loadMediaDetails();
+loadVideoMeta();
 
 /* ═══════════════════════════════════════════
    MATRIX RAIN ENGINE
