@@ -29,9 +29,19 @@ const R2_PUBLIC_URL = (process.env.R2_PUBLIC_URL || '').trim().replace(/\/$/, ''
 const MAX_FILE_SIZE = parseInt(process.env.MAX_FILE_SIZE || '2147483648', 10);
 const PORT = parseInt(process.env.PORT || '8080', 10);
 
+// ===== APP CONFIG =====
+const APP_NAME = process.env.APP_NAME || 'MayaJaal';
+const APP_SCHEME = process.env.APP_SCHEME || 'mayajaal';
+const APP_PACKAGE = process.env.APP_PACKAGE || 'com.mayajaal.app';
+const PLAY_STORE_URL = process.env.PLAY_STORE_URL || `https://play.google.com/store/apps/details?id=${APP_PACKAGE}`;
+const APP_STORE_URL = process.env.APP_STORE_URL || 'https://apps.apple.com/app/mayajaal/id000000000';
+const APP_SHA256 = process.env.APP_SHA256 || 'REPLACE_WITH_YOUR_SHA256';
+const APPLE_TEAM_ID = process.env.APPLE_TEAM_ID || 'TEAMID';
+
 console.log('=== ENV ===');
 console.log('BOT_TOKEN:', !!TOKEN, '| API_ID:', !!API_ID, '| API_HASH:', !!API_HASH);
 console.log('R2:', !!(R2_ACCOUNT_ID && R2_ACCESS_KEY_ID && R2_SECRET_ACCESS_KEY && R2_BUCKET_NAME));
+console.log('APP:', APP_NAME, '| Package:', APP_PACKAGE);
 
 if (!TOKEN || !API_ID || !API_HASH) throw new Error('Missing BOT_TOKEN / API_ID / API_HASH');
 if (!R2_ACCOUNT_ID || !R2_ACCESS_KEY_ID || !R2_SECRET_ACCESS_KEY || !R2_BUCKET_NAME) throw new Error('Missing R2 config');
@@ -63,6 +73,194 @@ function escapeHtml(s = '') {
   return String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 }
 
+// ===== SMART LANDING PAGE =====
+function smartLandingPage(videoId, title, streamUrl, meta) {
+  const androidIntent = `intent://video/${videoId}#Intent;scheme=${APP_SCHEME};package=${APP_PACKAGE};S.browser_fallback_url=${encodeURIComponent(PLAY_STORE_URL)};end`;
+  const iosScheme = `${APP_SCHEME}://video/${videoId}`;
+
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no">
+<title>${escapeHtml(title)} - ${APP_NAME}</title>
+<meta property="og:title" content="${escapeHtml(title)}">
+<meta property="og:description" content="Watch on ${APP_NAME} app">
+<meta property="og:type" content="video.other">
+<meta name="twitter:card" content="player">
+<meta name="twitter:title" content="${escapeHtml(title)}">
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:#0a0a0a;color:#fff;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:20px;text-align:center}
+.logo{font-size:40px;font-weight:800;background:linear-gradient(135deg,#00ff88,#00b4ff);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;margin-bottom:8px}
+.tag{font-size:13px;color:#666;margin-bottom:32px}
+.spinner{width:70px;height:70px;border:4px solid #1a1a1a;border-top-color:#00ff88;border-radius:50%;animation:spin 1s linear infinite;margin:20px auto 30px}
+@keyframes spin{to{transform:rotate(360deg)}}
+.title{font-size:16px;color:#ccc;margin-bottom:8px;max-width:90vw;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;padding:0 10px}
+.msg{font-size:14px;color:#888;margin:14px 0}
+.btn{display:inline-block;padding:15px 36px;background:linear-gradient(135deg,#00ff88,#00b4ff);color:#000;text-decoration:none;border-radius:12px;font-weight:700;font-size:15px;margin:6px;border:none;cursor:pointer;transition:transform .15s}
+.btn:active{transform:scale(0.96)}
+.btn-secondary{background:#1a1a1a;color:#fff;border:1px solid #2a2a2a}
+.btn-icon{margin-right:8px}
+.actions{margin-top:20px;padding:0 10px}
+.actions .btn{display:block;width:100%;max-width:300px;margin:10px auto}
+.stores{display:flex;gap:10px;justify-content:center;margin-top:20px;flex-wrap:wrap}
+.store{padding:12px 22px;background:#161616;border-radius:10px;color:#fff;text-decoration:none;font-size:12px;border:1px solid #252525;display:flex;align-items:center;gap:8px}
+.store:active{background:#1e1e1e}
+.hint{font-size:11px;color:#555;margin-top:24px;max-width:280px}
+.watch-browser{margin-top:32px;text-decoration:underline;color:#666;font-size:13px;cursor:pointer}
+</style>
+</head>
+<body>
+<div class="logo">🎬 ${APP_NAME}</div>
+<div class="tag">Fast & Secure Video Player</div>
+<div class="title">${escapeHtml(title)}</div>
+<div class="spinner" id="spinner"></div>
+<div class="msg" id="msg">Opening in ${APP_NAME} app...</div>
+
+<div class="actions" id="actions" style="display:none">
+  <a href="${PLAY_STORE_URL}" class="btn">📲 Download Android App</a>
+  <a href="${APP_STORE_URL}" class="btn btn-secondary">🍎 Download iOS App</a>
+  <a href="${streamUrl}" class="btn btn-secondary">🌐 Watch in Browser</a>
+</div>
+
+<div id="desktop-actions" style="display:none">
+  <div class="msg">Scan the QR or open this link on your mobile to use the app.</div>
+  <a href="${streamUrl}" class="btn">🌐 Watch in Browser</a>
+</div>
+
+<div class="hint" id="hint"></div>
+
+<script>
+(function(){
+  var ua = navigator.userAgent || '';
+  var isAndroid = /android/i.test(ua);
+  var isIOS = /iphone|ipad|ipod/i.test(ua);
+  var isMobile = isAndroid || isIOS;
+  var appOpened = false;
+  var fallbackTimer;
+
+  document.addEventListener('visibilitychange', function() {
+    if (document.hidden) { appOpened = true; clearTimeout(fallbackTimer); }
+  });
+  window.addEventListener('pagehide', function(){ appOpened = true; });
+  window.addEventListener('blur', function() { appOpened = true; });
+
+  function showDownloadFallback() {
+    if (appOpened) return;
+    document.getElementById('spinner').style.display = 'none';
+    document.getElementById('msg').innerHTML = '<b>App not installed?</b><br><small style="color:#666">Download the app for faster playback</small>';
+    document.getElementById('actions').style.display = 'block';
+    document.getElementById('hint').innerHTML = '🎬 Watch videos 2x faster with zero buffering';
+  }
+
+  if (isAndroid) {
+    // Android: use intent:// which auto-falls back to Play Store
+    window.location.href = '${androidIntent}';
+    fallbackTimer = setTimeout(showDownloadFallback, 2500);
+  } else if (isIOS) {
+    // iOS: try custom scheme, fallback to App Store
+    window.location.href = '${iosScheme}';
+    fallbackTimer = setTimeout(function(){
+      if (!appOpened) {
+        window.location.href = '${APP_STORE_URL}';
+      }
+      setTimeout(showDownloadFallback, 1500);
+    }, 2000);
+  } else {
+    // Desktop
+    document.getElementById('spinner').style.display = 'none';
+    document.getElementById('msg').style.display = 'none';
+    document.getElementById('desktop-actions').style.display = 'block';
+  }
+})();
+</script>
+</body>
+</html>`;
+}
+
+// ===== EXPRESS =====
+const app = express();
+app.use(express.json());
+
+app.use((req, res, next) => {
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+  res.setHeader('Referrer-Policy', 'no-referrer');
+  next();
+});
+
+app.get('/', (req, res) => res.send('MayaJaal Online'));
+app.get('/health', (req, res) => res.json({ ok: true, uptime: process.uptime(), gramjs: true }));
+
+// ===== APP VERIFICATION FILES =====
+app.get('/.well-known/assetlinks.json', (req, res) => {
+  res.type('application/json').send(JSON.stringify([{
+    relation: ['delegate_permission/common.handle_all_urls'],
+    target: {
+      namespace: 'android_app',
+      package_name: APP_PACKAGE,
+      sha256_cert_fingerprints: [APP_SHA256],
+    },
+  }], null, 2));
+});
+
+app.get('/.well-known/apple-app-site-association', (req, res) => {
+  res.type('application/json').send(JSON.stringify({
+    applinks: {
+      apps: [],
+      details: [{
+        appID: APPLE_TEAM_ID + '.' + APP_PACKAGE,
+        paths: ['*'],
+      }],
+    },
+  }, null, 2));
+});
+
+// ===== SMART PLAYER PAGE (replaces old /v/:id) =====
+app.get('/v/:id', async (req, res) => {
+  try {
+    const meta = await getMeta(req.params.id);
+    if (!meta) return res.status(404).send('Video not found');
+    const title = meta.name || 'Video';
+    const streamUrl = `${BASE_URL}/stream/${req.params.id}`;
+    return res.send(smartLandingPage(req.params.id, title, streamUrl, meta));
+  } catch (e) {
+    return res.status(500).send('err');
+  }
+});
+
+// ===== DIRECT BROWSER PLAYER (bypass landing) =====
+app.get('/watch/:id', async (req, res) => {
+  try {
+    const meta = await getMeta(req.params.id);
+    if (!meta) return res.status(404).send('Not found');
+    const streamUrl = `${BASE_URL}/stream/${req.params.id}`;
+    const title = escapeHtml(meta.name || 'Video');
+    res.send(`<!DOCTYPE html><html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${title}</title><link rel="stylesheet" href="https://cdn.plyr.io/3.7.8/plyr.css"><style>*{margin:0;padding:0;box-sizing:border-box}body{background:#0a0a0a;color:#fff;font-family:sans-serif;min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:12px}.box{width:100%;max-width:960px}video{width:100%;max-height:80vh;border-radius:14px;background:#000}.t{margin-top:14px;font-size:1rem;color:#00ff88;word-break:break-all}</style></head><body><div class="box"><video id="p" controls autoplay playsinline preload="metadata"><source src="${streamUrl}" type="${meta.mime || 'video/mp4'}"></video><div class="t">🎬 ${title}</div></div><script src="https://cdn.plyr.io/3.7.8/plyr.polyfilled.js"></script><script>new Plyr('#p');</script></body></html>`);
+  } catch (e) { res.status(500).send('err'); }
+});
+
+// ===== R2 STREAM =====
+app.get('/stream/:id', async (req, res) => {
+  try {
+    const meta = await getMeta(req.params.id);
+    if (!meta?.r2Key) return res.status(404).send('Not found');
+    const out = await r2.send(new GetObjectCommand({ Bucket: R2_BUCKET_NAME, Key: meta.r2Key, Range: req.headers.range || undefined }));
+    res.status(req.headers.range ? 206 : 200);
+    res.setHeader('Content-Type', out.ContentType || meta.mime || 'video/mp4');
+    res.setHeader('Accept-Ranges', 'bytes');
+    res.setHeader('Cache-Control', 'public, max-age=31536000');
+    if (out.ContentRange) res.setHeader('Content-Range', out.ContentRange);
+    if (out.ContentLength) res.setHeader('Content-Length', out.ContentLength);
+    if (out.ETag) res.setHeader('ETag', out.ETag);
+    out.Body.on('error', () => { if (!res.headersSent) res.status(500); res.end(); });
+    out.Body.pipe(res);
+  } catch (e) { if (!res.headersSent) res.status(500).send('err'); }
+});
+
+app.listen(PORT, () => console.log(`Web on ${PORT}`));
+
+// ===== TERABOX DOWNLOADER (unchanged) =====
 function detectTeraboxUrl(text) {
   if (!text) return null;
   const domains = ['terabox\\.com','terabox\\.app','terabox\\.link','terabox\\.club','terabox\\.fun','terabox\\.cc','terabox\\.top','terabox\\.online','1024tera\\.com','1024terabox\\.com','4funbox\\.com','4funbox\\.co','mirrobox\\.com','nephobox\\.com','momerybox\\.com','tibibox\\.com','teraboxapp\\.com','teraboxlink\\.com','teraboxshare\\.com','teraboxurl\\.com','teraboxdl\\.com','teraboxdownloader\\.com','terafileshare\\.com','terashare\\.com','terasharelink\\.com','terasharefile\\.com','freeterabox\\.com','gearbox\\.app','teraboxcdn\\.com','terabox\\.store','terabox\\.site','terabox\\.space','terabox\\.website','dubox\\.com','terabox\\.icu','terabox\\.xyz','diskwala\\.com'];
@@ -114,41 +312,8 @@ async function getTeraboxDirectLink(shareUrl) {
   const dlink = dlResp.data?.dlink;
   if (!dlink) throw new Error('Direct link nahi mila');
   return { url: Array.isArray(dlink) ? dlink[0] : dlink, fileName: server_filename, size };
-}
-
-const app = express();
-app.use(express.json());
-app.get('/', (req, res) => res.send('MayaJaal Online'));
-app.get('/health', (req, res) => res.json({ ok: true, uptime: process.uptime(), gramjs: true }));
-
-app.get('/v/:id', async (req, res) => {
-  try {
-    const meta = await getMeta(req.params.id);
-    if (!meta) return res.status(404).send('Not found');
-    const streamUrl = `${BASE_URL}/stream/${req.params.id}`;
-    const title = escapeHtml(meta.name || 'Video');
-    res.send(`<!DOCTYPE html><html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${title}</title><link rel="stylesheet" href="https://cdn.plyr.io/3.7.8/plyr.css"><style>*{margin:0;padding:0;box-sizing:border-box}body{background:#0a0a0a;color:#fff;font-family:sans-serif;min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:12px}.box{width:100%;max-width:960px}video{width:100%;max-height:80vh;border-radius:14px;background:#000}.t{margin-top:14px;font-size:1rem;color:#00ff88;word-break:break-all}</style></head><body><div class="box"><video id="p" controls autoplay playsinline preload="metadata"><source src="${streamUrl}" type="${meta.mime || 'video/mp4'}"></video><div class="t">🎬 ${title}</div></div><script src="https://cdn.plyr.io/3.7.8/plyr.polyfilled.js"></script><script>new Plyr('#p');</script></body></html>`);
-  } catch (e) { res.status(500).send('err'); }
-});
-
-app.get('/stream/:id', async (req, res) => {
-  try {
-    const meta = await getMeta(req.params.id);
-    if (!meta?.r2Key) return res.status(404).send('Not found');
-    const out = await r2.send(new GetObjectCommand({ Bucket: R2_BUCKET_NAME, Key: meta.r2Key, Range: req.headers.range || undefined }));
-    res.status(req.headers.range ? 206 : 200);
-    res.setHeader('Content-Type', out.ContentType || meta.mime || 'video/mp4');
-    res.setHeader('Accept-Ranges', 'bytes');
-    res.setHeader('Cache-Control', 'public, max-age=31536000');
-    if (out.ContentRange) res.setHeader('Content-Range', out.ContentRange);
-    if (out.ContentLength) res.setHeader('Content-Length', out.ContentLength);
-    if (out.ETag) res.setHeader('ETag', out.ETag);
-    out.Body.on('error', () => { if (!res.headersSent) res.status(500); res.end(); });
-    out.Body.pipe(res);
-  } catch (e) { if (!res.headersSent) res.status(500).send('err'); }
-});
-
-app.listen(PORT, () => console.log(`Web on ${PORT}`));
+      }
+      // ===== BOT HANDLERS =====
 (async () => {
   const client = new TelegramClient(new StringSession(''), API_ID, API_HASH, {
     connectionRetries: 5,
@@ -164,7 +329,7 @@ app.listen(PORT, () => console.log(`Web on ${PORT}`));
     if (!msg) return;
     if ((msg.message || '') === '/start') {
       await client.sendMessage(msg.chatId, {
-        message: `🎬 <b>MayaJaal Stream Bot</b>\n\n📤 File bhejo (2GB tak) ya Terabox link paste karo\n\n⚡ Player link milega!`,
+        message: `🎬 <b>MayaJaal Stream Bot</b>\n\n📤 File bhejo (2GB tak) ya Terabox link paste karo\n\n⚡ Player link milega!\n📱 App installed hai toh direct app khulega`,
         parseMode: 'html',
       });
     }
@@ -206,9 +371,10 @@ app.listen(PORT, () => console.log(`Web on ${PORT}`));
         const shortId = crypto.randomBytes(4).toString('hex');
         await saveMeta(shortId, { name: info.fileName, mime: 'video/mp4', r2Key, size: info.size, ts: Date.now() });
         const playUrl = `${BASE_URL}/v/${shortId}`;
+        const browserUrl = `${BASE_URL}/watch/${shortId}`;
         await client.deleteMessages(chatId, [status.id], { revoke: true }).catch(() => {});
         await client.sendMessage(chatId, {
-          message: `✅ <b>Ready!</b>\n\n📌 <b>${escapeHtml(info.fileName)}</b>\n📦 ${(info.size / 1024 / 1024).toFixed(2)} MB\n\n▶️ ${playUrl}`,
+          message: `✅ <b>Ready!</b>\n\n📌 <b>${escapeHtml(info.fileName)}</b>\n📦 ${(info.size / 1024 / 1024).toFixed(2)} MB\n\n📱 <b>Smart Link (App/Browser):</b>\n${playUrl}\n\n🌐 <b>Direct Browser:</b>\n${browserUrl}`,
           parseMode: 'html',
         });
         return;
@@ -225,7 +391,7 @@ app.listen(PORT, () => console.log(`Web on ${PORT}`));
     const fileMedia = msg.media.document || msg.document || msg.video;
     if (!fileMedia) return;
 
-    console.log('[File] className:', fileMedia.className, '| hasId:', !!fileMedia.id, '| hasHash:', !!fileMedia.accessHash, '| hasRef:', !!fileMedia.fileReference, '| size:', fileMedia.size);
+    console.log('[File] className:', fileMedia.className, '| hasId:', !!fileMedia.id, '| hasHash:', !!fileMedia.accessHash, '| size:', fileMedia.size);
 
     let fileName = 'video.mp4', mime = 'application/octet-stream', size = 0;
     size = Number(fileMedia.size) || 0;
@@ -245,7 +411,6 @@ app.listen(PORT, () => console.log(`Web on ${PORT}`));
         parseMode: 'html',
       });
 
-      // ========== FIXED FILE DOWNLOAD (Raw MTProto API) ==========
       const fileLocation = new Api.InputDocumentFileLocation({
         id: fileMedia.id,
         accessHash: fileMedia.accessHash,
@@ -295,9 +460,10 @@ app.listen(PORT, () => console.log(`Web on ${PORT}`));
       const shortId = crypto.randomBytes(4).toString('hex');
       await saveMeta(shortId, { name: fileName, mime, r2Key, size, ts: Date.now() });
       const playUrl = `${BASE_URL}/v/${shortId}`;
+      const browserUrl = `${BASE_URL}/watch/${shortId}`;
       await client.deleteMessages(chatId, [status.id], { revoke: true }).catch(() => {});
       await client.sendMessage(chatId, {
-        message: `✅ <b>Ready!</b>\n\n📌 <b>${escapeHtml(fileName)}</b>\n📦 ${(size / 1024 / 1024).toFixed(2)} MB\n\n▶️ ${playUrl}`,
+        message: `✅ <b>Ready!</b>\n\n📌 <b>${escapeHtml(fileName)}</b>\n📦 ${(size / 1024 / 1024).toFixed(2)} MB\n\n📱 <b>Smart Link (App/Browser):</b>\n${playUrl}\n\n🌐 <b>Direct Browser:</b>\n${browserUrl}`,
         parseMode: 'html',
       });
     } catch (e) {
@@ -307,5 +473,5 @@ app.listen(PORT, () => console.log(`Web on ${PORT}`));
     }
   }, new NewMessage({}));
 
-  console.log('Handlers ready');
+  console.log('Handlers ready - Smart App Links enabled');
 })();
