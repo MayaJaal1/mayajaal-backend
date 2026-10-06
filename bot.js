@@ -28,7 +28,6 @@ const R2_BUCKET_NAME = (process.env.R2_BUCKET_NAME || '').trim();
 const MAX_FILE_SIZE = parseInt(process.env.MAX_FILE_SIZE || '2147483648', 10);
 const PORT = parseInt(process.env.PORT || '8080', 10);
 const VIDEO_SECRET = (process.env.VIDEO_SECRET || '').trim();
-
 const APP_NAME = process.env.APP_NAME || 'MayaJaal';
 const APP_UA_KEYWORD = (process.env.APP_UA_KEYWORD || 'MayaJaalApp').trim();
 
@@ -72,6 +71,16 @@ async function saveUserKey(tgId, key) {
 async function deleteUserKey(tgId) {
   try { await redis.del(`apikey:${tgId}`); } catch (e) { }
 }
+async function getUserLang(tgId) {
+  try {
+    const raw = await redis.get(`lang:${tgId}`);
+    if (raw) return typeof raw === 'string' ? raw.replace(/"/g, '') : 'en';
+  } catch (e) { }
+  return 'en';
+}
+async function saveUserLang(tgId, lang) {
+  try { await redis.set(`lang:${tgId}`, lang); } catch (e) { }
+}
 
 const r2 = new S3Client({
   region: 'auto',
@@ -101,9 +110,230 @@ function verifyVideoSig(videoId, token) {
   const expected = crypto.createHmac('sha256', VIDEO_SECRET).update(payload).digest('hex').substring(0, 16);
   try { return crypto.timingSafeEqual(Buffer.from(sig), Buffer.from(expected)); }
   catch (e) { return false; }
+  }
+// ============================================================
+// TRANSLATIONS
+// ============================================================
+const T = {
+  en: {
+    welcome_title: 'M A Y A  J A A L',
+    subtitle: 'Official Stream Bot',
+    tagline: 'Fast • Secure • App-Only Streaming',
+    about_title: 'About This Bot',
+    about_text: 'This bot uploads your videos to a secure cloud and gives you a signed player link.',
+    security_features: 'Security Features',
+    sec_1: 'HMAC-signed links (cannot be copied)',
+    sec_2: 'Plays only in MayaJaal App',
+    sec_3: 'Browser playback disabled',
+    sec_4: '30-day link validity',
+    status: 'Status',
+    api_connected: 'API Connected',
+    api_not_connected: 'API Not Connected',
+    how_to_use: 'How to Use',
+    step_1: 'Connect API key (one time)',
+    step_2: 'Send video or Terabox link',
+    step_3: 'Get signed player link',
+    step_4: 'Play in App',
+    nav_hint: 'Use the buttons below to navigate',
+    btn_api: 'API Connect',
+    btn_help: 'How to Use',
+    btn_allbots: 'All Bots',
+    btn_account: 'Account',
+    btn_logout: 'Logout',
+    btn_settings: 'Settings',
+    btn_language: 'Language',
+    btn_main_menu: 'Main Menu',
+    btn_generate_key: 'Generate API Key',
+    btn_generate_new: 'Generate New Key',
+    btn_confirm_logout: 'Confirm Logout',
+    btn_cancel: 'Cancel',
+    api_status_title: 'API Status',
+    already_connected: 'Already Connected',
+    connected_at: 'Connected',
+    key_label: 'Key',
+    need_new_key: 'Need a new key? Tap below:',
+    api_connect_title: 'API Connect',
+    api_connect_step1: 'Tap the button below',
+    api_connect_step2: 'API key will be generated in browser',
+    api_connect_step3: 'Copy the key',
+    api_connect_step4: 'Send it here: /api YOUR_KEY',
+    api_key_connected: 'API Key Connected!',
+    api_key_required: 'API Key Required',
+    api_key_required_text: 'Please connect your API key first:',
+    api_key_invalid: 'Invalid API key',
+    api_key_min_12: 'Key must be at least 12 characters',
+    now_send_video: 'Now send a video or paste a Terabox link',
+    help_title: 'How to Use MayaJaal Bot',
+    help_step1: 'Step 1 — API Connect (once):',
+    help_step1_a: 'Tap "API Connect" button',
+    help_step1_b: 'Get API key in browser',
+    help_step1_c: 'Copy the key',
+    help_step1_d: 'Send: /api YOUR_KEY',
+    help_step2: 'Step 2 — Video Upload:',
+    help_step2_a: 'Send video/file directly (up to 2GB)',
+    help_step2_b: 'Or paste Terabox link',
+    help_step3: 'Step 3 — Player Link:',
+    help_step3_a: 'Bot gives signed link',
+    help_step3_b: 'Open the link',
+    help_step3_c: 'Play button → App download',
+    help_step4: 'Step 4 — App Install:',
+    help_step4_a: 'Download APK',
+    help_step4_b: 'Install and watch videos',
+    all_bots_title: 'All MayaJaal Bots',
+    bot1_name: 'Stream Bot',
+    bot1_desc: 'Video upload + player link',
+    bot2_name: 'Link Converter Bot',
+    bot2_desc: 'Short link generator + earning',
+    bot3_name: 'Content Bot',
+    bot3_desc: 'Coming soon',
+    bot4_name: 'Web Bot',
+    bot4_desc: 'Coming soon',
+    status_active: 'Active',
+    status_soon: 'Soon',
+    data_safe: 'Everyone\'s data is safe',
+    account_title: 'Your Account',
+    user_id: 'User ID',
+    api_status: 'API Status',
+    connected_label: 'Connected',
+    not_connected_label: 'Not Connected',
+    connected_since: 'Connected Since',
+    bot_version: 'Bot Version',
+    logout_title: 'Logout',
+    logout_confirm_text: 'Are you sure you want to disconnect your API?',
+    logout_safe: 'Your data will remain safe.',
+    logout_success: 'Logout Successful!',
+    logout_disconnected: 'Your API key has been disconnected.',
+    logout_restart: 'Send /start to connect again.',
+    already_logged_out: 'You are already logged out.',
+    settings_title: 'Settings',
+    settings_lang_label: 'Current Language',
+    settings_choose_lang: 'Choose your preferred language:',
+    lang_english: 'English',
+    lang_hindi: 'हिंदी (Hindi)',
+    lang_changed: 'Language changed successfully!',
+    lang_changed_to: 'Language set to:',
+    terabox_detected: 'Terabox link detected, processing...',
+    downloading_uploading: 'Download + upload in progress...',
+    uploading: 'Uploading...',
+    ready_app_only: 'Ready — App Only',
+    app_only_note: 'Will play only in App',
+    player_link: 'Player Link',
+    max_size: 'Max',
+  },
+  hi: {
+    welcome_title: 'माया जाल',
+    subtitle: 'ऑफिशियल स्ट्रीम बॉट',
+    tagline: 'तेज़ • सुरक्षित • सिर्फ ऐप में',
+    about_title: 'इस बॉट के बारे में',
+    about_text: 'यह बॉट आपकी वीडियो को सुरक्षित क्लाउड पर अपलोड करता है और साइन किया हुआ प्लेयर लिंक देता है।',
+    security_features: 'सुरक्षा फीचर्स',
+    sec_1: 'HMAC-साइन लिंक (कोई कॉपी नहीं कर सकता)',
+    sec_2: 'सिर्फ MayaJaal ऐप में चलेगा',
+    sec_3: 'ब्राउज़र प्लेबैक बंद',
+    sec_4: '30 दिन तक लिंक वैध',
+    status: 'स्थिति',
+    api_connected: 'API कनेक्टेड',
+    api_not_connected: 'API कनेक्ट नहीं',
+    how_to_use: 'इस्तेमाल कैसे करें',
+    step_1: 'API की कनेक्ट करें (एक बार)',
+    step_2: 'वीडियो या Terabox लिंक भेजें',
+    step_3: 'साइन किया प्लेयर लिंक मिलेगा',
+    step_4: 'ऐप में देखें',
+    nav_hint: 'नीचे बटन्स से नेविगेट करें',
+    btn_api: 'API कनेक्ट',
+    btn_help: 'कैसे इस्तेमाल करें',
+    btn_allbots: 'सभी बॉट्स',
+    btn_account: 'अकाउंट',
+    btn_logout: 'लॉगआउट',
+    btn_settings: 'सेटिंग्स',
+    btn_language: 'भाषा',
+    btn_main_menu: 'मुख्य मेन्यू',
+    btn_generate_key: 'API की बनाएं',
+    btn_generate_new: 'नई की बनाएं',
+    btn_confirm_logout: 'लॉगआउट पक्का करें',
+    btn_cancel: 'रद्द करें',
+    api_status_title: 'API स्टेटस',
+    already_connected: 'पहले से कनेक्टेड',
+    connected_at: 'कनेक्टेड',
+    key_label: 'की',
+    need_new_key: 'नई की चाहिए? नीचे दबाएं:',
+    api_connect_title: 'API कनेक्ट',
+    api_connect_step1: 'नीचे बटन दबाएं',
+    api_connect_step2: 'ब्राउज़र में API की बनेगी',
+    api_connect_step3: 'की कॉपी करें',
+    api_connect_step4: 'यहां भेजें: /api YOUR_KEY',
+    api_key_connected: 'API की कनेक्ट हो गई!',
+    api_key_required: 'API की ज़रूरी है',
+    api_key_required_text: 'पहले अपनी API की कनेक्ट करें:',
+    api_key_invalid: 'गलत API की',
+    api_key_min_12: 'की कम से कम 12 अक्षर की होनी चाहिए',
+    now_send_video: 'अब वीडियो भेजें या Terabox लिंक पेस्ट करें',
+    help_title: 'MayaJaal बॉट कैसे इस्तेमाल करें',
+    help_step1: 'स्टेप 1 — API कनेक्ट (एक बार):',
+    help_step1_a: '"API कनेक्ट" बटन दबाएं',
+    help_step1_b: 'ब्राउज़र में API की लें',
+    help_step1_c: 'की कॉपी करें',
+    help_step1_d: 'भेजें: /api YOUR_KEY',
+    help_step2: 'स्टेप 2 — वीडियो अपलोड:',
+    help_step2_a: 'वीडियो/फाइल सीधे भेजें (2GB तक)',
+    help_step2_b: 'या Terabox लिंक पेस्ट करें',
+    help_step3: 'स्टेप 3 — प्लेयर लिंक:',
+    help_step3_a: 'बॉट साइन किया लिंक देगा',
+    help_step3_b: 'लिंक खोलें',
+    help_step3_c: 'प्ले बटन → ऐप डाउनलोड',
+    help_step4: 'स्टेप 4 — ऐप इंस्टॉल:',
+    help_step4_a: 'APK डाउनलोड करें',
+    help_step4_b: 'इंस्टॉल करके वीडियो देखें',
+    all_bots_title: 'सभी MayaJaal बॉट्स',
+    bot1_name: 'स्ट्रीम बॉट',
+    bot1_desc: 'वीडियो अपलोड + प्लेयर लिंक',
+    bot2_name: 'लिंक कनवर्टर बॉट',
+    bot2_desc: 'शॉर्ट लिंक जेनरेटर + कमाई',
+    bot3_name: 'कंटेंट बॉट',
+    bot3_desc: 'जल्द आ रहा है',
+    bot4_name: 'वेब बॉट',
+    bot4_desc: 'जल्द आ रहा है',
+    status_active: 'सक्रिय',
+    status_soon: 'जल्द',
+    data_safe: 'सबका डेटा सुरक्षित है',
+    account_title: 'आपका अकाउंट',
+    user_id: 'यूज़र ID',
+    api_status: 'API स्टेटस',
+    connected_label: 'कनेक्टेड',
+    not_connected_label: 'कनेक्ट नहीं',
+    connected_since: 'कनेक्टेड कब से',
+    bot_version: 'बॉट वर्ज़न',
+    logout_title: 'लॉगआउट',
+    logout_confirm_text: 'क्या आप API डिसकनेक्ट करना चाहते हैं?',
+    logout_safe: 'आपका डेटा सुरक्षित रहेगा।',
+    logout_success: 'लॉगआउट हो गया!',
+    logout_disconnected: 'आपकी API की डिसकनेक्ट हो गई।',
+    logout_restart: 'दोबारा कनेक्ट करने के लिए /start भेजें।',
+    already_logged_out: 'आप पहले से लॉगआउट हैं।',
+    settings_title: 'सेटिंग्स',
+    settings_lang_label: 'वर्तमान भाषा',
+    settings_choose_lang: 'अपनी पसंदीदा भाषा चुनें:',
+    lang_english: 'English',
+    lang_hindi: 'हिंदी (Hindi)',
+    lang_changed: 'भाषा सफलतापूर्वक बदली गई!',
+    lang_changed_to: 'भाषा सेट:',
+    terabox_detected: 'Terabox लिंक मिला, प्रोसेस हो रहा है...',
+    downloading_uploading: 'डाउनलोड + अपलोड हो रहा है...',
+    uploading: 'अपलोड हो रहा है...',
+    ready_app_only: 'तैयार — सिर्फ ऐप में',
+    app_only_note: 'सिर्फ ऐप में चलेगा',
+    player_link: 'प्लेयर लिंक',
+    max_size: 'अधिकतम',
+  }
+};
+
+function t(lang, key) {
+  return (T[lang] && T[lang][key]) || T.en[key] || key;
 }
 
-// ===== EXPRESS =====
+// ============================================================
+// EXPRESS SERVER
+// ============================================================
 const app = express();
 app.use(express.json());
 
@@ -182,6 +412,7 @@ app.get('/stream/:id', async (req, res) => {
 
 app.listen(PORT, () => console.log(`Web on ${PORT}`));
 
+// ===== TERABOX HELPERS =====
 function detectTeraboxUrl(text) {
   if (!text) return null;
   const domains = ['terabox\\.com','terabox\\.app','terabox\\.link','terabox\\.club','terabox\\.fun','terabox\\.cc','terabox\\.top','terabox\\.online','1024tera\\.com','1024terabox\\.com','4funbox\\.com','4funbox\\.co','mirrobox\\.com','nephobox\\.com','momerybox\\.com','tibibox\\.com','teraboxapp\\.com','teraboxlink\\.com','teraboxshare\\.com','teraboxurl\\.com','teraboxdl\\.com','teraboxdownloader\\.com','terafileshare\\.com','terashare\\.com','terasharelink\\.com','terasharefile\\.com','freeterabox\\.com','gearbox\\.app','teraboxcdn\\.com','terabox\\.store','terabox\\.site','terabox\\.space','terabox\\.website','dubox\\.com','terabox\\.icu','terabox\\.xyz','diskwala\\.com'];
@@ -213,7 +444,7 @@ async function getTeraboxDirectLink(shareUrl) {
   if (!fs_id) { const m3 = html.match(/"fs_id"\s*:\s*"?(\d+)"?/); if (m3) fs_id = m3[1]; }
   if (server_filename === 'video.mp4') { const m4 = html.match(/"server_filename"\s*:\s*"([^"]+)"/); if (m4) server_filename = m4[1]; }
   if (!size) { const m5 = html.match(/"size"\s*:\s*(\d+)/); if (m5) size = parseInt(m5[1], 10); }
-  if (!shareid || !uk) throw new Error('Share info nahi mili');
+  if (!shareid || !uk) throw new Error('Share info not found');
   const apiHeaders = { 'User-Agent': UA, 'Cookie': TERABOX_COOKIE, 'Referer': shareUrl };
   if (!fs_id) {
     const shorturl = shareUrl.split('/s/')[1]?.split('?')[0] || '';
@@ -223,13 +454,15 @@ async function getTeraboxDirectLink(shareUrl) {
       if (f) { fs_id = f.fs_id; server_filename = f.server_filename || server_filename; size = f.size || size; }
     } catch (e) { }
   }
-  if (!fs_id) throw new Error('fs_id nahi mila');
+  if (!fs_id) throw new Error('fs_id not found');
   const dlResp = await axios.get(`https://www.terabox.com/share/download?shareid=${shareid}&uk=${uk}&sign=${sign || ''}&timestamp=${timestamp || ''}&fs_id=${fs_id}&channel=dubox&web=1&app_id=250528`, { headers: apiHeaders, timeout: 30000 });
   const dlink = dlResp.data?.dlink;
-  if (!dlink) throw new Error('Direct link nahi mili');
+  if (!dlink) throw new Error('Direct link not found');
   return { url: Array.isArray(dlink) ? dlink[0] : dlink, fileName: server_filename, size };
-}
-// ===== BOT =====
+    }
+// ============================================================
+// BOT
+// ============================================================
 (async () => {
   const client = new TelegramClient(new StringSession(''), API_ID, API_HASH, {
     connectionRetries: 5, autoReconnect: true,
@@ -250,40 +483,41 @@ async function getTeraboxDirectLink(shareUrl) {
     });
   }
 
-  // ===== WELCOME MENU =====
+  // ===== WELCOME =====
   async function sendWelcome(chatId, uid, editMsgId = null) {
+    const lang = await getUserLang(uid);
     const userData = await getUserKey(uid);
-    const status = userData ? '✅ API Connected' : '⚠️ API Not Connected';
+    const statusText = userData ? `✅ ${t(lang, 'api_connected')}` : `⚠️ ${t(lang, 'api_not_connected')}`;
 
     const text =
       `<b>╔══════════════════════╗</b>\n` +
-      `<b>   🎬  M A Y A  J A A L  🎬</b>\n` +
+      `<b>   🎬  ${t(lang, 'welcome_title')}  🎬</b>\n` +
       `<b>╚══════════════════════╝</b>\n\n` +
-      `<b>🚀 OFFICIAL STREAM BOT</b>\n` +
-      `<i>Fast • Secure • App-Only Streaming</i>\n\n` +
+      `<b>🚀 ${t(lang, 'subtitle')}</b>\n` +
+      `<i>${t(lang, 'tagline')}</i>\n\n` +
       `<b>━━━━━━━━━━━━━━━━━━━━━━</b>\n` +
-      `<b>📖 About This Bot</b>\n` +
+      `<b>📖 ${t(lang, 'about_title')}</b>\n` +
       `<b>━━━━━━━━━━━━━━━━━━━━━━</b>\n\n` +
-      `Ye bot aapki videos ko <b>secure cloud</b> pe upload karta hai aur ek <b>signed player link</b> deta hai.\n\n` +
-      `<b>🔐 Security Features:</b>\n` +
-      `├ ✅ HMAC-signed links (koi copy nahi kar sakta)\n` +
-      `├ ✅ Sirf MayaJaal App me play hoga\n` +
-      `├ ✅ Browser playback disabled\n` +
-      `└ ✅ 30-day link validity\n\n` +
+      `${t(lang, 'about_text')}\n\n` +
+      `<b>🔐 ${t(lang, 'security_features')}:</b>\n` +
+      `├ ✅ ${t(lang, 'sec_1')}\n` +
+      `├ ✅ ${t(lang, 'sec_2')}\n` +
+      `├ ✅ ${t(lang, 'sec_3')}\n` +
+      `└ ✅ ${t(lang, 'sec_4')}\n\n` +
       `<b>━━━━━━━━━━━━━━━━━━━━━━</b>\n` +
-      `<b>📌 Status:</b> ${status}\n` +
+      `<b>📌 ${t(lang, 'status')}:</b> ${statusText}\n` +
       `<b>━━━━━━━━━━━━━━━━━━━━━━</b>\n\n` +
-      `<b>🎯 How to Use:</b>\n` +
-      `<b>1.</b> API Connect karo (ek baar)\n` +
-      `<b>2.</b> Video ya Terabox link bhejo\n` +
-      `<b>3.</b> Signed player link milega\n` +
-      `<b>4.</b> App me play karo\n\n` +
-      `<i>Neeche buttons se navigate karo 👇</i>`;
+      `<b>🎯 ${t(lang, 'how_to_use')}:</b>\n` +
+      `<b>1.</b> ${t(lang, 'step_1')}\n` +
+      `<b>2.</b> ${t(lang, 'step_2')}\n` +
+      `<b>3.</b> ${t(lang, 'step_3')}\n` +
+      `<b>4.</b> ${t(lang, 'step_4')}\n\n` +
+      `<i>${t(lang, 'nav_hint')} 👇</i>`;
 
     const rows = [
-      [{ text: '🔑 API Connect', callback_data: 'menu_api' }, { text: '📖 How to Use', callback_data: 'menu_help' }],
-      [{ text: '🤖 All Bots', callback_data: 'menu_allbots' }, { text: '📊 Account', callback_data: 'menu_account' }],
-      [{ text: '🚪 Logout', callback_data: 'menu_logout' }],
+      [{ text: `🔑 ${t(lang, 'btn_api')}`, callback_data: 'menu_api' }, { text: `📖 ${t(lang, 'btn_help')}`, callback_data: 'menu_help' }],
+      [{ text: `🤖 ${t(lang, 'btn_allbots')}`, callback_data: 'menu_allbots' }, { text: `📊 ${t(lang, 'btn_account')}`, callback_data: 'menu_account' }],
+      [{ text: `⚙️ ${t(lang, 'btn_settings')}`, callback_data: 'menu_settings' }, { text: `🚪 ${t(lang, 'btn_logout')}`, callback_data: 'menu_logout' }],
     ];
 
     if (editMsgId) {
@@ -291,6 +525,77 @@ async function getTeraboxDirectLink(shareUrl) {
         await client.editMessage(chatId, { message: editMsgId, text, parseMode: 'html', buttons: keyboard(rows) });
         return;
       } catch (e) { }
+    }
+    await client.sendMessage(chatId, { message: text, parseMode: 'html', buttons: keyboard(rows) });
+  }
+
+  async function sendHelp(chatId, uid, editMsgId = null) {
+    const lang = await getUserLang(uid);
+    const text = `📖 <b>${t(lang, 'help_title')}</b>\n\n` +
+      `<b>${t(lang, 'help_step1')}</b>\n` +
+      `├ ${t(lang, 'help_step1_a')}\n` +
+      `├ ${t(lang, 'help_step1_b')}\n` +
+      `├ ${t(lang, 'help_step1_c')}\n` +
+      `└ ${t(lang, 'help_step1_d')}\n\n` +
+      `<b>${t(lang, 'help_step2')}</b>\n` +
+      `├ ${t(lang, 'help_step2_a')}\n` +
+      `└ ${t(lang, 'help_step2_b')}\n\n` +
+      `<b>${t(lang, 'help_step3')}</b>\n` +
+      `├ ${t(lang, 'help_step3_a')}\n` +
+      `├ ${t(lang, 'help_step3_b')}\n` +
+      `└ ${t(lang, 'help_step3_c')}\n\n` +
+      `<b>${t(lang, 'help_step4')}</b>\n` +
+      `├ ${t(lang, 'help_step4_a')}\n` +
+      `└ ${t(lang, 'help_step4_b')}`;
+    const rows = [[{ text: `⬅️ ${t(lang, 'btn_main_menu')}`, callback_data: 'main_menu' }]];
+    if (editMsgId) {
+      try { await client.editMessage(chatId, { message: editMsgId, text, parseMode: 'html', buttons: keyboard(rows) }); return; } catch (e) { }
+    }
+    await client.sendMessage(chatId, { message: text, parseMode: 'html', buttons: keyboard(rows) });
+  }
+
+  async function sendAllBots(chatId, uid, editMsgId = null) {
+    const lang = await getUserLang(uid);
+    const text = `🤖 <b>${t(lang, 'all_bots_title')}</b>\n\n` +
+      `<b>1. 🎬 ${t(lang, 'bot1_name')}</b>\n<i>${t(lang, 'bot1_desc')}</i>\n${t(lang, 'status')}: ✅ ${t(lang, 'status_active')}\n\n` +
+      `<b>2. 🔗 ${t(lang, 'bot2_name')}</b>\n<i>${t(lang, 'bot2_desc')}</i>\n${t(lang, 'status')}: ✅ ${t(lang, 'status_active')}\n\n` +
+      `<b>3. 📝 ${t(lang, 'bot3_name')}</b>\n<i>${t(lang, 'bot3_desc')}</i>\n${t(lang, 'status')}: ⏳ ${t(lang, 'status_soon')}\n\n` +
+      `<b>4. 🌐 ${t(lang, 'bot4_name')}</b>\n<i>${t(lang, 'bot4_desc')}</i>\n${t(lang, 'status')}: ⏳ ${t(lang, 'status_soon')}\n\n` +
+      `<i>🔒 ${t(lang, 'data_safe')}</i>`;
+    const rows = [[{ text: `⬅️ ${t(lang, 'btn_main_menu')}`, callback_data: 'main_menu' }]];
+    if (editMsgId) {
+      try { await client.editMessage(chatId, { message: editMsgId, text, parseMode: 'html', buttons: keyboard(rows) }); return; } catch (e) { }
+    }
+    await client.sendMessage(chatId, { message: text, parseMode: 'html', buttons: keyboard(rows) });
+  }
+
+  async function sendSettings(chatId, uid, editMsgId = null) {
+    const lang = await getUserLang(uid);
+    const text = `⚙️ <b>${t(lang, 'settings_title')}</b>\n\n` +
+      `<b>${t(lang, 'settings_lang_label')}:</b> ${lang === 'hi' ? 'हिंदी' : 'English'}\n\n` +
+      `${t(lang, 'settings_choose_lang')}`;
+    const rows = [
+      [{ text: `🌐 ${t(lang, 'btn_language')}`, callback_data: 'menu_language' }],
+      [{ text: `⬅️ ${t(lang, 'btn_main_menu')}`, callback_data: 'main_menu' }],
+    ];
+    if (editMsgId) {
+      try { await client.editMessage(chatId, { message: editMsgId, text, parseMode: 'html', buttons: keyboard(rows) }); return; } catch (e) { }
+    }
+    await client.sendMessage(chatId, { message: text, parseMode: 'html', buttons: keyboard(rows) });
+  }
+
+  async function sendLanguageSelector(chatId, uid, editMsgId = null) {
+    const lang = await getUserLang(uid);
+    const text = `🌐 <b>${t(lang, 'btn_language')} / भाषा</b>\n\n` +
+      `Current / वर्तमान: <b>${lang === 'hi' ? 'हिंदी' : 'English'}</b>\n\n` +
+      `Choose / चुनें:`;
+    const rows = [
+      [{ text: '🇬🇧 English', callback_data: 'set_lang_en' }],
+      [{ text: '🇮🇳 हिंदी (Hindi)', callback_data: 'set_lang_hi' }],
+      [{ text: `⬅️ ${t(lang, 'btn_main_menu')}`, callback_data: 'main_menu' }],
+    ];
+    if (editMsgId) {
+      try { await client.editMessage(chatId, { message: editMsgId, text, parseMode: 'html', buttons: keyboard(rows) }); return; } catch (e) { }
     }
     await client.sendMessage(chatId, { message: text, parseMode: 'html', buttons: keyboard(rows) });
   }
@@ -303,92 +608,63 @@ async function getTeraboxDirectLink(shareUrl) {
       const chatId = msg.chatId;
       const text = (msg.message || '').trim();
       const uid = msg.senderId || (msg.fromId && msg.fromId.userId) || 0;
+      const lang = await getUserLang(uid);
 
-      // /start
-      if (text === '/start') {
-        await sendWelcome(chatId, uid);
-        return;
-      }
+      if (text === '/start') { await sendWelcome(chatId, uid); return; }
 
-      // /api KEY
       if (text.startsWith('/api ')) {
         const key = text.replace('/api ', '').trim();
         if (key.length < 12) {
-          await client.sendMessage(chatId, { message: `❌ <b>Invalid API key</b>\n\nKey at least 12 characters honi chahiye.`, parseMode: 'html' });
+          await client.sendMessage(chatId, { message: `❌ <b>${t(lang, 'api_key_invalid')}</b>\n\n${t(lang, 'api_key_min_12')}`, parseMode: 'html' });
           return;
         }
         await saveUserKey(uid, key);
         await client.sendMessage(chatId, {
-          message: `✅ <b>API Key Connected!</b>\n\n🔑 <code>${escapeHtml(key.substring(0, 8))}...</code>\n\n📤 <b>Ab video bhejo ya Terabox link paste karo</b>`,
+          message: `✅ <b>${t(lang, 'api_key_connected')}</b>\n\n🔑 <code>${escapeHtml(key.substring(0, 8))}...</code>\n\n📤 <b>${t(lang, 'now_send_video')}</b>`,
           parseMode: 'html',
         });
         return;
       }
 
-      // /logout
       if (text === '/logout') {
         const userData = await getUserKey(uid);
         if (!userData) {
-          await client.sendMessage(chatId, { message: `⚠️ Aap already logged out ho.`, parseMode: 'html' });
+          await client.sendMessage(chatId, { message: `⚠️ ${t(lang, 'already_logged_out')}`, parseMode: 'html' });
           return;
         }
         await deleteUserKey(uid);
         await client.sendMessage(chatId, {
-          message: `✅ <b>Logout Successful!</b>\n\nAapki API key disconnect ho gayi.\nDobara connect karne ke liye <code>/start</code> bhejo.`,
+          message: `✅ <b>${t(lang, 'logout_success')}</b>\n\n${t(lang, 'logout_disconnected')}\n${t(lang, 'logout_restart')}`,
           parseMode: 'html',
         });
         return;
       }
 
-      // /help
-      if (text === '/help') {
-        await client.sendMessage(chatId, {
-          message: `📖 <b>MayaJaal Bot — Help</b>\n\n` +
-            `<b>Commands:</b>\n` +
-            `/start — Main menu\n` +
-            `/api KEY — Connect API key\n` +
-            `/logout — Disconnect API\n` +
-            `/help — Show this help\n\n` +
-            `<b>How to use:</b>\n` +
-            `1. /start → API Connect button\n` +
-            `2. Copy key from browser\n` +
-            `3. Send /api YOUR_KEY\n` +
-            `4. Send video or Terabox link\n` +
-            `5. Get signed player link\n` +
-            `6. Play in MayaJaal App`,
-          parseMode: 'html',
-        });
-        return;
-      }
+      if (text === '/help') { await sendHelp(chatId, uid); return; }
+      if (text === '/allbots') { await sendAllBots(chatId, uid); return; }
+      if (text === '/settings') { await sendSettings(chatId, uid); return; }
+      if (text === '/language') { await sendLanguageSelector(chatId, uid); return; }
 
-      // /allbots
-      if (text === '/allbots') {
-        await sendAllBots(chatId);
-        return;
-      }
-
-      // API CHECK
       const userData = await getUserKey(uid);
       const teraboxUrl = detectTeraboxUrl(text);
       const hasMedia = !!msg.media;
 
       if (!userData && (hasMedia || teraboxUrl)) {
         await client.sendMessage(chatId, {
-          message: `🔒 <b>API Key Required</b>\n\nPehle API key connect karo:\n\n1. <code>/start</code> bhejo\n2. "🔑 API Connect" button dabao\n3. Key copy karke bhejo: <code>/api YOUR_KEY</code>`,
+          message: `🔒 <b>${t(lang, 'api_key_required')}</b>\n\n${t(lang, 'api_key_required_text')}\n\n1. <code>/start</code>\n2. ${t(lang, 'btn_api')}\n3. <code>/api YOUR_KEY</code>`,
           parseMode: 'html',
-          buttons: keyboard([[{ text: '🔑 API Connect', url: `${BASE_URL}/index.html?tg=${uid}` }]]),
+          buttons: keyboard([[{ text: `🔑 ${t(lang, 'btn_api')}`, url: `${BASE_URL}/index.html?tg=${uid}` }]]),
         });
         return;
       }
 
-      // TERABOX
       if (teraboxUrl) {
-        const status = await client.sendMessage(chatId, { message: `🔍 <i>Terabox link mila, process ho raha hai...</i>`, parseMode: 'html' });
+        const status = await client.sendMessage(chatId, { message: `🔍 <i>${t(lang, 'terabox_detected')}</i>`, parseMode: 'html' });
         try {
           const info = await getTeraboxDirectLink(teraboxUrl);
           await client.editMessage(chatId, {
             message: status.id,
-            text: `⬇️ <i>Download + upload...</i>\n📌 ${escapeHtml(info.fileName)}\n📦 ${(info.size / 1024 / 1024).toFixed(2)} MB`,
+            text: `⬇️ <i>${t(lang, 'downloading_uploading')}</i>\n📌 ${escapeHtml(info.fileName)}\n📦 ${(info.size / 1024 / 1024).toFixed(2)} MB`,
             parseMode: 'html',
           });
           const TERABOX_COOKIE = (process.env.TERABOX_COOKIE || '').trim();
@@ -410,7 +686,7 @@ async function getTeraboxDirectLink(shareUrl) {
           const playUrl = `${BASE_URL}/v/${shortId}?t=${token}`;
           await client.deleteMessages(chatId, [status.id], { revoke: true }).catch(() => {});
           await client.sendMessage(chatId, {
-            message: `✅ <b>Ready — App Only</b>\n\n📌 <b>${escapeHtml(info.fileName)}</b>\n📦 ${(info.size / 1024 / 1024).toFixed(2)} MB\n\n🔒 <b>Sirf app me play hoga</b>\n\n▶️ <b>Player Link:</b>\n${playUrl}`,
+            message: `✅ <b>${t(lang, 'ready_app_only')}</b>\n\n📌 <b>${escapeHtml(info.fileName)}</b>\n📦 ${(info.size / 1024 / 1024).toFixed(2)} MB\n\n🔒 <b>${t(lang, 'app_only_note')}</b>\n\n▶️ <b>${t(lang, 'player_link')}:</b>\n${playUrl}`,
             parseMode: 'html',
           });
         } catch (e) {
@@ -421,14 +697,9 @@ async function getTeraboxDirectLink(shareUrl) {
         return;
       }
 
-      // DIRECT FILE
       if (!msg.media) return;
       const doc = msg.media.document;
-      if (!doc) {
-        console.log('[NO DOC]', msg.media.className);
-        return;
-      }
-      console.log('[DOC]', doc.className, '| size:', doc.size);
+      if (!doc) return;
 
       let fileName = 'video.mp4', mime = 'application/octet-stream', size = 0;
       size = Number(doc.size) || 0;
@@ -438,12 +709,12 @@ async function getTeraboxDirectLink(shareUrl) {
       else if (msg.video) fileName = `video_${Date.now()}.mp4`;
 
       if (size && size > MAX_FILE_SIZE) {
-        await client.sendMessage(chatId, { message: `❌ Max ${(MAX_FILE_SIZE / 1024 / 1024).toFixed(0)} MB` });
+        await client.sendMessage(chatId, { message: `❌ ${t(lang, 'max_size')} ${(MAX_FILE_SIZE / 1024 / 1024).toFixed(0)} MB` });
         return;
       }
 
       const status = await client.sendMessage(chatId, {
-        message: `⚡ <i>Uploading...</i>\n📌 ${escapeHtml(fileName)}\n📦 ${(size / 1024 / 1024).toFixed(2)} MB`,
+        message: `⚡ <i>${t(lang, 'uploading')}</i>\n📌 ${escapeHtml(fileName)}\n📦 ${(size / 1024 / 1024).toFixed(2)} MB`,
         parseMode: 'html',
       });
 
@@ -479,7 +750,7 @@ async function getTeraboxDirectLink(shareUrl) {
         const playUrl = `${BASE_URL}/v/${shortId}?t=${token}`;
         await client.deleteMessages(chatId, [status.id], { revoke: true }).catch(() => {});
         await client.sendMessage(chatId, {
-          message: `✅ <b>Ready — App Only</b>\n\n📌 <b>${escapeHtml(fileName)}</b>\n📦 ${(size / 1024 / 1024).toFixed(2)} MB\n\n🔒 <b>Sirf app me play hoga</b>\n\n▶️ <b>Player Link:</b>\n${playUrl}`,
+          message: `✅ <b>${t(lang, 'ready_app_only')}</b>\n\n📌 <b>${escapeHtml(fileName)}</b>\n📦 ${(size / 1024 / 1024).toFixed(2)} MB\n\n🔒 <b>${t(lang, 'app_only_note')}</b>\n\n▶️ <b>${t(lang, 'player_link')}:</b>\n${playUrl}`,
           parseMode: 'html',
         });
       } catch (e) {
@@ -492,7 +763,7 @@ async function getTeraboxDirectLink(shareUrl) {
     }
   }, new NewMessage({}));
 
-  // ===== CALLBACK BUTTONS =====
+  // ===== CALLBACK HANDLER =====
   client.addEventHandler(async (event) => {
     const q = event.query;
     if (!q) return;
@@ -501,96 +772,66 @@ async function getTeraboxDirectLink(shareUrl) {
     const chatId = q.chatId || q.userId;
     const uid = q.userId;
     const msgId = q.msgId;
+    const lang = await getUserLang(uid);
 
     if (data === 'menu_api') {
       const userData = await getUserKey(uid);
       if (userData) {
         await client.editMessage(chatId, {
           message: msgId,
-          text: `🔑 <b>API Status</b>\n\n✅ <b>Already Connected</b>\n\n🔐 Key: <code>${escapeHtml(userData.apiKey.substring(0, 8))}...${escapeHtml(userData.apiKey.slice(-4))}</code>\n📅 Connected: ${new Date(userData.connectedAt).toLocaleString()}\n\nNayi key chahiye toh niche button dabao:`,
+          text: `🔑 <b>${t(lang, 'api_status_title')}</b>\n\n✅ <b>${t(lang, 'already_connected')}</b>\n\n🔐 ${t(lang, 'key_label')}: <code>${escapeHtml(userData.apiKey.substring(0, 8))}...${escapeHtml(userData.apiKey.slice(-4))}</code>\n📅 ${t(lang, 'connected_at')}: ${new Date(userData.connectedAt).toLocaleString()}\n\n${t(lang, 'need_new_key')}`,
           parseMode: 'html',
           buttons: keyboard([
-            [{ text: '🔄 Generate New Key', url: `${BASE_URL}/index.html?tg=${uid}` }],
-            [{ text: '⬅️ Main Menu', callback_data: 'main_menu' }],
+            [{ text: `🔄 ${t(lang, 'btn_generate_new')}`, url: `${BASE_URL}/index.html?tg=${uid}` }],
+            [{ text: `⬅️ ${t(lang, 'btn_main_menu')}`, callback_data: 'main_menu' }],
           ]),
         });
       } else {
         await client.editMessage(chatId, {
           message: msgId,
-          text: `🔑 <b>API Connect</b>\n\nAPI key connect karne ke liye:\n\n<b>Step 1:</b> Niche button dabao\n<b>Step 2:</b> Key generate hogi browser me\n<b>Step 3:</b> Key copy karo\n<b>Step 4:</b> Yahan bhejo: <code>/api YOUR_KEY</code>`,
+          text: `🔑 <b>${t(lang, 'api_connect_title')}</b>\n\n` +
+            `<b>Step 1:</b> ${t(lang, 'api_connect_step1')}\n` +
+            `<b>Step 2:</b> ${t(lang, 'api_connect_step2')}\n` +
+            `<b>Step 3:</b> ${t(lang, 'api_connect_step3')}\n` +
+            `<b>Step 4:</b> <code>/api YOUR_KEY</code>`,
           parseMode: 'html',
           buttons: keyboard([
-            [{ text: '🔑 Generate API Key', url: `${BASE_URL}/index.html?tg=${uid}` }],
-            [{ text: '⬅️ Main Menu', callback_data: 'main_menu' }],
+            [{ text: `🔑 ${t(lang, 'btn_generate_key')}`, url: `${BASE_URL}/index.html?tg=${uid}` }],
+            [{ text: `⬅️ ${t(lang, 'btn_main_menu')}`, callback_data: 'main_menu' }],
           ]),
         });
       }
       return;
     }
 
-    if (data === 'menu_help') {
-      await client.editMessage(chatId, {
-        message: msgId,
-        text: `📖 <b>How to Use MayaJaal Bot</b>\n\n` +
-          `<b>Step 1 — API Connect (Ek baar):</b>\n` +
-          `├ "🔑 API Connect" button dabao\n` +
-          `├ Browser me API key milegi\n` +
-          `├ Key copy karo\n` +
-          `└ Bot me bhejo: <code>/api YOUR_KEY</code>\n\n` +
-          `<b>Step 2 — Video Upload:</b>\n` +
-          `├ Direct video/file bhejo (2GB tak)\n` +
-          `└ Ya Terabox link paste karo\n\n` +
-          `<b>Step 3 — Player Link:</b>\n` +
-          `├ Bot signed link dega\n` +
-          `├ Us link ko kholo\n` +
-          `└ Play button → App download\n\n` +
-          `<b>Step 4 — App Install:</b>\n` +
-          `├ APK download karo\n` +
-          `└ Install karke video dekho\n\n` +
-          `<b>🔐 Security:</b>\n` +
-          `├ HMAC-signed links\n` +
-          `├ Browser playback disabled\n` +
-          `└ 30-day link validity`,
-        parseMode: 'html',
-        buttons: keyboard([[{ text: '⬅️ Main Menu', callback_data: 'main_menu' }]]),
-      });
-      return;
-    }
-
-    if (data === 'menu_allbots') {
-      await client.editMessage(chatId, {
-        message: msgId,
-        text: `🤖 <b>All MayaJaal Bots</b>\n\n` +
-          `<b>1. 🎬 Stream Bot</b>\n` +
-          `<i>Video upload + player link</i>\n` +
-          `Status: ✅ Active\n\n` +
-          `<b>2. 🔗 Link Converter Bot</b>\n` +
-          `<i>Short link generator + earning</i>\n` +
-          `Status: ✅ Active\n\n` +
-          `<b>3. 📝 Content Bot</b>\n` +
-          `<i>Coming soon</i>\n` +
-          `Status: ⏳ Soon\n\n` +
-          `<b>4. 🌐 Web Bot</b>\n` +
-          `<i>Coming soon</i>\n` +
-          `Status: ⏳ Soon\n\n` +
-          `<i>Sabka data safe hai 🔒</i>`,
-        parseMode: 'html',
-        buttons: keyboard([[{ text: '⬅️ Main Menu', callback_data: 'main_menu' }]]),
-      });
-      return;
-    }
+    if (data === 'menu_help') { await sendHelp(chatId, uid, msgId); return; }
+    if (data === 'menu_allbots') { await sendAllBots(chatId, uid, msgId); return; }
+    if (data === 'menu_settings') { await sendSettings(chatId, uid, msgId); return; }
+    if (data === 'menu_language') { await sendLanguageSelector(chatId, uid, msgId); return; }
 
     if (data === 'menu_account') {
       const userData = await getUserKey(uid);
       await client.editMessage(chatId, {
         message: msgId,
-        text: `📊 <b>Your Account</b>\n\n` +
-          `<b>User ID:</b> <code>${uid}</code>\n` +
-          `<b>API Status:</b> ${userData ? '✅ Connected' : '❌ Not Connected'}\n` +
-          (userData ? `<b>Connected Since:</b> ${new Date(userData.connectedAt).toLocaleString()}\n` : '') +
-          `\n<b>Bot Version:</b> v2.0.0`,
+        text: `📊 <b>${t(lang, 'account_title')}</b>\n\n` +
+          `<b>${t(lang, 'user_id')}:</b> <code>${uid}</code>\n` +
+          `<b>${t(lang, 'api_status')}:</b> ${userData ? '✅ ' + t(lang, 'connected_label') : '❌ ' + t(lang, 'not_connected_label')}\n` +
+          (userData ? `<b>${t(lang, 'connected_since')}:</b> ${new Date(userData.connectedAt).toLocaleString()}\n` : '') +
+          `\n<b>${t(lang, 'bot_version')}:</b> v2.0.0`,
         parseMode: 'html',
-        buttons: keyboard([[{ text: '⬅️ Main Menu', callback_data: 'main_menu' }]]),
+        buttons: keyboard([[{ text: `⬅️ ${t(lang, 'btn_main_menu')}`, callback_data: 'main_menu' }]]),
+      });
+      return;
+    }
+
+    if (data === 'set_lang_en' || data === 'set_lang_hi') {
+      const newLang = data === 'set_lang_en' ? 'en' : 'hi';
+      await saveUserLang(uid, newLang);
+      await client.editMessage(chatId, {
+        message: msgId,
+        text: `✅ <b>${t(newLang, 'lang_changed')}</b>\n\n🌐 ${t(newLang, 'lang_changed_to')} <b>${newLang === 'hi' ? 'हिंदी' : 'English'}</b>`,
+        parseMode: 'html',
+        buttons: keyboard([[{ text: `⬅️ ${t(newLang, 'btn_main_menu')}`, callback_data: 'main_menu' }]]),
       });
       return;
     }
@@ -598,11 +839,11 @@ async function getTeraboxDirectLink(shareUrl) {
     if (data === 'menu_logout') {
       await client.editMessage(chatId, {
         message: msgId,
-        text: `🚪 <b>Logout</b>\n\nKya aap API disconnect karna chahte hain?\n\nAapka data safe rahega.`,
+        text: `🚪 <b>${t(lang, 'logout_title')}</b>\n\n${t(lang, 'logout_confirm_text')}\n\n${t(lang, 'logout_safe')}`,
         parseMode: 'html',
         buttons: keyboard([
-          [{ text: '✅ Confirm Logout', callback_data: 'confirm_logout' }],
-          [{ text: '❌ Cancel', callback_data: 'main_menu' }],
+          [{ text: `✅ ${t(lang, 'btn_confirm_logout')}`, callback_data: 'confirm_logout' }],
+          [{ text: `❌ ${t(lang, 'btn_cancel')}`, callback_data: 'main_menu' }],
         ]),
       });
       return;
@@ -612,17 +853,14 @@ async function getTeraboxDirectLink(shareUrl) {
       await deleteUserKey(uid);
       await client.editMessage(chatId, {
         message: msgId,
-        text: `✅ <b>Logout Successful!</b>\n\nAPI key disconnect ho gayi.\n\nDobara connect karne ke liye /start bhejo.`,
+        text: `✅ <b>${t(lang, 'logout_success')}</b>\n\n${t(lang, 'logout_disconnected')}\n${t(lang, 'logout_restart')}`,
         parseMode: 'html',
       });
       return;
     }
 
-    if (data === 'main_menu') {
-      await sendWelcome(chatId, uid, msgId);
-      return;
-    }
+    if (data === 'main_menu') { await sendWelcome(chatId, uid, msgId); return; }
   }, new CallbackQuery({}));
 
-  console.log('Bot ready — API + App-only mode');
+  console.log('Bot ready — Multilingual + App-only mode');
 })();
