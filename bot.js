@@ -1,5 +1,4 @@
 require('dotenv').config();
-
 const express = require('express');
 const { TelegramClient, Api } = require('telegram');
 const { StringSession } = require('telegram/sessions');
@@ -25,9 +24,9 @@ const R2_ACCOUNT_ID = (process.env.R2_ACCOUNT_ID || '').trim();
 const R2_ACCESS_KEY_ID = (process.env.R2_ACCESS_KEY_ID || '').trim();
 const R2_SECRET_ACCESS_KEY = (process.env.R2_SECRET_ACCESS_KEY || '').trim();
 const R2_BUCKET_NAME = (process.env.R2_BUCKET_NAME || '').trim();
-const R2_PUBLIC_URL = (process.env.R2_PUBLIC_URL || '').trim().replace(/\/$/, '');
 const MAX_FILE_SIZE = parseInt(process.env.MAX_FILE_SIZE || '2147483648', 10);
 const PORT = parseInt(process.env.PORT || '8080', 10);
+const VIDEO_SECRET = (process.env.VIDEO_SECRET || '').trim();
 
 // ===== APP CONFIG =====
 const APP_NAME = process.env.APP_NAME || 'MayaJaal';
@@ -37,14 +36,17 @@ const PLAY_STORE_URL = process.env.PLAY_STORE_URL || `https://play.google.com/st
 const APP_STORE_URL = process.env.APP_STORE_URL || 'https://apps.apple.com/app/mayajaal/id000000000';
 const APP_SHA256 = process.env.APP_SHA256 || 'REPLACE_WITH_YOUR_SHA256';
 const APPLE_TEAM_ID = process.env.APPLE_TEAM_ID || 'TEAMID';
+const APP_UA_KEYWORD = (process.env.APP_UA_KEYWORD || 'MayaJaalApp').trim();
 
 console.log('=== ENV ===');
 console.log('BOT_TOKEN:', !!TOKEN, '| API_ID:', !!API_ID, '| API_HASH:', !!API_HASH);
 console.log('R2:', !!(R2_ACCOUNT_ID && R2_ACCESS_KEY_ID && R2_SECRET_ACCESS_KEY && R2_BUCKET_NAME));
+console.log('VIDEO_SECRET:', VIDEO_SECRET.length >= 20 ? 'OK' : 'MISSING/WEAK!');
 console.log('APP:', APP_NAME, '| Package:', APP_PACKAGE);
 
 if (!TOKEN || !API_ID || !API_HASH) throw new Error('Missing BOT_TOKEN / API_ID / API_HASH');
 if (!R2_ACCOUNT_ID || !R2_ACCESS_KEY_ID || !R2_SECRET_ACCESS_KEY || !R2_BUCKET_NAME) throw new Error('Missing R2 config');
+if (VIDEO_SECRET.length < 20) throw new Error('VIDEO_SECRET missing or too weak (need 20+ chars)');
 
 let redis;
 try { redis = Redis.fromEnv(); } catch (e) { redis = { get: async () => null, set: async () => null }; }
@@ -73,126 +75,131 @@ function escapeHtml(s = '') {
   return String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 }
 
-// ===== SMART LANDING PAGE =====
-function smartLandingPage(videoId, title, streamUrl, meta) {
-  const androidIntent = `intent://video/${videoId}#Intent;scheme=${APP_SCHEME};package=${APP_PACKAGE};S.browser_fallback_url=${encodeURIComponent(PLAY_STORE_URL)};end`;
-  const iosScheme = `${APP_SCHEME}://video/${videoId}`;
+// ===== HMAC SIGNATURE (time-limited) =====
+function signVideo(videoId, expiresInHours = 720) {
+  const exp = Math.floor(Date.now() / 1000) + (expiresInHours * 3600);
+  const payload = `${videoId}.${exp}`;
+  const sig = crypto.createHmac('sha256', VIDEO_SECRET).update(payload).digest('hex').substring(0, 16);
+  return `${exp}.${sig}`;
+}
+
+function verifyVideoSig(videoId, token) {
+  if (!token || typeof token !== 'string') return false;
+  const parts = token.split('.');
+  if (parts.length !== 2) return false;
+  const [expStr, sig] = parts;
+  const exp = parseInt(expStr, 10);
+  if (!exp || isNaN(exp)) return false;
+  if (Math.floor(Date.now() / 1000) > exp) return false;
+  const payload = `${videoId}.${exp}`;
+  const expected = crypto.createHmac('sha256', VIDEO_SECRET).update(payload).digest('hex').substring(0, 16);
+  try {
+    return crypto.timingSafeEqual(Buffer.from(sig), Buffer.from(expected));
+  } catch (e) {
+    return false;
+  }
+}
+
+// ===== APP-ONLY LANDING PAGE =====
+function appOnlyLandingPage(videoId, title, token) {
+  const androidIntent = `intent://video/${videoId}?t=${token}#Intent;scheme=${APP_SCHEME};package=${APP_PACKAGE};S.browser_fallback_url=${encodeURIComponent(PLAY_STORE_URL)};end`;
+  const iosScheme = `${APP_SCHEME}://video/${videoId}?t=${token}`;
 
   return `<!DOCTYPE html>
-<html lang="en">
-<head>
+<html lang="en"><head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no">
-<title>${escapeHtml(title)} - ${APP_NAME}</title>
+<title>${escapeHtml(title)} — ${APP_NAME}</title>
+<meta name="robots" content="noindex,nofollow,noarchive">
 <meta property="og:title" content="${escapeHtml(title)}">
-<meta property="og:description" content="Watch on ${APP_NAME} app">
-<meta property="og:type" content="video.other">
-<meta name="twitter:card" content="player">
-<meta name="twitter:title" content="${escapeHtml(title)}">
+<meta property="og:description" content="Watch on ${APP_NAME} app only">
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
-body{background:#0a0a0a;color:#fff;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:20px;text-align:center}
-.logo{font-size:40px;font-weight:800;background:linear-gradient(135deg,#00ff88,#00b4ff);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;margin-bottom:8px}
-.tag{font-size:13px;color:#666;margin-bottom:32px}
-.spinner{width:70px;height:70px;border:4px solid #1a1a1a;border-top-color:#00ff88;border-radius:50%;animation:spin 1s linear infinite;margin:20px auto 30px}
+body{background:#050505;color:#fff;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:24px;text-align:center;overflow:hidden}
+.bg{position:fixed;inset:0;background:radial-gradient(circle at 50% 0%,rgba(0,255,136,.08),transparent 60%);pointer-events:none}
+.logo{font-size:44px;font-weight:900;background:linear-gradient(135deg,#00ff88,#00b4ff);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;margin-bottom:6px;position:relative;z-index:1}
+.tag{font-size:12px;color:#555;letter-spacing:2px;text-transform:uppercase;margin-bottom:40px;position:relative;z-index:1}
+.spinner{width:64px;height:64px;border:3px solid #111;border-top-color:#00ff88;border-radius:50%;animation:spin .9s linear infinite;margin:0 auto 28px;position:relative;z-index:1}
 @keyframes spin{to{transform:rotate(360deg)}}
-.title{font-size:16px;color:#ccc;margin-bottom:8px;max-width:90vw;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;padding:0 10px}
-.msg{font-size:14px;color:#888;margin:14px 0}
-.btn{display:inline-block;padding:15px 36px;background:linear-gradient(135deg,#00ff88,#00b4ff);color:#000;text-decoration:none;border-radius:12px;font-weight:700;font-size:15px;margin:6px;border:none;cursor:pointer;transition:transform .15s}
-.btn:active{transform:scale(0.96)}
-.btn-secondary{background:#1a1a1a;color:#fff;border:1px solid #2a2a2a}
-.btn-icon{margin-right:8px}
-.actions{margin-top:20px;padding:0 10px}
+.title{font-size:15px;color:#888;margin-bottom:10px;max-width:90vw;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;position:relative;z-index:1}
+.msg{font-size:14px;color:#666;margin:12px 0 20px;position:relative;z-index:1}
+.btn{display:inline-block;padding:15px 34px;background:linear-gradient(135deg,#00ff88,#00b4ff);color:#000;text-decoration:none;border-radius:12px;font-weight:800;font-size:15px;margin:6px;border:none;cursor:pointer;position:relative;z-index:1}
+.btn:active{transform:scale(.96)}
+.btn-sec{background:#111;color:#fff;border:1px solid #222}
+.actions{margin-top:20px;padding:0 10px;position:relative;z-index:1}
 .actions .btn{display:block;width:100%;max-width:300px;margin:10px auto}
-.stores{display:flex;gap:10px;justify-content:center;margin-top:20px;flex-wrap:wrap}
-.store{padding:12px 22px;background:#161616;border-radius:10px;color:#fff;text-decoration:none;font-size:12px;border:1px solid #252525;display:flex;align-items:center;gap:8px}
-.store:active{background:#1e1e1e}
-.hint{font-size:11px;color:#555;margin-top:24px;max-width:280px}
-.watch-browser{margin-top:32px;text-decoration:underline;color:#666;font-size:13px;cursor:pointer}
-</style>
-</head>
-<body>
+.lock{font-size:11px;color:#333;margin-top:32px;position:relative;z-index:1}
+</style></head><body>
+<div class="bg"></div>
 <div class="logo">🎬 ${APP_NAME}</div>
-<div class="tag">Fast & Secure Video Player</div>
+<div class="tag">App Exclusive</div>
 <div class="title">${escapeHtml(title)}</div>
 <div class="spinner" id="spinner"></div>
 <div class="msg" id="msg">Opening in ${APP_NAME} app...</div>
-
 <div class="actions" id="actions" style="display:none">
   <a href="${PLAY_STORE_URL}" class="btn">📲 Download Android App</a>
-  <a href="${APP_STORE_URL}" class="btn btn-secondary">🍎 Download iOS App</a>
-  <a href="${streamUrl}" class="btn btn-secondary">🌐 Watch in Browser</a>
+  <a href="${APP_STORE_URL}" class="btn btn-sec">🍎 Download iOS App</a>
 </div>
-
-<div id="desktop-actions" style="display:none">
-  <div class="msg">Scan the QR or open this link on your mobile to use the app.</div>
-  <a href="${streamUrl}" class="btn">🌐 Watch in Browser</a>
+<div id="desktop-msg" style="display:none;position:relative;z-index:1">
+  <div class="msg">Open this link on your mobile device</div>
 </div>
-
-<div class="hint" id="hint"></div>
-
+<div class="lock" id="lock">🔒 Video play karne ke liye app zaroori hai</div>
 <script>
 (function(){
   var ua = navigator.userAgent || '';
   var isAndroid = /android/i.test(ua);
   var isIOS = /iphone|ipad|ipod/i.test(ua);
-  var isMobile = isAndroid || isIOS;
   var appOpened = false;
-  var fallbackTimer;
+  var timer;
 
   document.addEventListener('visibilitychange', function() {
-    if (document.hidden) { appOpened = true; clearTimeout(fallbackTimer); }
+    if (document.hidden) { appOpened = true; clearTimeout(timer); }
   });
   window.addEventListener('pagehide', function(){ appOpened = true; });
   window.addEventListener('blur', function() { appOpened = true; });
 
-  function showDownloadFallback() {
+  function showDownload() {
     if (appOpened) return;
     document.getElementById('spinner').style.display = 'none';
-    document.getElementById('msg').innerHTML = '<b>App not installed?</b><br><small style="color:#666">Download the app for faster playback</small>';
+    document.getElementById('msg').innerHTML = '<b style="color:#ccc">App not installed?</b><br><small style="color:#555">Download to play this video</small>';
     document.getElementById('actions').style.display = 'block';
-    document.getElementById('hint').innerHTML = '🎬 Watch videos 2x faster with zero buffering';
+    document.getElementById('lock').innerHTML = '🔒 Browser playback disabled for security';
   }
 
   if (isAndroid) {
-    // Android: use intent:// which auto-falls back to Play Store
     window.location.href = '${androidIntent}';
-    fallbackTimer = setTimeout(showDownloadFallback, 2500);
+    timer = setTimeout(showDownload, 2200);
   } else if (isIOS) {
-    // iOS: try custom scheme, fallback to App Store
     window.location.href = '${iosScheme}';
-    fallbackTimer = setTimeout(function(){
-      if (!appOpened) {
-        window.location.href = '${APP_STORE_URL}';
-      }
-      setTimeout(showDownloadFallback, 1500);
-    }, 2000);
+    timer = setTimeout(function(){
+      if (!appOpened) window.location.href = '${APP_STORE_URL}';
+      setTimeout(showDownload, 1500);
+    }, 1800);
   } else {
-    // Desktop
     document.getElementById('spinner').style.display = 'none';
     document.getElementById('msg').style.display = 'none';
-    document.getElementById('desktop-actions').style.display = 'block';
+    document.getElementById('desktop-msg').style.display = 'block';
+    document.getElementById('lock').innerHTML = '🔒 Mobile app required to play';
   }
 })();
 </script>
-</body>
-</html>`;
+</body></html>`;
 }
 
 // ===== EXPRESS =====
 const app = express();
 app.use(express.json());
-
 app.use((req, res, next) => {
   res.setHeader('X-Content-Type-Options', 'nosniff');
+  res.setHeader('X-Frame-Options', 'DENY');
   res.setHeader('Referrer-Policy', 'no-referrer');
+  res.setHeader('Permissions-Policy', 'autoplay=(self)');
   next();
 });
 
 app.get('/', (req, res) => res.send('MayaJaal Online'));
-app.get('/health', (req, res) => res.json({ ok: true, uptime: process.uptime(), gramjs: true }));
+app.get('/health', (req, res) => res.json({ ok: true, uptime: process.uptime(), mode: 'app-only' }));
 
-// ===== APP VERIFICATION FILES =====
 app.get('/.well-known/assetlinks.json', (req, res) => {
   res.type('application/json').send(JSON.stringify([{
     relation: ['delegate_permission/common.handle_all_urls'],
@@ -208,48 +215,54 @@ app.get('/.well-known/apple-app-site-association', (req, res) => {
   res.type('application/json').send(JSON.stringify({
     applinks: {
       apps: [],
-      details: [{
-        appID: APPLE_TEAM_ID + '.' + APP_PACKAGE,
-        paths: ['*'],
-      }],
+      details: [{ appID: APPLE_TEAM_ID + '.' + APP_PACKAGE, paths: ['*'] }],
     },
   }, null, 2));
 });
 
-// ===== SMART PLAYER PAGE (replaces old /v/:id) =====
+// ===== SMART LANDING (video page) =====
 app.get('/v/:id', async (req, res) => {
   try {
-    const meta = await getMeta(req.params.id);
+    const videoId = req.params.id;
+    const token = req.query.t || req.query.s || '';
+    if (!verifyVideoSig(videoId, token)) {
+      return res.status(403).send('<h2 style="font-family:sans-serif;padding:40px;text-align:center">🔒 Invalid or expired link<br><small>Please get a fresh link from the bot</small></h2>');
+    }
+    const meta = await getMeta(videoId);
     if (!meta) return res.status(404).send('Video not found');
-    const title = meta.name || 'Video';
-    const streamUrl = `${BASE_URL}/stream/${req.params.id}`;
-    return res.send(smartLandingPage(req.params.id, title, streamUrl, meta));
-  } catch (e) {
-    return res.status(500).send('err');
-  }
+    return res.send(appOnlyLandingPage(videoId, meta.name || 'Video', token));
+  } catch (e) { return res.status(500).send('err'); }
 });
 
-// ===== DIRECT BROWSER PLAYER (bypass landing) =====
-app.get('/watch/:id', async (req, res) => {
-  try {
-    const meta = await getMeta(req.params.id);
-    if (!meta) return res.status(404).send('Not found');
-    const streamUrl = `${BASE_URL}/stream/${req.params.id}`;
-    const title = escapeHtml(meta.name || 'Video');
-    res.send(`<!DOCTYPE html><html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${title}</title><link rel="stylesheet" href="https://cdn.plyr.io/3.7.8/plyr.css"><style>*{margin:0;padding:0;box-sizing:border-box}body{background:#0a0a0a;color:#fff;font-family:sans-serif;min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:12px}.box{width:100%;max-width:960px}video{width:100%;max-height:80vh;border-radius:14px;background:#000}.t{margin-top:14px;font-size:1rem;color:#00ff88;word-break:break-all}</style></head><body><div class="box"><video id="p" controls autoplay playsinline preload="metadata"><source src="${streamUrl}" type="${meta.mime || 'video/mp4'}"></video><div class="t">🎬 ${title}</div></div><script src="https://cdn.plyr.io/3.7.8/plyr.polyfilled.js"></script><script>new Plyr('#p');</script></body></html>`);
-  } catch (e) { res.status(500).send('err'); }
-});
-
-// ===== R2 STREAM =====
+// ===== STREAM (App only) =====
 app.get('/stream/:id', async (req, res) => {
   try {
-    const meta = await getMeta(req.params.id);
+    const videoId = req.params.id;
+    const token = req.query.t || req.query.s || '';
+
+    // 1. Verify HMAC signature
+    if (!verifyVideoSig(videoId, token)) {
+      return res.status(403).send('Forbidden — invalid token');
+    }
+
+    // 2. Verify request comes from app (User-Agent contains keyword)
+    const ua = req.headers['user-agent'] || '';
+    const fromApp = ua.includes(APP_UA_KEYWORD);
+    if (!fromApp) {
+      return res.status(403).send('Forbidden — app required');
+    }
+
+    const meta = await getMeta(videoId);
     if (!meta?.r2Key) return res.status(404).send('Not found');
-    const out = await r2.send(new GetObjectCommand({ Bucket: R2_BUCKET_NAME, Key: meta.r2Key, Range: req.headers.range || undefined }));
+
+    const out = await r2.send(new GetObjectCommand({
+      Bucket: R2_BUCKET_NAME, Key: meta.r2Key,
+      Range: req.headers.range || undefined,
+    }));
     res.status(req.headers.range ? 206 : 200);
     res.setHeader('Content-Type', out.ContentType || meta.mime || 'video/mp4');
     res.setHeader('Accept-Ranges', 'bytes');
-    res.setHeader('Cache-Control', 'public, max-age=31536000');
+    res.setHeader('Cache-Control', 'private, max-age=3600');
     if (out.ContentRange) res.setHeader('Content-Range', out.ContentRange);
     if (out.ContentLength) res.setHeader('Content-Length', out.ContentLength);
     if (out.ETag) res.setHeader('ETag', out.ETag);
@@ -258,9 +271,12 @@ app.get('/stream/:id', async (req, res) => {
   } catch (e) { if (!res.headersSent) res.status(500).send('err'); }
 });
 
-app.listen(PORT, () => console.log(`Web on ${PORT}`));
+// ===== Block any other video access =====
+app.get('/watch/:id', (req, res) => res.status(403).send('Browser playback disabled'));
 
-// ===== TERABOX DOWNLOADER (unchanged) =====
+app.listen(PORT, () => console.log(`Web on ${PORT} — App-only mode`));
+
+// ===== TERABOX helpers (unchanged) =====
 function detectTeraboxUrl(text) {
   if (!text) return null;
   const domains = ['terabox\\.com','terabox\\.app','terabox\\.link','terabox\\.club','terabox\\.fun','terabox\\.cc','terabox\\.top','terabox\\.online','1024tera\\.com','1024terabox\\.com','4funbox\\.com','4funbox\\.co','mirrobox\\.com','nephobox\\.com','momerybox\\.com','tibibox\\.com','teraboxapp\\.com','teraboxlink\\.com','teraboxshare\\.com','teraboxurl\\.com','teraboxdl\\.com','teraboxdownloader\\.com','terafileshare\\.com','terashare\\.com','terasharelink\\.com','terasharefile\\.com','freeterabox\\.com','gearbox\\.app','teraboxcdn\\.com','terabox\\.store','terabox\\.site','terabox\\.space','terabox\\.website','dubox\\.com','terabox\\.icu','terabox\\.xyz','diskwala\\.com'];
@@ -273,14 +289,10 @@ async function getTeraboxDirectLink(shareUrl) {
   const TERABOX_COOKIE = (process.env.TERABOX_COOKIE || '').trim();
   if (!TERABOX_COOKIE) throw new Error('TERABOX_COOKIE missing');
   const UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36';
-  const pageResp = await axios.get(shareUrl, {
-    headers: { 'User-Agent': UA, 'Cookie': TERABOX_COOKIE },
-    timeout: 30000, maxRedirects: 5,
-  });
+  const pageResp = await axios.get(shareUrl, { headers: { 'User-Agent': UA, 'Cookie': TERABOX_COOKIE }, timeout: 30000, maxRedirects: 5 });
   const html = String(pageResp.data);
   let shareid = null, uk = null, sign = null, timestamp = null, fs_id = null;
   let server_filename = 'video.mp4', size = 0;
-
   const match = html.match(/window\.yunData\s*=\s*(\{[\s\S]+?\});?\s*<\/script>/);
   if (match) {
     try {
@@ -297,7 +309,6 @@ async function getTeraboxDirectLink(shareUrl) {
   if (server_filename === 'video.mp4') { const m4 = html.match(/"server_filename"\s*:\s*"([^"]+)"/); if (m4) server_filename = m4[1]; }
   if (!size) { const m5 = html.match(/"size"\s*:\s*(\d+)/); if (m5) size = parseInt(m5[1], 10); }
   if (!shareid || !uk) throw new Error('Share info nahi mili');
-
   const apiHeaders = { 'User-Agent': UA, 'Cookie': TERABOX_COOKIE, 'Referer': shareUrl };
   if (!fs_id) {
     const shorturl = shareUrl.split('/s/')[1]?.split('?')[0] || '';
@@ -312,8 +323,7 @@ async function getTeraboxDirectLink(shareUrl) {
   const dlink = dlResp.data?.dlink;
   if (!dlink) throw new Error('Direct link nahi mila');
   return { url: Array.isArray(dlink) ? dlink[0] : dlink, fileName: server_filename, size };
-      }
-      // ===== BOT HANDLERS =====
+}
 (async () => {
   const client = new TelegramClient(new StringSession(''), API_ID, API_HASH, {
     connectionRetries: 5,
@@ -329,7 +339,7 @@ async function getTeraboxDirectLink(shareUrl) {
     if (!msg) return;
     if ((msg.message || '') === '/start') {
       await client.sendMessage(msg.chatId, {
-        message: `🎬 <b>MayaJaal Stream Bot</b>\n\n📤 File bhejo (2GB tak) ya Terabox link paste karo\n\n⚡ Player link milega!\n📱 App installed hai toh direct app khulega`,
+        message: `🎬 <b>MayaJaal Stream Bot</b>\n\n📤 File bhejo (2GB tak) ya Terabox link paste karo\n\n⚡ Sirf app me play hoga\n🔒 Browser playback disabled`,
         parseMode: 'html',
       });
     }
@@ -342,7 +352,7 @@ async function getTeraboxDirectLink(shareUrl) {
     const text = msg.message || '';
     if (text === '/start') return;
 
-    // ========== TERABOX LINK ==========
+    // ========== TERABOX ==========
     const teraboxUrl = detectTeraboxUrl(text);
     if (teraboxUrl) {
       let status;
@@ -368,13 +378,16 @@ async function getTeraboxDirectLink(shareUrl) {
           queueSize: isLarge ? 4 : 1, partSize: isLarge ? 10 * 1024 * 1024 : 5 * 1024 * 1024,
         });
         await upload.done();
+
         const shortId = crypto.randomBytes(4).toString('hex');
         await saveMeta(shortId, { name: info.fileName, mime: 'video/mp4', r2Key, size: info.size, ts: Date.now() });
-        const playUrl = `${BASE_URL}/v/${shortId}`;
-        const browserUrl = `${BASE_URL}/watch/${shortId}`;
+
+        const token = signVideo(shortId, 720);
+        const playUrl = `${BASE_URL}/v/${shortId}?t=${token}`;
+
         await client.deleteMessages(chatId, [status.id], { revoke: true }).catch(() => {});
         await client.sendMessage(chatId, {
-          message: `✅ <b>Ready!</b>\n\n📌 <b>${escapeHtml(info.fileName)}</b>\n📦 ${(info.size / 1024 / 1024).toFixed(2)} MB\n\n📱 <b>Smart Link (App/Browser):</b>\n${playUrl}\n\n🌐 <b>Direct Browser:</b>\n${browserUrl}`,
+          message: `✅ <b>Ready — App Only</b>\n\n📌 <b>${escapeHtml(info.fileName)}</b>\n📦 ${(info.size / 1024 / 1024).toFixed(2)} MB\n\n🔒 <b>Sirf app me play hoga</b>\n\n▶️ <b>Player Link:</b>\n${playUrl}\n\n<i>Ye link 30 din tak valid hai. App na ho toh download page khulega.</i>`,
           parseMode: 'html',
         });
         return;
@@ -386,12 +399,10 @@ async function getTeraboxDirectLink(shareUrl) {
       }
     }
 
-    // ========== DIRECT FILE (2GB tak) ==========
+    // ========== DIRECT FILE ==========
     if (!msg.media) return;
     const fileMedia = msg.media.document || msg.document || msg.video;
     if (!fileMedia) return;
-
-    console.log('[File] className:', fileMedia.className, '| hasId:', !!fileMedia.id, '| hasHash:', !!fileMedia.accessHash, '| size:', fileMedia.size);
 
     let fileName = 'video.mp4', mime = 'application/octet-stream', size = 0;
     size = Number(fileMedia.size) || 0;
@@ -444,7 +455,6 @@ async function getTeraboxDirectLink(shareUrl) {
       const ext = path.extname(fileName) || '.mp4';
       const r2Key = `uploads/${crypto.randomBytes(8).toString('hex')}${ext}`;
       const isLarge = size > 100 * 1024 * 1024;
-      console.log('[R2]', r2Key, `${(size / 1024 / 1024).toFixed(2)} MB`);
 
       const upload = new Upload({
         client: r2,
@@ -459,11 +469,13 @@ async function getTeraboxDirectLink(shareUrl) {
 
       const shortId = crypto.randomBytes(4).toString('hex');
       await saveMeta(shortId, { name: fileName, mime, r2Key, size, ts: Date.now() });
-      const playUrl = `${BASE_URL}/v/${shortId}`;
-      const browserUrl = `${BASE_URL}/watch/${shortId}`;
+
+      const token = signVideo(shortId, 720);
+      const playUrl = `${BASE_URL}/v/${shortId}?t=${token}`;
+
       await client.deleteMessages(chatId, [status.id], { revoke: true }).catch(() => {});
       await client.sendMessage(chatId, {
-        message: `✅ <b>Ready!</b>\n\n📌 <b>${escapeHtml(fileName)}</b>\n📦 ${(size / 1024 / 1024).toFixed(2)} MB\n\n📱 <b>Smart Link (App/Browser):</b>\n${playUrl}\n\n🌐 <b>Direct Browser:</b>\n${browserUrl}`,
+        message: `✅ <b>Ready — App Only</b>\n\n📌 <b>${escapeHtml(fileName)}</b>\n📦 ${(size / 1024 / 1024).toFixed(2)} MB\n\n🔒 <b>Sirf app me play hoga</b>\n\n▶️ <b>Player Link:</b>\n${playUrl}\n\n<i>Ye link 30 din tak valid hai.</i>`,
         parseMode: 'html',
       });
     } catch (e) {
@@ -473,5 +485,5 @@ async function getTeraboxDirectLink(shareUrl) {
     }
   }, new NewMessage({}));
 
-  console.log('Handlers ready - Smart App Links enabled');
+  console.log('Handlers ready — App-only mode');
 })();
