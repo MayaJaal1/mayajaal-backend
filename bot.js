@@ -11,7 +11,7 @@ const path = require('path');
 const { Redis } = require('@upstash/redis');
 const { S3Client, GetObjectCommand } = require('@aws-sdk/client-s3');
 const { Upload } = require('@aws-sdk/lib-storage');
-const { getCentralConfig } = require('./config'); // <-- YEH NAYI LINE HAI
+const { getCentralConfig } = require('./config');
 
 process.on('uncaughtException', (e) => console.error('[Uncaught]', e.stack || e.message));
 process.on('unhandledRejection', (e) => console.error('[Unhandled]', e?.stack || e));
@@ -112,8 +112,9 @@ function verifyVideoSig(videoId, token) {
   try { return crypto.timingSafeEqual(Buffer.from(sig), Buffer.from(expected)); }
   catch (e) { return false; }
 }
+
 // ============================================================
-// TRANSLATIONS
+// TRANSLATIONS (Hindi + English)
 // ============================================================
 const T = {
   en: {
@@ -331,7 +332,6 @@ const T = {
 function t(lang, key) {
   return (T[lang] && T[lang][key]) || T.en[key] || key;
 }
-
 // ============================================================
 // EXPRESS SERVER
 // ============================================================
@@ -460,12 +460,8 @@ async function getTeraboxDirectLink(shareUrl) {
   const dlink = dlResp.data?.dlink;
   if (!dlink) throw new Error('Direct link not found');
   return { url: Array.isArray(dlink) ? dlink[0] : dlink, fileName: server_filename, size };
-    }
-// ============================================================
-// BOT
-// ============================================================
+}
 
-// 🔽 YEH NAYA FUNCTION HAI JO API CONNECT HONE KA WAIT KAREGA 🔽
 async function waitForApiConnection() {
   console.log('[BOT] Waiting for central API connection...');
   while (true) {
@@ -477,13 +473,12 @@ async function waitForApiConnection() {
     console.log('[BOT] ⏳ Not connected yet. Retrying in 10s...');
     await new Promise(r => setTimeout(r, 10000));
   }
-}
-// 🔼 YEH NAYA FUNCTION HAI 🔼
-
+        }
+        // ============================================================
+// BOT
+// ============================================================
 (async () => {
-  // 🔽 YEH NAYI LINE HAI JO BOT START HONE SE PEHLE API KA WAIT KAREGI 🔽
   await waitForApiConnection();
-  // 🔼 YEH NAYI LINE HAI 🔼
 
   const client = new TelegramClient(new StringSession(''), API_ID, API_HASH, {
     connectionRetries: 5, autoReconnect: true,
@@ -493,9 +488,6 @@ async function waitForApiConnection() {
   await client.start({ botAuthToken: TOKEN });
   console.log('GramJS connected — 2GB unlocked!');
 
-  // ============================================================
-  // UPLOAD QUEUE (Parallel processing, max 5 at once)
-  // ============================================================
   const MAX_CONCURRENT_UPLOADS = 5;
   const uploadQueue = [];
   let activeUploads = 0;
@@ -529,7 +521,6 @@ async function waitForApiConnection() {
     });
   }
 
-  // ===== WELCOME =====
   async function sendWelcome(chatId, uid, editMsgId = null) {
     const lang = await getUserLang(uid);
     const userData = await getUserKey(uid);
@@ -645,9 +636,7 @@ async function waitForApiConnection() {
     }
     await client.sendMessage(chatId, { message: text, parseMode: 'html', buttons: keyboard(rows) });
   }
-    // ============================================================
-  // DIRECT FILE UPLOAD (parallel-safe)
-  // ============================================================
+
   async function handleDirectFile(msg, uid, lang) {
     const chatId = msg.chatId;
     const doc = msg.media && msg.media.document;
@@ -740,9 +729,6 @@ async function waitForApiConnection() {
     }
   }
 
-  // ============================================================
-  // TERABOX UPLOAD (parallel-safe)
-  // ============================================================
   async function handleTerabox(teraboxUrl, chatId, uid, lang) {
     const status = await client.sendMessage(chatId, { message: `🔍 <i>${t(lang, 'terabox_detected')}</i>`, parseMode: 'html' });
     try {
@@ -779,9 +765,8 @@ async function waitForApiConnection() {
       await client.deleteMessages(chatId, [status.id], { revoke: true }).catch(() => {});
       await client.sendMessage(chatId, { message: `❌ ${escapeHtml(e.message)}`, parseMode: 'html' });
     }
-  }
-
-  // ============================================================
+      }
+    // ============================================================
   // MESSAGE HANDLER
   // ============================================================
   client.addEventHandler(async (event) => {
