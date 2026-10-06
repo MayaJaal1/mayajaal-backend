@@ -3,6 +3,7 @@ const express = require('express');
 const { TelegramClient, Api } = require('telegram');
 const { StringSession } = require('telegram/sessions');
 const { NewMessage } = require('telegram/events');
+const { CallbackQuery } = require('telegram/events/CallbackQuery');
 const { Readable } = require('stream');
 const axios = require('axios');
 const crypto = require('crypto');
@@ -42,16 +43,19 @@ console.log('=== ENV ===');
 console.log('BOT_TOKEN:', !!TOKEN, '| API_ID:', !!API_ID, '| API_HASH:', !!API_HASH);
 console.log('R2:', !!(R2_ACCOUNT_ID && R2_ACCESS_KEY_ID && R2_SECRET_ACCESS_KEY && R2_BUCKET_NAME));
 console.log('VIDEO_SECRET:', VIDEO_SECRET.length >= 20 ? 'OK' : 'MISSING/WEAK!');
-console.log('APP:', APP_NAME, '| Package:', APP_PACKAGE);
 
 if (!TOKEN || !API_ID || !API_HASH) throw new Error('Missing BOT_TOKEN / API_ID / API_HASH');
 if (!R2_ACCOUNT_ID || !R2_ACCESS_KEY_ID || !R2_SECRET_ACCESS_KEY || !R2_BUCKET_NAME) throw new Error('Missing R2 config');
 if (VIDEO_SECRET.length < 20) throw new Error('VIDEO_SECRET missing or too weak (need 20+ chars)');
 
+// ===== REDIS =====
 let redis;
-try { redis = Redis.fromEnv(); } catch (e) { redis = { get: async () => null, set: async () => null }; }
+try { redis = Redis.fromEnv(); console.log('Redis connected'); }
+catch (e) { console.log('Redis not available, memory mode'); redis = { get: async () => null, set: async () => null }; }
 
 const memStore = new Map();
+const userKeys = new Map(); // telegramId -> { apiKey, connectedAt }
+
 async function saveMeta(id, payload) {
   memStore.set(id, payload);
   try { await redis.set(`v:${id}`, JSON.stringify(payload), { ex: 30 * 86400 }); } catch (e) { }
@@ -61,6 +65,25 @@ async function getMeta(id) {
   try {
     const raw = await redis.get(`v:${id}`);
     if (raw) { const d = typeof raw === 'string' ? JSON.parse(raw) : raw; memStore.set(id, d); return d; }
+  } catch (e) { }
+  return null;
+}
+
+// ===== API KEY STORAGE =====
+async function saveUserKey(tgId, apiKey) {
+  const data = { apiKey, connectedAt: Date.now() };
+  userKeys.set(String(tgId), data);
+  try { await redis.set(`apikey:${tgId}`, JSON.stringify(data)); } catch (e) { }
+}
+async function getUserKey(tgId) {
+  if (userKeys.has(String(tgId))) return userKeys.get(String(tgId));
+  try {
+    const raw = await redis.get(`apikey:${tgId}`);
+    if (raw) {
+      const d = typeof raw === 'string' ? JSON.parse(raw) : raw;
+      userKeys.set(String(tgId), d);
+      return d;
+    }
   } catch (e) { }
   return null;
 }
@@ -75,14 +98,13 @@ function escapeHtml(s = '') {
   return String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 }
 
-// ===== HMAC SIGNATURE (time-limited) =====
+// ===== HMAC SIGNATURE =====
 function signVideo(videoId, expiresInHours = 720) {
   const exp = Math.floor(Date.now() / 1000) + (expiresInHours * 3600);
   const payload = `${videoId}.${exp}`;
   const sig = crypto.createHmac('sha256', VIDEO_SECRET).update(payload).digest('hex').substring(0, 16);
   return `${exp}.${sig}`;
 }
-
 function verifyVideoSig(videoId, token) {
   if (!token || typeof token !== 'string') return false;
   const parts = token.split('.');
@@ -93,97 +115,8 @@ function verifyVideoSig(videoId, token) {
   if (Math.floor(Date.now() / 1000) > exp) return false;
   const payload = `${videoId}.${exp}`;
   const expected = crypto.createHmac('sha256', VIDEO_SECRET).update(payload).digest('hex').substring(0, 16);
-  try {
-    return crypto.timingSafeEqual(Buffer.from(sig), Buffer.from(expected));
-  } catch (e) {
-    return false;
-  }
-}
-
-// ===== APP-ONLY LANDING PAGE =====
-function appOnlyLandingPage(videoId, title, token) {
-  const androidIntent = `intent://video/${videoId}?t=${token}#Intent;scheme=${APP_SCHEME};package=${APP_PACKAGE};S.browser_fallback_url=${encodeURIComponent(PLAY_STORE_URL)};end`;
-  const iosScheme = `${APP_SCHEME}://video/${videoId}?t=${token}`;
-
-  return `<!DOCTYPE html>
-<html lang="en"><head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no">
-<title>${escapeHtml(title)} — ${APP_NAME}</title>
-<meta name="robots" content="noindex,nofollow,noarchive">
-<meta property="og:title" content="${escapeHtml(title)}">
-<meta property="og:description" content="Watch on ${APP_NAME} app only">
-<style>
-*{margin:0;padding:0;box-sizing:border-box}
-body{background:#050505;color:#fff;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:24px;text-align:center;overflow:hidden}
-.bg{position:fixed;inset:0;background:radial-gradient(circle at 50% 0%,rgba(0,255,136,.08),transparent 60%);pointer-events:none}
-.logo{font-size:44px;font-weight:900;background:linear-gradient(135deg,#00ff88,#00b4ff);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;margin-bottom:6px;position:relative;z-index:1}
-.tag{font-size:12px;color:#555;letter-spacing:2px;text-transform:uppercase;margin-bottom:40px;position:relative;z-index:1}
-.spinner{width:64px;height:64px;border:3px solid #111;border-top-color:#00ff88;border-radius:50%;animation:spin .9s linear infinite;margin:0 auto 28px;position:relative;z-index:1}
-@keyframes spin{to{transform:rotate(360deg)}}
-.title{font-size:15px;color:#888;margin-bottom:10px;max-width:90vw;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;position:relative;z-index:1}
-.msg{font-size:14px;color:#666;margin:12px 0 20px;position:relative;z-index:1}
-.btn{display:inline-block;padding:15px 34px;background:linear-gradient(135deg,#00ff88,#00b4ff);color:#000;text-decoration:none;border-radius:12px;font-weight:800;font-size:15px;margin:6px;border:none;cursor:pointer;position:relative;z-index:1}
-.btn:active{transform:scale(.96)}
-.btn-sec{background:#111;color:#fff;border:1px solid #222}
-.actions{margin-top:20px;padding:0 10px;position:relative;z-index:1}
-.actions .btn{display:block;width:100%;max-width:300px;margin:10px auto}
-.lock{font-size:11px;color:#333;margin-top:32px;position:relative;z-index:1}
-</style></head><body>
-<div class="bg"></div>
-<div class="logo">🎬 ${APP_NAME}</div>
-<div class="tag">App Exclusive</div>
-<div class="title">${escapeHtml(title)}</div>
-<div class="spinner" id="spinner"></div>
-<div class="msg" id="msg">Opening in ${APP_NAME} app...</div>
-<div class="actions" id="actions" style="display:none">
-  <a href="${PLAY_STORE_URL}" class="btn">📲 Download Android App</a>
-  <a href="${APP_STORE_URL}" class="btn btn-sec">🍎 Download iOS App</a>
-</div>
-<div id="desktop-msg" style="display:none;position:relative;z-index:1">
-  <div class="msg">Open this link on your mobile device</div>
-</div>
-<div class="lock" id="lock">🔒 Video play karne ke liye app zaroori hai</div>
-<script>
-(function(){
-  var ua = navigator.userAgent || '';
-  var isAndroid = /android/i.test(ua);
-  var isIOS = /iphone|ipad|ipod/i.test(ua);
-  var appOpened = false;
-  var timer;
-
-  document.addEventListener('visibilitychange', function() {
-    if (document.hidden) { appOpened = true; clearTimeout(timer); }
-  });
-  window.addEventListener('pagehide', function(){ appOpened = true; });
-  window.addEventListener('blur', function() { appOpened = true; });
-
-  function showDownload() {
-    if (appOpened) return;
-    document.getElementById('spinner').style.display = 'none';
-    document.getElementById('msg').innerHTML = '<b style="color:#ccc">App not installed?</b><br><small style="color:#555">Download to play this video</small>';
-    document.getElementById('actions').style.display = 'block';
-    document.getElementById('lock').innerHTML = '🔒 Browser playback disabled for security';
-  }
-
-  if (isAndroid) {
-    window.location.href = '${androidIntent}';
-    timer = setTimeout(showDownload, 2200);
-  } else if (isIOS) {
-    window.location.href = '${iosScheme}';
-    timer = setTimeout(function(){
-      if (!appOpened) window.location.href = '${APP_STORE_URL}';
-      setTimeout(showDownload, 1500);
-    }, 1800);
-  } else {
-    document.getElementById('spinner').style.display = 'none';
-    document.getElementById('msg').style.display = 'none';
-    document.getElementById('desktop-msg').style.display = 'block';
-    document.getElementById('lock').innerHTML = '🔒 Mobile app required to play';
-  }
-})();
-</script>
-</body></html>`;
+  try { return crypto.timingSafeEqual(Buffer.from(sig), Buffer.from(expected)); }
+  catch (e) { return false; }
 }
 
 // ===== EXPRESS =====
@@ -193,13 +126,29 @@ app.use((req, res, next) => {
   res.setHeader('X-Content-Type-Options', 'nosniff');
   res.setHeader('X-Frame-Options', 'DENY');
   res.setHeader('Referrer-Policy', 'no-referrer');
-  res.setHeader('Permissions-Policy', 'autoplay=(self)');
   next();
 });
 
 app.get('/', (req, res) => res.send('MayaJaal Online'));
 app.get('/health', (req, res) => res.json({ ok: true, uptime: process.uptime(), mode: 'app-only' }));
 
+// ===== SAVE API KEY (called from index.html) =====
+app.post('/save-key', async (req, res) => {
+  try {
+    const { telegram_id, key } = req.body;
+    if (!telegram_id || !key) return res.status(400).json({ error: 'Missing telegram_id or key' });
+    await saveUserKey(telegram_id, key);
+    console.log(`[API KEY SAVED] tg=${telegram_id} key=${key.substring(0, 8)}...`);
+    return res.json({ success: true });
+  } catch (e) { return res.status(500).json({ error: e.message }); }
+});
+
+app.get('/get-key/:tgId', async (req, res) => {
+  const data = await getUserKey(req.params.tgId);
+  return res.json(data || { apiKey: null });
+});
+
+// ===== APP VERIFICATION FILES =====
 app.get('/.well-known/assetlinks.json', (req, res) => {
   res.type('application/json').send(JSON.stringify([{
     relation: ['delegate_permission/common.handle_all_urls'],
@@ -220,18 +169,37 @@ app.get('/.well-known/apple-app-site-association', (req, res) => {
   }, null, 2));
 });
 
-// ===== SMART LANDING (video page) =====
+// ===== API META (for player.html) - NO STREAM URL =====
+app.get('/api/v/:id', async (req, res) => {
+  const videoId = req.params.id;
+  const token = req.query.t || req.query.s || '';
+  if (!verifyVideoSig(videoId, token)) {
+    return res.status(403).json({ error: 'Invalid token' });
+  }
+  const meta = await getMeta(videoId);
+  if (!meta) return res.status(404).json({ error: 'Not found' });
+  // IMPORTANT: NEVER return streamUrl here. Only return metadata for display.
+  return res.json({
+    id: videoId,
+    name: meta.name || 'Video',
+    size: meta.size || 0,
+    mime: meta.mime || 'video/mp4',
+    ts: meta.ts || 0,
+    // No stream URL — browser ke liye hai
+  });
+});
+
+// ===== PLAYER PAGE (custom HTML, no real video) =====
 app.get('/v/:id', async (req, res) => {
-  try {
-    const videoId = req.params.id;
-    const token = req.query.t || req.query.s || '';
-    if (!verifyVideoSig(videoId, token)) {
-      return res.status(403).send('<h2 style="font-family:sans-serif;padding:40px;text-align:center">🔒 Invalid or expired link<br><small>Please get a fresh link from the bot</small></h2>');
-    }
-    const meta = await getMeta(videoId);
-    if (!meta) return res.status(404).send('Video not found');
-    return res.send(appOnlyLandingPage(videoId, meta.name || 'Video', token));
-  } catch (e) { return res.status(500).send('err'); }
+  const videoId = req.params.id;
+  const token = req.query.t || req.query.s || '';
+  if (!verifyVideoSig(videoId, token)) {
+    return res.status(403).send('<h2 style="font-family:sans-serif;padding:40px;text-align:center">🔒 Invalid or expired link<br><small>Please get a fresh link from the bot</small></h2>');
+  }
+  const meta = await getMeta(videoId);
+  if (!meta) return res.status(404).send('Video not found');
+  // Serve player.html with params
+  return res.sendFile(path.join(__dirname, 'player.html'));
 });
 
 // ===== STREAM (App only) =====
@@ -239,18 +207,9 @@ app.get('/stream/:id', async (req, res) => {
   try {
     const videoId = req.params.id;
     const token = req.query.t || req.query.s || '';
-
-    // 1. Verify HMAC signature
-    if (!verifyVideoSig(videoId, token)) {
-      return res.status(403).send('Forbidden — invalid token');
-    }
-
-    // 2. Verify request comes from app (User-Agent contains keyword)
+    if (!verifyVideoSig(videoId, token)) return res.status(403).send('Forbidden — invalid token');
     const ua = req.headers['user-agent'] || '';
-    const fromApp = ua.includes(APP_UA_KEYWORD);
-    if (!fromApp) {
-      return res.status(403).send('Forbidden — app required');
-    }
+    if (!ua.includes(APP_UA_KEYWORD)) return res.status(403).send('Forbidden — app required');
 
     const meta = await getMeta(videoId);
     if (!meta?.r2Key) return res.status(404).send('Not found');
@@ -271,12 +230,11 @@ app.get('/stream/:id', async (req, res) => {
   } catch (e) { if (!res.headersSent) res.status(500).send('err'); }
 });
 
-// ===== Block any other video access =====
 app.get('/watch/:id', (req, res) => res.status(403).send('Browser playback disabled'));
 
 app.listen(PORT, () => console.log(`Web on ${PORT} — App-only mode`));
 
-// ===== TERABOX helpers (unchanged) =====
+// ===== TERABOX HELPERS =====
 function detectTeraboxUrl(text) {
   if (!text) return null;
   const domains = ['terabox\\.com','terabox\\.app','terabox\\.link','terabox\\.club','terabox\\.fun','terabox\\.cc','terabox\\.top','terabox\\.online','1024tera\\.com','1024terabox\\.com','4funbox\\.com','4funbox\\.co','mirrobox\\.com','nephobox\\.com','momerybox\\.com','tibibox\\.com','teraboxapp\\.com','teraboxlink\\.com','teraboxshare\\.com','teraboxurl\\.com','teraboxdl\\.com','teraboxdownloader\\.com','terafileshare\\.com','terashare\\.com','terasharelink\\.com','terasharefile\\.com','freeterabox\\.com','gearbox\\.app','teraboxcdn\\.com','terabox\\.store','terabox\\.site','terabox\\.space','terabox\\.website','dubox\\.com','terabox\\.icu','terabox\\.xyz','diskwala\\.com'];
@@ -319,40 +277,188 @@ async function getTeraboxDirectLink(shareUrl) {
     } catch (e) { }
   }
   if (!fs_id) throw new Error('fs_id nahi mila');
-  const dlResp = await axios.get(`https://www.terabox.com/share/download?shareid=${shareid}&uk=${uk}&sign=${sign || ''}&timestamp=${timestamp || ''}&fs_id=${fs_id}&channel=dubox&web=1&app_id=250528`, { headers: apiHeaders, timeout: 30000 });
-  const dlink = dlResp.data?.dlink;
+  const dlResp = await axios.get(`https://www.terabox.com/share/list?shorturl=${shareUrl.split('/s/')[1]?.split('?')[0] || ''}&root=1&web=1&app_id=250528`, { headers: apiHeaders, timeout: 30000 });
+  const dlResp2 = await axios.get(`https://www.terabox.com/share/download?shareid=${shareid}&uk=${uk}&sign=${sign || ''}&timestamp=${timestamp || ''}&fs_id=${fs_id}&channel=dubox&web=1&app_id=250528`, { headers: apiHeaders, timeout: 30000 });
+  const dlink = dlResp2.data?.dlink;
   if (!dlink) throw new Error('Direct link nahi mila');
   return { url: Array.isArray(dlink) ? dlink[0] : dlink, fileName: server_filename, size };
-}
+        }
+// ===== BOT =====
 (async () => {
   const client = new TelegramClient(new StringSession(''), API_ID, API_HASH, {
-    connectionRetries: 5,
-    autoReconnect: true,
+    connectionRetries: 5, autoReconnect: true,
   });
 
   console.log('Connecting MTProto...');
   await client.start({ botAuthToken: TOKEN });
-  console.log('GramJS connected - 2GB unlocked!');
+  console.log('GramJS connected — 2GB unlocked!');
 
+  function keyboard(rows) {
+    return new Api.ReplyInlineMarkup({
+      rows: rows.map(row => new Api.KeyboardButtonRow({
+        buttons: row.map(btn => {
+          if (btn.url) return new Api.KeyboardButtonUrl({ text: btn.text, url: btn.url });
+          return new Api.KeyboardButtonCallback({ text: btn.text, data: Buffer.from(btn.callback_data || '') });
+        }),
+      })),
+    });
+  }
+
+  async function sendWelcome(chatId, tgId) {
+    const userData = await getUserKey(tgId);
+    const isConnected = !!userData;
+
+    if (isConnected) {
+      await client.sendMessage(chatId, {
+        message: `✅ <b>API Connected!</b>\n\n` +
+          `🔑 Key: <code>${userData.apiKey.substring(0, 8)}...${userData.apiKey.substring(userData.apiKey.length - 4)}</code>\n\n` +
+          `📤 <b>Ab video bhejo ya Terabox link paste karo</b>\n\n` +
+          `⚡ Upload hoga → signed player link milega\n` +
+          `🔒 Sirf app me play hoga`,
+        parseMode: 'html',
+        buttons: keyboard([
+          [{ text: '🎬 How to Use', callback_data: 'how_to' }],
+          [{ text: '🔄 Reset API', callback_data: 'reset_api_cmd' }],
+        ]),
+      });
+      return;
+    }
+
+    await client.sendMessage(chatId, {
+      message: `👋 <b>Welcome to MayaJaal Stream Bot</b>\n\n` +
+        `<b>Step 1:</b> Pehle apni API key connect karo.\n\n` +
+        `🔑 Neeche button dabao → API key generate hogi\n` +
+        `📋 Us key ko yahan bhejo: <code>/api YOUR_KEY</code>\n\n` +
+        `Uske baad hi video upload kar paoge.`,
+      parseMode: 'html',
+      buttons: keyboard([
+        [{ text: '🔑 Generate API Key', url: `${BASE_URL}/index.html?tg=${tgId}` }],
+        [{ text: '📖 How to Use', callback_data: 'how_to' }],
+      ]),
+    });
+  }
+
+  // /start
   client.addEventHandler(async (event) => {
     const msg = event.message;
     if (!msg) return;
     if ((msg.message || '') === '/start') {
-      await client.sendMessage(msg.chatId, {
-        message: `🎬 <b>MayaJaal Stream Bot</b>\n\n📤 File bhejo (2GB tak) ya Terabox link paste karo\n\n⚡ Sirf app me play hoga\n🔒 Browser playback disabled`,
-        parseMode: 'html',
-      });
+      const uid = msg.senderId || (msg.fromId && msg.fromId.userId) || 0;
+      await sendWelcome(msg.chatId, uid);
     }
   }, new NewMessage({}));
 
+  // Callback buttons
+  client.addEventHandler(async (event) => {
+    const q = event.query;
+    if (!q) return;
+    try { await q.answer(); } catch (e) {}
+    const data = q.data.toString();
+    const chatId = q.chatId || q.userId;
+    const uid = q.userId;
+
+    if (data === 'how_to') {
+      await client.editMessage(chatId, {
+        message: q.msgId,
+        text: `📖 <b>How to Use MayaJaal Bot</b>\n\n` +
+          `<b>1. API Connect (Ek Baar):</b>\n` +
+          `• "🔑 Generate API Key" button dabao\n` +
+          `• Browser me key milega — copy karo\n` +
+          `• Bot me bhejo: <code>/api YOUR_KEY</code>\n\n` +
+          `<b>2. Video Upload:</b>\n` +
+          `• Direct video/file bhejo (2GB tak)\n` +
+          `• Ya Terabox link paste karo\n\n` +
+          `<b>3. Player Link:</b>\n` +
+          `• Bot signed link dega\n` +
+          `• Us link ko kholo → player khulega\n` +
+          `• Play/Download button → app download\n\n` +
+          `<b>4. App Install:</b>\n` +
+          `• APK download karo\n` +
+          `• Install karke video dekho`,
+        parseMode: 'html',
+        buttons: keyboard([[{ text: '⬅️ Back', callback_data: 'back_menu' }]]),
+      });
+      return;
+    }
+
+    if (data === 'back_menu') {
+      await sendWelcome(chatId, uid);
+      return;
+    }
+
+    if (data === 'reset_api_cmd') {
+      await client.editMessage(chatId, {
+        message: q.msgId,
+        text: `🔄 <b>Reset API Key</b>\n\n` +
+          `Nayi key chahiye? Neeche button dabao:\n\n` +
+          `Ya bot me bhejo: <code>/resetapi</code>`,
+        parseMode: 'html',
+        buttons: keyboard([
+          [{ text: '🔑 Generate New Key', url: `${BASE_URL}/index.html?tg=${uid}` }],
+          [{ text: '⬅️ Back', callback_data: 'back_menu' }],
+        ]),
+      });
+      return;
+    }
+  }, new CallbackQuery({}));
+
+  // Message handler
   client.addEventHandler(async (event) => {
     const msg = event.message;
     if (!msg) return;
     const chatId = msg.chatId;
     const text = msg.message || '';
+    if (!text) return;
+
+    const uid = msg.senderId || (msg.fromId && msg.fromId.userId) || 0;
+
+    // ===== /api KEY =====
+    if (text.startsWith('/api ')) {
+      const key = text.replace('/api ', '').trim();
+      if (key.length < 12) {
+        return client.sendMessage(chatId, { message: `❌ Invalid API key format. Minimum 12 characters.`, parseMode: 'html' });
+      }
+      await saveUserKey(uid, key);
+      await client.sendMessage(chatId, {
+        message: `✅ <b>API Key Connected!</b>\n\n` +
+          `🔑 <code>${key.substring(0, 8)}...${key.substring(key.length - 4)}</code>\n\n` +
+          `📤 <b>Ab video bhejo ya Terabox link paste karo</b>`,
+        parseMode: 'html',
+      });
+      return;
+    }
+
+    // ===== /resetapi =====
+    if (text === '/resetapi') {
+      await client.sendMessage(chatId, {
+        message: `🔄 <b>Reset API Key</b>\n\n` +
+          `Neeche button dabao, nayi key generate karo, phir /api KEY bhejo:`,
+        parseMode: 'html',
+        buttons: keyboard([
+          [{ text: '🔑 Generate New Key', url: `${BASE_URL}/index.html?tg=${uid}` }],
+        ]),
+      });
+      return;
+    }
+
     if (text === '/start') return;
 
-    // ========== TERABOX ==========
+    // ===== API CHECK =====
+    const userData = await getUserKey(uid);
+    if (!userData) {
+      return client.sendMessage(chatId, {
+        message: `🔒 <b>API Key Required</b>\n\n` +
+          `Pehle apni API key connect karo.\n\n` +
+          `1. Neeche button → key generate karo\n` +
+          `2. Bot me bhejo: <code>/api YOUR_KEY</code>`,
+        parseMode: 'html',
+        buttons: keyboard([
+          [{ text: '🔑 Generate API Key', url: `${BASE_URL}/index.html?tg=${uid}` }],
+        ]),
+      });
+    }
+
+    // ===== TERABOX =====
     const teraboxUrl = detectTeraboxUrl(text);
     if (teraboxUrl) {
       let status;
@@ -387,7 +493,7 @@ async function getTeraboxDirectLink(shareUrl) {
 
         await client.deleteMessages(chatId, [status.id], { revoke: true }).catch(() => {});
         await client.sendMessage(chatId, {
-          message: `✅ <b>Ready — App Only</b>\n\n📌 <b>${escapeHtml(info.fileName)}</b>\n📦 ${(info.size / 1024 / 1024).toFixed(2)} MB\n\n🔒 <b>Sirf app me play hoga</b>\n\n▶️ <b>Player Link:</b>\n${playUrl}\n\n<i>Ye link 30 din tak valid hai. App na ho toh download page khulega.</i>`,
+          message: `✅ <b>Ready — App Only</b>\n\n📌 <b>${escapeHtml(info.fileName)}</b>\n📦 ${(info.size / 1024 / 1024).toFixed(2)} MB\n\n🔒 <b>Sirf app me play hoga</b>\n\n▶️ <b>Player Link:</b>\n${playUrl}\n\n<i>Link 30 din tak valid hai. App na ho toh download page khulega.</i>`,
           parseMode: 'html',
         });
         return;
@@ -399,7 +505,7 @@ async function getTeraboxDirectLink(shareUrl) {
       }
     }
 
-    // ========== DIRECT FILE ==========
+    // ===== DIRECT FILE =====
     if (!msg.media) return;
     const fileMedia = msg.media.document || msg.document || msg.video;
     if (!fileMedia) return;
@@ -437,15 +543,8 @@ async function getTeraboxDirectLink(shareUrl) {
         while (offset < totalSize) {
           let res;
           try {
-            res = await client.invoke(new Api.upload.GetFile({
-              location: fileLocation,
-              offset: offset,
-              limit: CHUNK,
-            }));
-          } catch (err) {
-            console.error('[GetFile Error]', err.message);
-            break;
-          }
+            res = await client.invoke(new Api.upload.GetFile({ location: fileLocation, offset: offset, limit: CHUNK }));
+          } catch (err) { console.error('[GetFile Error]', err.message); break; }
           if (!res || !res.bytes || res.bytes.length === 0) break;
           offset += res.bytes.length;
           yield Buffer.from(res.bytes);
@@ -475,7 +574,7 @@ async function getTeraboxDirectLink(shareUrl) {
 
       await client.deleteMessages(chatId, [status.id], { revoke: true }).catch(() => {});
       await client.sendMessage(chatId, {
-        message: `✅ <b>Ready — App Only</b>\n\n📌 <b>${escapeHtml(fileName)}</b>\n📦 ${(size / 1024 / 1024).toFixed(2)} MB\n\n🔒 <b>Sirf app me play hoga</b>\n\n▶️ <b>Player Link:</b>\n${playUrl}\n\n<i>Ye link 30 din tak valid hai.</i>`,
+        message: `✅ <b>Ready — App Only</b>\n\n📌 <b>${escapeHtml(fileName)}</b>\n📦 ${(size / 1024 / 1024).toFixed(2)} MB\n\n🔒 <b>Sirf app me play hoga</b>\n\n▶️ <b>Player Link:</b>\n${playUrl}\n\n<i>Link 30 din tak valid hai.</i>`,
         parseMode: 'html',
       });
     } catch (e) {
@@ -485,5 +584,5 @@ async function getTeraboxDirectLink(shareUrl) {
     }
   }, new NewMessage({}));
 
-  console.log('Handlers ready — App-only mode');
+  console.log('Handlers ready — API + App-only mode');
 })();
