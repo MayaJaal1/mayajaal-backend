@@ -3,7 +3,6 @@ const express = require('express');
 const { TelegramClient, Api } = require('telegram');
 const { StringSession } = require('telegram/sessions');
 const { NewMessage } = require('telegram/events');
-const { CallbackQuery } = require('telegram/events/CallbackQuery');
 const { Readable } = require('stream');
 const axios = require('axios');
 const crypto = require('crypto');
@@ -34,12 +33,15 @@ const APP_SCHEME = process.env.APP_SCHEME || 'mayajaal';
 const APP_PACKAGE = process.env.APP_PACKAGE || 'com.mayajaal.app';
 const PLAY_STORE_URL = process.env.PLAY_STORE_URL || `https://play.google.com/store/apps/details?id=${APP_PACKAGE}`;
 const APP_STORE_URL = process.env.APP_STORE_URL || 'https://apps.apple.com/app/mayajaal/id000000000';
+const APP_SHA256 = process.env.APP_SHA256 || 'REPLACE_WITH_YOUR_SHA256';
+const APPLE_TEAM_ID = process.env.APPLE_TEAM_ID || 'TEAMID';
 const APP_UA_KEYWORD = (process.env.APP_UA_KEYWORD || 'MayaJaalApp').trim();
 
 console.log('=== ENV ===');
 console.log('BOT_TOKEN:', !!TOKEN, '| API_ID:', !!API_ID, '| API_HASH:', !!API_HASH);
 console.log('R2:', !!(R2_ACCOUNT_ID && R2_ACCESS_KEY_ID && R2_SECRET_ACCESS_KEY && R2_BUCKET_NAME));
 console.log('VIDEO_SECRET:', VIDEO_SECRET.length >= 20 ? 'OK' : 'MISSING/WEAK!');
+console.log('APP:', APP_NAME, '| Package:', APP_PACKAGE);
 
 if (!TOKEN || !API_ID || !API_HASH) throw new Error('Missing BOT_TOKEN / API_ID / API_HASH');
 if (!R2_ACCOUNT_ID || !R2_ACCESS_KEY_ID || !R2_SECRET_ACCESS_KEY || !R2_BUCKET_NAME) throw new Error('Missing R2 config');
@@ -50,7 +52,6 @@ try { redis = Redis.fromEnv(); console.log('Redis connected'); }
 catch (e) { console.log('Redis not available, memory mode'); redis = { get: async () => null, set: async () => null }; }
 
 const memStore = new Map();
-const userKeys = new Map();
 
 async function saveMeta(id, payload) {
   memStore.set(id, payload);
@@ -65,22 +66,15 @@ async function getMeta(id) {
   return null;
 }
 
-async function saveUserKey(tgId, apiKey) {
-  const data = { apiKey, connectedAt: Date.now() };
-  userKeys.set(String(tgId), data);
-  try { await redis.set(`apikey:${tgId}`, JSON.stringify(data)); } catch (e) { }
-}
 async function getUserKey(tgId) {
-  if (userKeys.has(String(tgId))) return userKeys.get(String(tgId));
   try {
     const raw = await redis.get(`apikey:${tgId}`);
-    if (raw) {
-      const d = typeof raw === 'string' ? JSON.parse(raw) : raw;
-      userKeys.set(String(tgId), d);
-      return d;
-    }
+    if (raw) return typeof raw === 'string' ? JSON.parse(raw) : raw;
   } catch (e) { }
   return null;
+}
+async function saveUserKey(tgId, key) {
+  try { await redis.set(`apikey:${tgId}`, JSON.stringify({ apiKey: key, connectedAt: Date.now() })); } catch (e) { }
 }
 
 const r2 = new S3Client({
@@ -124,6 +118,7 @@ app.use((req, res, next) => {
   next();
 });
 
+// ===== STATIC FILES =====
 app.use(express.static(__dirname, { index: false }));
 
 app.get('/index.html', (req, res) => res.sendFile(path.join(__dirname, 'index.html')));
@@ -132,18 +127,52 @@ app.get('/player.html', (req, res) => res.sendFile(path.join(__dirname, 'player.
 app.get('/logo.jpg', (req, res) => res.sendFile(path.join(__dirname, 'logo.jpg')));
 
 app.get('/', (req, res) => res.send('MayaJaal Online'));
-app.get('/health', (req, res) => res.json({ ok: true, uptime: process.uptime() }));
+app.get('/health', (req, res) => res.json({ ok: true, uptime: process.uptime(), mode: 'app-only' }));
 
+// ===== API KEY SAVE (from index.html) =====
 app.post('/save-key', async (req, res) => {
   try {
     const { telegram_id, key } = req.body;
     if (!telegram_id || !key) return res.status(400).json({ error: 'Missing data' });
     await saveUserKey(telegram_id, key);
-    console.log(`[API KEY SAVED] tg=${telegram_id}`);
+    console.log(`[API SAVED] tg=${telegram_id} key=${key.substring(0, 8)}...`);
     return res.json({ success: true });
   } catch (e) { return res.status(500).json({ error: e.message }); }
 });
 
+// ===== APP VERIFICATION FILES =====
+app.get('/.well-known/assetlinks.json', (req, res) => {
+  res.type('application/json').send(JSON.stringify([{
+    relation: ['delegate_permission/common.handle_all_urls'],
+    target: {
+      namespace: 'android_app',
+      package_name: APP_PACKAGE,
+      sha256_cert_fingerprints: [APP_SHA256],
+    },
+  }], null, 2));
+});
+
+app.get('/.well-known/apple-app-site-association', (req, res) => {
+  res.type('application/json').send(JSON.stringify({
+    applinks: { apps: [], details: [{ appID: APPLE_TEAM_ID + '.' + APP_PACKAGE, paths: ['*'] }] },
+  }, null, 2));
+});
+
+// ===== PLAYER PAGE =====
+app.get('/v/:id', async (req, res) => {
+  try {
+    const videoId = req.params.id;
+    const token = req.query.t || req.query.s || '';
+    if (!verifyVideoSig(videoId, token)) {
+      return res.status(403).send('<h2 style="font-family:sans-serif;padding:40px;text-align:center">🔒 Invalid or expired link</h2>');
+    }
+    const meta = await getMeta(videoId);
+    if (!meta) return res.status(404).send('Video not found');
+    return res.sendFile(path.join(__dirname, 'player.html'));
+  } catch (e) { return res.status(500).send('err'); }
+});
+
+// ===== METADATA API (for player.html) =====
 app.get('/api/v/:id', async (req, res) => {
   const videoId = req.params.id;
   const token = req.query.t || req.query.s || '';
@@ -153,17 +182,7 @@ app.get('/api/v/:id', async (req, res) => {
   return res.json({ id: videoId, name: meta.name || 'Video', size: meta.size || 0, mime: meta.mime || 'video/mp4' });
 });
 
-app.get('/v/:id', async (req, res) => {
-  const videoId = req.params.id;
-  const token = req.query.t || req.query.s || '';
-  if (!verifyVideoSig(videoId, token)) {
-    return res.status(403).send('<h2 style="font-family:sans-serif;padding:40px;text-align:center">🔒 Invalid or expired link</h2>');
-  }
-  const meta = await getMeta(videoId);
-  if (!meta) return res.status(404).send('Video not found');
-  return res.sendFile(path.join(__dirname, 'player.html'));
-});
-
+// ===== STREAM (App only) =====
 app.get('/stream/:id', async (req, res) => {
   try {
     const videoId = req.params.id;
@@ -188,8 +207,11 @@ app.get('/stream/:id', async (req, res) => {
   } catch (e) { if (!res.headersSent) res.status(500).send('err'); }
 });
 
+app.get('/watch/:id', (req, res) => res.status(403).send('Browser playback disabled'));
+
 app.listen(PORT, () => console.log(`Web on ${PORT}`));
 
+// ===== TERABOX HELPERS =====
 function detectTeraboxUrl(text) {
   if (!text) return null;
   const domains = ['terabox\\.com','terabox\\.app','terabox\\.link','terabox\\.club','terabox\\.fun','terabox\\.cc','terabox\\.top','terabox\\.online','1024tera\\.com','1024terabox\\.com','4funbox\\.com','4funbox\\.co','mirrobox\\.com','nephobox\\.com','momerybox\\.com','tibibox\\.com','teraboxapp\\.com','teraboxlink\\.com','teraboxshare\\.com','teraboxurl\\.com','teraboxdl\\.com','teraboxdownloader\\.com','terafileshare\\.com','terashare\\.com','terasharelink\\.com','terasharefile\\.com','freeterabox\\.com','gearbox\\.app','teraboxcdn\\.com','terabox\\.store','terabox\\.site','terabox\\.space','terabox\\.website','dubox\\.com','terabox\\.icu','terabox\\.xyz','diskwala\\.com'];
@@ -236,7 +258,7 @@ async function getTeraboxDirectLink(shareUrl) {
   const dlink = dlResp.data?.dlink;
   if (!dlink) throw new Error('Direct link nahi mili');
   return { url: Array.isArray(dlink) ? dlink[0] : dlink, fileName: server_filename, size };
-}
+  }
 // ===== BOT =====
 (async () => {
   const client = new TelegramClient(new StringSession(''), API_ID, API_HASH, {
@@ -258,7 +280,13 @@ async function getTeraboxDirectLink(shareUrl) {
     });
   }
 
-  // ===== SINGLE MESSAGE HANDLER (handles /start + /api + media) =====
+  function apiBtn(uid) {
+    return keyboard([
+      [{ text: '🔑 Generate API Key', url: `${BASE_URL}/index.html?tg=${uid}` }],
+    ]);
+  }
+
+  // ===== SINGLE HANDLER =====
   client.addEventHandler(async (event) => {
     try {
       const msg = event.message;
@@ -277,11 +305,9 @@ async function getTeraboxDirectLink(shareUrl) {
           });
         } else {
           await client.sendMessage(chatId, {
-            message: `👋 <b>Welcome to MayaJaal Stream Bot</b>\n\n<b>Step 1:</b> Pehle API key connect karo.\n\n🔑 Button dabao → key generate karo\n📋 Phir bot me bhejo: <code>/api YOUR_KEY</code>`,
+            message: `👋 <b>Welcome to MayaJaal Stream Bot</b>\n\n<b>Step 1:</b> Pehle API key connect karo.\n\n🔑 Neeche button dabao\n📋 Phir bot me bhejo: <code>/api YOUR_KEY</code>`,
             parseMode: 'html',
-            buttons: keyboard([
-              [{ text: '🔑 Generate API Key', url: `${BASE_URL}/index.html?tg=${uid}` }],
-            ]),
+            buttons: apiBtn(uid),
           });
         }
         return;
@@ -302,23 +328,21 @@ async function getTeraboxDirectLink(shareUrl) {
         return;
       }
 
-      // ===== API CHECK (for media / terabox) =====
+      // ===== API CHECK =====
       const userData = await getUserKey(uid);
-      if (!userData) {
-        if (msg.media || detectTeraboxUrl(text)) {
-          await client.sendMessage(chatId, {
-            message: `🔒 <b>API Key Required</b>\n\nPehle API key connect karo:\n\n🔑 Neeche button dabao\n📋 Phir <code>/api YOUR_KEY</code> bhejo`,
-            parseMode: 'html',
-            buttons: keyboard([
-              [{ text: '🔑 Generate API Key', url: `${BASE_URL}/index.html?tg=${uid}` }],
-            ]),
-          });
-        }
+      const teraboxUrl = detectTeraboxUrl(text);
+      const hasMedia = !!msg.media;
+
+      if (!userData && (hasMedia || teraboxUrl)) {
+        await client.sendMessage(chatId, {
+          message: `🔒 <b>API Key Required</b>\n\nPehle API key connect karo:\n\n🔑 Neeche button dabao\n📋 Phir <code>/api YOUR_KEY</code> bhejo`,
+          parseMode: 'html',
+          buttons: apiBtn(uid),
+        });
         return;
       }
 
       // ===== TERABOX =====
-      const teraboxUrl = detectTeraboxUrl(text);
       if (teraboxUrl) {
         const status = await client.sendMessage(chatId, { message: `🔍 <i>Terabox link mila...</i>`, parseMode: 'html' });
         try {
@@ -335,10 +359,11 @@ async function getTeraboxDirectLink(shareUrl) {
           });
           const ext = path.extname(info.fileName) || '.mp4';
           const r2Key = `uploads/${crypto.randomBytes(8).toString('hex')}${ext}`;
+          const isLarge = info.size > 100 * 1024 * 1024;
           const upload = new Upload({
             client: r2,
-            params: { Bucket: R2_BUCKET_NAME, Key: r2Key, Body: resp.data, ContentType: 'video/mp4', CacheControl: 'public, max-age=31536000' },
-            queueSize: 4, partSize: 10 * 1024 * 1024,
+            params: { Bucket: R2_BUCKET_NAME, Key: r2Key, Body: resp.data, ContentType: 'video/mp4', CacheControl: 'public, max-age=31536000', Metadata: { source: 'terabox' } },
+            queueSize: isLarge ? 4 : 1, partSize: isLarge ? 10 * 1024 * 1024 : 5 * 1024 * 1024,
           });
           await upload.done();
           const shortId = crypto.randomBytes(4).toString('hex');
@@ -347,7 +372,7 @@ async function getTeraboxDirectLink(shareUrl) {
           const playUrl = `${BASE_URL}/v/${shortId}?t=${token}`;
           await client.deleteMessages(chatId, [status.id], { revoke: true }).catch(() => {});
           await client.sendMessage(chatId, {
-            message: `✅ <b>Ready — App Only</b>\n\n📌 <b>${escapeHtml(info.fileName)}</b>\n📦 ${(info.size / 1024 / 1024).toFixed(2)} MB\n\n▶️ <b>Player Link:</b>\n${playUrl}`,
+            message: `✅ <b>Ready — App Only</b>\n\n📌 <b>${escapeHtml(info.fileName)}</b>\n📦 ${(info.size / 1024 / 1024).toFixed(2)} MB\n\n🔒 <b>Sirf app me play hoga</b>\n\n▶️ <b>Player Link:</b>\n${playUrl}`,
             parseMode: 'html',
           });
         } catch (e) {
@@ -361,7 +386,6 @@ async function getTeraboxDirectLink(shareUrl) {
       // ===== DIRECT FILE =====
       if (!msg.media) return;
 
-      // Get document from media
       const doc = msg.media.document;
       if (!doc) {
         console.log('[NO DOC] media class:', msg.media.className);
@@ -372,7 +396,7 @@ async function getTeraboxDirectLink(shareUrl) {
 
       let fileName = 'video.mp4', mime = 'application/octet-stream', size = 0;
       size = Number(doc.size) || 0;
-      mime = doc.mimeType || 'video/mp4';
+      mime = doc.mimeType || (msg.video ? 'video/mp4' : 'application/octet-stream');
 
       const attr = (doc.attributes || []).find(a => a.className === 'DocumentAttributeFilename');
       if (attr && attr.fileName) fileName = attr.fileName;
@@ -417,6 +441,7 @@ async function getTeraboxDirectLink(shareUrl) {
 
         const ext = path.extname(fileName) || '.mp4';
         const r2Key = `uploads/${crypto.randomBytes(8).toString('hex')}${ext}`;
+        const isLarge = size > 100 * 1024 * 1024;
 
         const upload = new Upload({
           client: r2,
@@ -424,7 +449,7 @@ async function getTeraboxDirectLink(shareUrl) {
             Bucket: R2_BUCKET_NAME, Key: r2Key, Body: stream, ContentType: mime,
             CacheControl: 'public, max-age=31536000',
           },
-          queueSize: 4, partSize: 10 * 1024 * 1024,
+          queueSize: isLarge ? 4 : 1, partSize: isLarge ? 10 * 1024 * 1024 : 5 * 1024 * 1024,
         });
         await upload.done();
 
@@ -435,7 +460,7 @@ async function getTeraboxDirectLink(shareUrl) {
 
         await client.deleteMessages(chatId, [status.id], { revoke: true }).catch(() => {});
         await client.sendMessage(chatId, {
-          message: `✅ <b>Ready — App Only</b>\n\n📌 <b>${escapeHtml(fileName)}</b>\n📦 ${(size / 1024 / 1024).toFixed(2)} MB\n\n▶️ <b>Player Link:</b>\n${playUrl}`,
+          message: `✅ <b>Ready — App Only</b>\n\n📌 <b>${escapeHtml(fileName)}</b>\n📦 ${(size / 1024 / 1024).toFixed(2)} MB\n\n🔒 <b>Sirf app me play hoga</b>\n\n▶️ <b>Player Link:</b>\n${playUrl}`,
           parseMode: 'html',
         });
       } catch (e) {
@@ -448,5 +473,5 @@ async function getTeraboxDirectLink(shareUrl) {
     }
   }, new NewMessage({}));
 
-  console.log('Bot ready!');
+  console.log('Bot ready — API + App-only mode');
 })();
