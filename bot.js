@@ -110,7 +110,7 @@ function verifyVideoSig(videoId, token) {
   const expected = crypto.createHmac('sha256', VIDEO_SECRET).update(payload).digest('hex').substring(0, 16);
   try { return crypto.timingSafeEqual(Buffer.from(sig), Buffer.from(expected)); }
   catch (e) { return false; }
-  }
+    }
 // ============================================================
 // TRANSLATIONS
 // ============================================================
@@ -459,7 +459,7 @@ async function getTeraboxDirectLink(shareUrl) {
   const dlink = dlResp.data?.dlink;
   if (!dlink) throw new Error('Direct link not found');
   return { url: Array.isArray(dlink) ? dlink[0] : dlink, fileName: server_filename, size };
-    }
+      }
 // ============================================================
 // BOT
 // ============================================================
@@ -471,6 +471,31 @@ async function getTeraboxDirectLink(shareUrl) {
   console.log('Connecting MTProto...');
   await client.start({ botAuthToken: TOKEN });
   console.log('GramJS connected — 2GB unlocked!');
+
+  // ============================================================
+  // UPLOAD QUEUE (Parallel processing, max 5 at once)
+  // ============================================================
+  const MAX_CONCURRENT_UPLOADS = 5;
+  const uploadQueue = [];
+  let activeUploads = 0;
+
+  function enqueueUpload(task) {
+    uploadQueue.push(task);
+    processQueue();
+  }
+
+  async function processQueue() {
+    while (activeUploads < MAX_CONCURRENT_UPLOADS && uploadQueue.length > 0) {
+      const task = uploadQueue.shift();
+      activeUploads++;
+      task().finally(() => {
+        activeUploads--;
+        setImmediate(processQueue);
+      });
+    }
+  }
+
+  console.log(`Upload queue ready — max ${MAX_CONCURRENT_UPLOADS} parallel uploads`);
 
   function keyboard(rows) {
     return new Api.ReplyInlineMarkup({
@@ -599,8 +624,145 @@ async function getTeraboxDirectLink(shareUrl) {
     }
     await client.sendMessage(chatId, { message: text, parseMode: 'html', buttons: keyboard(rows) });
   }
+    // ============================================================
+  // DIRECT FILE UPLOAD (parallel-safe)
+  // ============================================================
+  async function handleDirectFile(msg, uid, lang) {
+    const chatId = msg.chatId;
+    const doc = msg.media && msg.media.document;
+    if (!doc) return;
 
-  // ===== MESSAGE HANDLER =====
+    let fileName = 'video.mp4', mime = 'application/octet-stream', size = 0;
+    size = Number(doc.size) || 0;
+    mime = doc.mimeType || (msg.video ? 'video/mp4' : 'application/octet-stream');
+    const attr = (doc.attributes || []).find(a => a.className === 'DocumentAttributeFilename');
+    if (attr && attr.fileName) fileName = attr.fileName;
+    else if (msg.video) fileName = `video_${Date.now()}.mp4`;
+
+    if (size && size > MAX_FILE_SIZE) {
+      await client.sendMessage(chatId, { message: `❌ ${t(lang, 'max_size')} ${(MAX_FILE_SIZE / 1024 / 1024).toFixed(0)} MB` });
+      return;
+    }
+
+    const status = await client.sendMessage(chatId, {
+      message: `⚡ <i>${t(lang, 'uploading')}</i>\n📌 ${escapeHtml(fileName)}\n📦 ${(size / 1024 / 1024).toFixed(2)} MB\n\n🔄 <b>0%</b>`,
+      parseMode: 'html',
+    });
+
+    try {
+      const fileLocation = new Api.InputDocumentFileLocation({
+        id: doc.id, accessHash: doc.accessHash, fileReference: doc.fileReference, thumbSize: '',
+      });
+
+      const CHUNK = 1024 * 1024;
+      let downloadedBytes = 0;
+      let lastProgressUpdate = Date.now();
+
+      const stream = Readable.from((async function* () {
+        let offset = 0;
+        while (offset < size) {
+          let res;
+          try {
+            res = await client.invoke(new Api.upload.GetFile({ location: fileLocation, offset, limit: CHUNK }));
+          } catch (err) {
+            console.error('[GetFile]', err.message);
+            break;
+          }
+          if (!res || !res.bytes || res.bytes.length === 0) break;
+          offset += res.bytes.length;
+          downloadedBytes = offset;
+
+          const now = Date.now();
+          if (now - lastProgressUpdate > 2000 && size > 0) {
+            lastProgressUpdate = now;
+            const percent = Math.min(100, Math.floor((downloadedBytes / size) * 100));
+            client.editMessage(chatId, {
+              message: status.id,
+              text: `⚡ <i>${t(lang, 'uploading')}</i>\n📌 ${escapeHtml(fileName)}\n📦 ${(size / 1024 / 1024).toFixed(2)} MB\n\n🔄 <b>${percent}%</b>`,
+              parseMode: 'html',
+            }).catch(() => {});
+          }
+
+          yield Buffer.from(res.bytes);
+        }
+      })());
+
+      const ext = path.extname(fileName) || '.mp4';
+      const r2Key = `uploads/${crypto.randomBytes(8).toString('hex')}${ext}`;
+      const isLarge = size > 100 * 1024 * 1024;
+
+      const upload = new Upload({
+        client: r2,
+        params: {
+          Bucket: R2_BUCKET_NAME, Key: r2Key, Body: stream, ContentType: mime,
+          CacheControl: 'public, max-age=31536000',
+        },
+        queueSize: isLarge ? 4 : 1,
+        partSize: isLarge ? 10 * 1024 * 1024 : 5 * 1024 * 1024,
+      });
+      await upload.done();
+
+      const shortId = crypto.randomBytes(4).toString('hex');
+      await saveMeta(shortId, { name: fileName, mime, r2Key, size, ts: Date.now() });
+      const token = signVideo(shortId, 720);
+      const playUrl = `${BASE_URL}/v/${shortId}?t=${token}`;
+
+      await client.deleteMessages(chatId, [status.id], { revoke: true }).catch(() => {});
+      await client.sendMessage(chatId, {
+        message: `✅ <b>${t(lang, 'ready_app_only')}</b>\n\n📌 <b>${escapeHtml(fileName)}</b>\n📦 ${(size / 1024 / 1024).toFixed(2)} MB\n\n🔒 <b>${t(lang, 'app_only_note')}</b>\n\n▶️ <b>${t(lang, 'player_link')}:</b>\n${playUrl}`,
+        parseMode: 'html',
+      });
+    } catch (e) {
+      console.error('[Upload Error]', e.message);
+      await client.deleteMessages(chatId, [status.id], { revoke: true }).catch(() => {});
+      await client.sendMessage(chatId, { message: `❌ ${escapeHtml(e.message)}`, parseMode: 'html' });
+    }
+  }
+
+  // ============================================================
+  // TERABOX UPLOAD (parallel-safe)
+  // ============================================================
+  async function handleTerabox(teraboxUrl, chatId, uid, lang) {
+    const status = await client.sendMessage(chatId, { message: `🔍 <i>${t(lang, 'terabox_detected')}</i>`, parseMode: 'html' });
+    try {
+      const info = await getTeraboxDirectLink(teraboxUrl);
+      await client.editMessage(chatId, {
+        message: status.id,
+        text: `⬇️ <i>${t(lang, 'downloading_uploading')}</i>\n📌 ${escapeHtml(info.fileName)}\n📦 ${(info.size / 1024 / 1024).toFixed(2)} MB`,
+        parseMode: 'html',
+      });
+      const TERABOX_COOKIE = (process.env.TERABOX_COOKIE || '').trim();
+      const resp = await axios.get(info.url, {
+        responseType: 'stream', maxContentLength: Infinity, maxBodyLength: Infinity, timeout: 0,
+        headers: { 'User-Agent': 'Mozilla/5.0', 'Cookie': TERABOX_COOKIE, 'Referer': teraboxUrl },
+      });
+      const ext = path.extname(info.fileName) || '.mp4';
+      const r2Key = `uploads/${crypto.randomBytes(8).toString('hex')}${ext}`;
+      const upload = new Upload({
+        client: r2,
+        params: { Bucket: R2_BUCKET_NAME, Key: r2Key, Body: resp.data, ContentType: 'video/mp4', CacheControl: 'public, max-age=31536000', Metadata: { source: 'terabox' } },
+        queueSize: 4, partSize: 10 * 1024 * 1024,
+      });
+      await upload.done();
+      const shortId = crypto.randomBytes(4).toString('hex');
+      await saveMeta(shortId, { name: info.fileName, mime: 'video/mp4', r2Key, size: info.size, ts: Date.now() });
+      const token = signVideo(shortId, 720);
+      const playUrl = `${BASE_URL}/v/${shortId}?t=${token}`;
+      await client.deleteMessages(chatId, [status.id], { revoke: true }).catch(() => {});
+      await client.sendMessage(chatId, {
+        message: `✅ <b>${t(lang, 'ready_app_only')}</b>\n\n📌 <b>${escapeHtml(info.fileName)}</b>\n📦 ${(info.size / 1024 / 1024).toFixed(2)} MB\n\n🔒 <b>${t(lang, 'app_only_note')}</b>\n\n▶️ <b>${t(lang, 'player_link')}:</b>\n${playUrl}`,
+        parseMode: 'html',
+      });
+    } catch (e) {
+      console.error('[Terabox Error]', e.message);
+      await client.deleteMessages(chatId, [status.id], { revoke: true }).catch(() => {});
+      await client.sendMessage(chatId, { message: `❌ ${escapeHtml(e.message)}`, parseMode: 'html' });
+    }
+  }
+
+  // ============================================================
+  // MESSAGE HANDLER
+  // ============================================================
   client.addEventHandler(async (event) => {
     try {
       const msg = event.message;
@@ -611,6 +773,10 @@ async function getTeraboxDirectLink(shareUrl) {
       const lang = await getUserLang(uid);
 
       if (text === '/start') { await sendWelcome(chatId, uid); return; }
+      if (text === '/help') { await sendHelp(chatId, uid); return; }
+      if (text === '/allbots') { await sendAllBots(chatId, uid); return; }
+      if (text === '/settings') { await sendSettings(chatId, uid); return; }
+      if (text === '/language') { await sendLanguageSelector(chatId, uid); return; }
 
       if (text.startsWith('/api ')) {
         const key = text.replace('/api ', '').trim();
@@ -640,11 +806,6 @@ async function getTeraboxDirectLink(shareUrl) {
         return;
       }
 
-      if (text === '/help') { await sendHelp(chatId, uid); return; }
-      if (text === '/allbots') { await sendAllBots(chatId, uid); return; }
-      if (text === '/settings') { await sendSettings(chatId, uid); return; }
-      if (text === '/language') { await sendLanguageSelector(chatId, uid); return; }
-
       const userData = await getUserKey(uid);
       const teraboxUrl = detectTeraboxUrl(text);
       const hasMedia = !!msg.media;
@@ -659,111 +820,22 @@ async function getTeraboxDirectLink(shareUrl) {
       }
 
       if (teraboxUrl) {
-        const status = await client.sendMessage(chatId, { message: `🔍 <i>${t(lang, 'terabox_detected')}</i>`, parseMode: 'html' });
-        try {
-          const info = await getTeraboxDirectLink(teraboxUrl);
-          await client.editMessage(chatId, {
-            message: status.id,
-            text: `⬇️ <i>${t(lang, 'downloading_uploading')}</i>\n📌 ${escapeHtml(info.fileName)}\n📦 ${(info.size / 1024 / 1024).toFixed(2)} MB`,
-            parseMode: 'html',
-          });
-          const TERABOX_COOKIE = (process.env.TERABOX_COOKIE || '').trim();
-          const resp = await axios.get(info.url, {
-            responseType: 'stream', maxContentLength: Infinity, maxBodyLength: Infinity, timeout: 0,
-            headers: { 'User-Agent': 'Mozilla/5.0', 'Cookie': TERABOX_COOKIE, 'Referer': teraboxUrl },
-          });
-          const ext = path.extname(info.fileName) || '.mp4';
-          const r2Key = `uploads/${crypto.randomBytes(8).toString('hex')}${ext}`;
-          const upload = new Upload({
-            client: r2,
-            params: { Bucket: R2_BUCKET_NAME, Key: r2Key, Body: resp.data, ContentType: 'video/mp4', CacheControl: 'public, max-age=31536000', Metadata: { source: 'terabox' } },
-            queueSize: 4, partSize: 10 * 1024 * 1024,
-          });
-          await upload.done();
-          const shortId = crypto.randomBytes(4).toString('hex');
-          await saveMeta(shortId, { name: info.fileName, mime: 'video/mp4', r2Key, size: info.size, ts: Date.now() });
-          const token = signVideo(shortId, 720);
-          const playUrl = `${BASE_URL}/v/${shortId}?t=${token}`;
-          await client.deleteMessages(chatId, [status.id], { revoke: true }).catch(() => {});
-          await client.sendMessage(chatId, {
-            message: `✅ <b>${t(lang, 'ready_app_only')}</b>\n\n📌 <b>${escapeHtml(info.fileName)}</b>\n📦 ${(info.size / 1024 / 1024).toFixed(2)} MB\n\n🔒 <b>${t(lang, 'app_only_note')}</b>\n\n▶️ <b>${t(lang, 'player_link')}:</b>\n${playUrl}`,
-            parseMode: 'html',
-          });
-        } catch (e) {
-          console.error('[Terabox Error]', e.message);
-          await client.deleteMessages(chatId, [status.id], { revoke: true }).catch(() => {});
-          await client.sendMessage(chatId, { message: `❌ ${escapeHtml(e.message)}`, parseMode: 'html' });
-        }
+        enqueueUpload(() => handleTerabox(teraboxUrl, chatId, uid, lang));
         return;
       }
 
-      if (!msg.media) return;
-      const doc = msg.media.document;
-      if (!doc) return;
-
-      let fileName = 'video.mp4', mime = 'application/octet-stream', size = 0;
-      size = Number(doc.size) || 0;
-      mime = doc.mimeType || (msg.video ? 'video/mp4' : 'application/octet-stream');
-      const attr = (doc.attributes || []).find(a => a.className === 'DocumentAttributeFilename');
-      if (attr && attr.fileName) fileName = attr.fileName;
-      else if (msg.video) fileName = `video_${Date.now()}.mp4`;
-
-      if (size && size > MAX_FILE_SIZE) {
-        await client.sendMessage(chatId, { message: `❌ ${t(lang, 'max_size')} ${(MAX_FILE_SIZE / 1024 / 1024).toFixed(0)} MB` });
+      if (hasMedia && msg.media.document) {
+        enqueueUpload(() => handleDirectFile(msg, uid, lang));
         return;
-      }
-
-      const status = await client.sendMessage(chatId, {
-        message: `⚡ <i>${t(lang, 'uploading')}</i>\n📌 ${escapeHtml(fileName)}\n📦 ${(size / 1024 / 1024).toFixed(2)} MB`,
-        parseMode: 'html',
-      });
-
-      try {
-        const fileLocation = new Api.InputDocumentFileLocation({
-          id: doc.id, accessHash: doc.accessHash, fileReference: doc.fileReference, thumbSize: '',
-        });
-        const CHUNK = 512 * 1024;
-        const stream = Readable.from((async function* () {
-          let offset = 0;
-          while (offset < size) {
-            let res;
-            try {
-              res = await client.invoke(new Api.upload.GetFile({ location: fileLocation, offset, limit: CHUNK }));
-            } catch (err) { console.error('[GetFile]', err.message); break; }
-            if (!res || !res.bytes || res.bytes.length === 0) break;
-            offset += res.bytes.length;
-            yield Buffer.from(res.bytes);
-          }
-        })());
-        const ext = path.extname(fileName) || '.mp4';
-        const r2Key = `uploads/${crypto.randomBytes(8).toString('hex')}${ext}`;
-        const isLarge = size > 100 * 1024 * 1024;
-        const upload = new Upload({
-          client: r2,
-          params: { Bucket: R2_BUCKET_NAME, Key: r2Key, Body: stream, ContentType: mime, CacheControl: 'public, max-age=31536000' },
-          queueSize: isLarge ? 4 : 1, partSize: isLarge ? 10 * 1024 * 1024 : 5 * 1024 * 1024,
-        });
-        await upload.done();
-        const shortId = crypto.randomBytes(4).toString('hex');
-        await saveMeta(shortId, { name: fileName, mime, r2Key, size, ts: Date.now() });
-        const token = signVideo(shortId, 720);
-        const playUrl = `${BASE_URL}/v/${shortId}?t=${token}`;
-        await client.deleteMessages(chatId, [status.id], { revoke: true }).catch(() => {});
-        await client.sendMessage(chatId, {
-          message: `✅ <b>${t(lang, 'ready_app_only')}</b>\n\n📌 <b>${escapeHtml(fileName)}</b>\n📦 ${(size / 1024 / 1024).toFixed(2)} MB\n\n🔒 <b>${t(lang, 'app_only_note')}</b>\n\n▶️ <b>${t(lang, 'player_link')}:</b>\n${playUrl}`,
-          parseMode: 'html',
-        });
-      } catch (e) {
-        console.error('[Upload Error]', e.message);
-        await client.deleteMessages(chatId, [status.id], { revoke: true }).catch(() => {});
-        await client.sendMessage(chatId, { message: `❌ ${escapeHtml(e.message)}`, parseMode: 'html' });
       }
     } catch (err) {
       console.error('[HANDLER ERROR]', err.stack || err.message);
     }
   }, new NewMessage({}));
 
-  // ===== CALLBACK HANDLER =====
+  // ============================================================
+  // CALLBACK HANDLER
+  // ============================================================
   client.addEventHandler(async (event) => {
     const q = event.query;
     if (!q) return;
@@ -817,7 +889,7 @@ async function getTeraboxDirectLink(shareUrl) {
           `<b>${t(lang, 'user_id')}:</b> <code>${uid}</code>\n` +
           `<b>${t(lang, 'api_status')}:</b> ${userData ? '✅ ' + t(lang, 'connected_label') : '❌ ' + t(lang, 'not_connected_label')}\n` +
           (userData ? `<b>${t(lang, 'connected_since')}:</b> ${new Date(userData.connectedAt).toLocaleString()}\n` : '') +
-          `\n<b>${t(lang, 'bot_version')}:</b> v2.0.0`,
+          `\n<b>${t(lang, 'bot_version')}:</b> v2.1.0`,
         parseMode: 'html',
         buttons: keyboard([[{ text: `⬅️ ${t(lang, 'btn_main_menu')}`, callback_data: 'main_menu' }]]),
       });
@@ -862,5 +934,5 @@ async function getTeraboxDirectLink(shareUrl) {
     if (data === 'main_menu') { await sendWelcome(chatId, uid, msgId); return; }
   }, new CallbackQuery({}));
 
-  console.log('Bot ready — Multilingual + App-only mode');
+  console.log('Bot ready — Power Mode (5 parallel uploads)');
 })();
