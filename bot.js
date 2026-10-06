@@ -11,6 +11,7 @@ const path = require('path');
 const { Redis } = require('@upstash/redis');
 const { S3Client, GetObjectCommand } = require('@aws-sdk/client-s3');
 const { Upload } = require('@aws-sdk/lib-storage');
+const { getCentralConfig } = require('./config'); // <-- YEH NAYI LINE HAI
 
 process.on('uncaughtException', (e) => console.error('[Uncaught]', e.stack || e.message));
 process.on('unhandledRejection', (e) => console.error('[Unhandled]', e?.stack || e));
@@ -110,7 +111,7 @@ function verifyVideoSig(videoId, token) {
   const expected = crypto.createHmac('sha256', VIDEO_SECRET).update(payload).digest('hex').substring(0, 16);
   try { return crypto.timingSafeEqual(Buffer.from(sig), Buffer.from(expected)); }
   catch (e) { return false; }
-    }
+}
 // ============================================================
 // TRANSLATIONS
 // ============================================================
@@ -459,11 +460,31 @@ async function getTeraboxDirectLink(shareUrl) {
   const dlink = dlResp.data?.dlink;
   if (!dlink) throw new Error('Direct link not found');
   return { url: Array.isArray(dlink) ? dlink[0] : dlink, fileName: server_filename, size };
-      }
+    }
 // ============================================================
 // BOT
 // ============================================================
+
+// 🔽 YEH NAYA FUNCTION HAI JO API CONNECT HONE KA WAIT KAREGA 🔽
+async function waitForApiConnection() {
+  console.log('[BOT] Waiting for central API connection...');
+  while (true) {
+    const cfg = await getCentralConfig();
+    if (cfg && cfg.api_connected === true) {
+      console.log('[BOT] ✅ Central API Connected:', cfg.api_base);
+      return cfg;
+    }
+    console.log('[BOT] ⏳ Not connected yet. Retrying in 10s...');
+    await new Promise(r => setTimeout(r, 10000));
+  }
+}
+// 🔼 YEH NAYA FUNCTION HAI 🔼
+
 (async () => {
+  // 🔽 YEH NAYI LINE HAI JO BOT START HONE SE PEHLE API KA WAIT KAREGI 🔽
+  await waitForApiConnection();
+  // 🔼 YEH NAYI LINE HAI 🔼
+
   const client = new TelegramClient(new StringSession(''), API_ID, API_HASH, {
     connectionRetries: 5, autoReconnect: true,
   });
