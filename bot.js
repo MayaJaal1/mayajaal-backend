@@ -30,11 +30,7 @@ const MAX_FILE_SIZE = parseInt(process.env.MAX_FILE_SIZE || '2147483648', 10);
 const PORT = parseInt(process.env.PORT || '8080', 10);
 const VIDEO_SECRET = (process.env.VIDEO_SECRET || '').trim();
 const APP_NAME = process.env.APP_NAME || 'MayaJaal';
-final Map<String, String> headers = {
-  'User-Agent': 'MayaJaalApp/1.0',
-  'Referer': 'https://mayajaal.online/',
-};
-
+const APP_UA_KEYWORD = (process.env.APP_UA_KEYWORD || 'MayaJaalApp').trim();
 
 console.log('=== ENV ===');
 console.log('BOT_TOKEN:', !!TOKEN, '| API_ID:', !!API_ID, '| API_HASH:', !!API_HASH);
