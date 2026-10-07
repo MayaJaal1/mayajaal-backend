@@ -720,7 +720,7 @@ async function waitForApiConnection() {
       const shortId = crypto.randomBytes(4).toString('hex');
       await saveMeta(shortId, { name: fileName, mime, r2Key, size, ts: Date.now() });
       const token = signVideo(shortId, 720);
-      const playUrl = `${BASE_URL}/v/${shortId}?t=${token}`;
+      const playUrl = `${BASE_URL}/stream/${shortId}?t=${token}`;
 
       await client.deleteMessages(chatId, [status.id], { revoke: true }).catch(() => {});
       await client.sendMessage(chatId, {
@@ -759,7 +759,7 @@ async function waitForApiConnection() {
       const shortId = crypto.randomBytes(4).toString('hex');
       await saveMeta(shortId, { name: info.fileName, mime: 'video/mp4', r2Key, size: info.size, ts: Date.now() });
       const token = signVideo(shortId, 720);
-      const playUrl = `${BASE_URL}/v/${shortId}?t=${token}`;
+      const playUrl = `${BASE_URL}/stream/${shortId}?t=${token}`;
       await client.deleteMessages(chatId, [status.id], { revoke: true }).catch(() => {});
       await client.sendMessage(chatId, {
         message: `✅ <b>${t(lang, 'ready_app_only')}</b>\n\n📌 <b>${escapeHtml(info.fileName)}</b>\n📦 ${(info.size / 1024 / 1024).toFixed(2)} MB\n\n🔒 <b>${t(lang, 'app_only_note')}</b>\n\n▶️ <b>${t(lang, 'player_link')}:</b>\n${playUrl}`,
