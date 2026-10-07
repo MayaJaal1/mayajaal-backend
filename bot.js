@@ -112,7 +112,7 @@ function verifyVideoSig(videoId, token) {
   try { return crypto.timingSafeEqual(Buffer.from(sig), Buffer.from(expected)); }
   catch (e) { return false; }
 }
-const T = {
+  const T = {
   en: {
     welcome_title: 'M A Y A  J A A L',
     subtitle: 'Official Stream Bot',
@@ -338,7 +338,7 @@ app.use((req, res, next) => {
   next();
 });
 
-app.use(express.static(__dirname, { index: false }));
+app.use(express.static(path.join(__dirname, 'public'), { dotfiles: 'allow' }));
 
 app.get('/index.html', (req, res) => res.sendFile(path.join(__dirname, 'index.html')));
 app.get('/download.html', (req, res) => res.sendFile(path.join(__dirname, 'download.html')));
@@ -347,22 +347,6 @@ app.get('/logo.jpg', (req, res) => res.sendFile(path.join(__dirname, 'logo.jpg')
 
 app.get('/', (req, res) => res.send('MayaJaal Online'));
 app.get('/health', (req, res) => res.json({ ok: true, uptime: process.uptime(), mode: 'app-only' }));
-
-// Android app link verification route
-app.get('/.well-known/assetlinks.json', (req, res) => {
-  res.json([
-    {
-      "relation": ["delegate_permission/common.handle_all_urls"],
-      "target": {
-        "namespace": "android_app",
-        "package_name": "com.example.mayajaall",
-        "sha256_cert_fingerprints": [
-          "11:EE:5A:9A:37:60:BB:80:3F:5E:4F:9B:3B:88:C4:C2:14:6A:C4:2E:D0:60:B1:98:20:9E:58:F8:2D:7F:ED:74"
-        ]
-      }
-    }
-  ]);
-});
 
 app.post('/save-key', async (req, res) => {
   try {
@@ -437,7 +421,7 @@ app.get('/stream/:id', async (req, res) => {
 });
 
 app.listen(PORT, () => console.log(`Web on ${PORT}`));
-        function detectTeraboxUrl(text) {
+      function detectTeraboxUrl(text) {
   if (!text) return null;
   const domains = ['terabox\\.com','terabox\\.app','terabox\\.link','terabox\\.club','terabox\\.fun','terabox\\.cc','terabox\\.top','terabox\\.online','1024tera\\.com','1024terabox\\.com','4funbox\\.com','4funbox\\.co','mirrobox\\.com','nephobox\\.com','momerybox\\.com','tibibox\\.com','teraboxapp\\.com','teraboxlink\\.com','teraboxshare\\.com','teraboxurl\\.com','teraboxdl\\.com','teraboxdownloader\\.com','terafileshare\\.com','terashare\\.com','terasharelink\\.com','terasharefile\\.com','freeterabox\\.com','gearbox\\.app','teraboxcdn\\.com','terabox\\.store','terabox\\.site','terabox\\.space','terabox\\.website','dubox\\.com','terabox\\.icu','terabox\\.xyz','diskwala\\.com'];
   const regex = new RegExp(`https?:\\/\\/[^\\s]*(${domains.join('|')})[^\\s]*`, 'i');
@@ -541,7 +525,7 @@ async function waitForApiConnection() {
       })),
     });
     }
-    async function sendWelcome(chatId, uid, editMsgId = null) {
+      async function sendWelcome(chatId, uid, editMsgId = null) {
     const lang = await getUserLang(uid);
     const userData = await getUserKey(uid);
     const statusText = userData ? `✅ ${t(lang, 'api_connected')}` : `⚠️ ${t(lang, 'api_not_connected')}`;
@@ -931,7 +915,7 @@ async function waitForApiConnection() {
 
     if (data === 'menu_logout') {
       await client.editMessage(chatId, {
-        message: msgId,
+        messageId: msgId,
         text: `🚪 <b>${t(lang, 'logout_title')}</b>\n\n${t(lang, 'logout_confirm_text')}\n\n${t(lang, 'logout_safe')}`,
         parseMode: 'html',
         buttons: keyboard([
@@ -957,4 +941,4 @@ async function waitForApiConnection() {
 
   console.log('Bot ready — Power Mode (5 parallel uploads)');
 })();
-              
+        
