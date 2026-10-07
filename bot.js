@@ -32,10 +32,46 @@ const VIDEO_SECRET = (process.env.VIDEO_SECRET || '').trim();
 const APP_NAME = process.env.APP_NAME || 'MayaJaal';
 const APP_UA_KEYWORD = (process.env.APP_UA_KEYWORD || 'MayaJaalApp').trim();
 
+// ===== 🌟 NEW: SUPABASE SESSION SYNC (Cross-bot login) =====
+const SUPABASE_URL = (process.env.SUPABASE_URL || '').trim();
+const SUPABASE_KEY = (process.env.SUPABASE_KEY || '').trim();
+
+const SB_HEADERS = {
+  'apikey': SUPABASE_KEY,
+  'Authorization': `Bearer ${SUPABASE_KEY}`,
+  'Content-Type': 'application/json',
+  'Prefer': 'return=representation',
+};
+
+async function sbGetUser(telegramId) {
+  if (!SUPABASE_URL || !SUPABASE_KEY) return null;
+  try {
+    const r = await axios.get(
+      `${SUPABASE_URL}/rest/v1/users?id=eq.${encodeURIComponent(String(telegramId))}&limit=1`,
+      { headers: SB_HEADERS, timeout: 8000 }
+    );
+    return (r.data && r.data[0]) ? r.data[0] : null;
+  } catch (e) { return null; }
+}
+
+async function sbUpsertUser(telegramId, updates) {
+  if (!SUPABASE_URL || !SUPABASE_KEY) return null;
+  try {
+    const r = await axios.post(
+      `${SUPABASE_URL}/rest/v1/users?on_conflict=id`,
+      { id: String(telegramId), username: 'user', joined: Date.now(), balance: 0, links_count: 0, clicks: 0, ...updates },
+      { headers: { ...SB_HEADERS, 'Prefer': 'resolution=merge-duplicates,return=representation' }, timeout: 8000 }
+    );
+    return r.data;
+  } catch (e) { console.error('[SB UPSERT]', e.response ? e.response.data : e.message); return null; }
+}
+// ===== END NEW =====
+
 console.log('=== ENV ===');
 console.log('BOT_TOKEN:', !!TOKEN, '| API_ID:', !!API_ID, '| API_HASH:', !!API_HASH);
 console.log('R2:', !!(R2_ACCOUNT_ID && R2_ACCESS_KEY_ID && R2_SECRET_ACCESS_KEY && R2_BUCKET_NAME));
 console.log('VIDEO_SECRET:', VIDEO_SECRET.length >= 20 ? 'OK' : 'MISSING/WEAK!');
+console.log('SUPABASE SYNC:', !!(SUPABASE_URL && SUPABASE_KEY) ? 'OK' : 'DISABLED');
 
 if (!TOKEN || !API_ID || !API_HASH) throw new Error('Missing BOT_TOKEN / API_ID / API_HASH');
 if (!R2_ACCOUNT_ID || !R2_ACCESS_KEY_ID || !R2_SECRET_ACCESS_KEY || !R2_BUCKET_NAME) throw new Error('Missing R2 config');
@@ -83,6 +119,28 @@ async function saveUserLang(tgId, lang) {
   try { await redis.set(`lang:${tgId}`, lang); } catch (e) { }
 }
 
+// ===== 🌟 NEW: CROSS-BOT SESSION HELPERS =====
+async function getUserKeySynced(telegramId) {
+  // Step 1: Check local Redis first (fast)
+  const local = await getUserKey(telegramId);
+  if (local && local.apiKey) return local;
+
+  // Step 2: Fallback to Supabase (cross-bot session)
+  const sbUser = await sbGetUser(telegramId);
+  if (sbUser && sbUser.is_logged_in === true && sbUser.api_key) {
+    await saveUserKey(telegramId, sbUser.api_key);
+    return { apiKey: sbUser.api_key, connectedAt: Date.now() };
+  }
+  return null;
+}
+
+async function setUserLogin(telegramId, status, apiKey = null) {
+  const updates = { is_logged_in: status };
+  if (apiKey !== null) updates.api_key = apiKey;
+  await sbUpsertUser(telegramId, updates);
+}
+// ===== END NEW =====
+
 const r2 = new S3Client({
   region: 'auto',
   endpoint: `https://${R2_ACCOUNT_ID}.r2.cloudflarestorage.com`,
@@ -111,7 +169,7 @@ function verifyVideoSig(videoId, token) {
   const expected = crypto.createHmac('sha256', VIDEO_SECRET).update(payload).digest('hex').substring(0, 16);
   try { return crypto.timingSafeEqual(Buffer.from(sig), Buffer.from(expected)); }
   catch (e) { return false; }
-}
+    }
 const T = {
   en: {
     welcome_title: 'M A Y A  J A A L',
@@ -437,7 +495,7 @@ app.get('/stream/:id', async (req, res) => {
 });
 
 app.listen(PORT, () => console.log(`Web on ${PORT}`));
-    function detectTeraboxUrl(text) {
+function detectTeraboxUrl(text) {
   if (!text) return null;
   const domains = ['terabox\\.com','terabox\\.app','terabox\\.link','terabox\\.club','terabox\\.fun','terabox\\.cc','terabox\\.top','terabox\\.online','1024tera\\.com','1024terabox\\.com','4funbox\\.com','4funbox\\.co','mirrobox\\.com','nephobox\\.com','momerybox\\.com','tibibox\\.com','teraboxapp\\.com','teraboxlink\\.com','teraboxshare\\.com','teraboxurl\\.com','teraboxdl\\.com','teraboxdownloader\\.com','terafileshare\\.com','terashare\\.com','terasharelink\\.com','terasharefile\\.com','freeterabox\\.com','gearbox\\.app','teraboxcdn\\.com','terabox\\.store','terabox\\.site','terabox\\.space','terabox\\.website','dubox\\.com','terabox\\.icu','terabox\\.xyz','diskwala\\.com'];
   const regex = new RegExp(`https?:\\/\\/[^\\s]*(${domains.join('|')})[^\\s]*`, 'i');
@@ -541,9 +599,10 @@ async function waitForApiConnection() {
       })),
     });
   }
-    async function sendWelcome(chatId, uid, editMsgId = null) {
+
+  async function sendWelcome(chatId, uid, editMsgId = null) {
     const lang = await getUserLang(uid);
-    const userData = await getUserKey(uid);
+    const userData = await getUserKeySynced(uid);
     const statusText = userData ? `✅ ${t(lang, 'api_connected')}` : `⚠️ ${t(lang, 'api_not_connected')}`;
 
     const text =
@@ -656,8 +715,7 @@ async function waitForApiConnection() {
     }
     await client.sendMessage(chatId, { message: text, parseMode: 'html', buttons: keyboard(rows) });
   }
-
-  async function handleDirectFile(msg, uid, lang) {
+    async function handleDirectFile(msg, uid, lang) {
     const chatId = msg.chatId;
     const doc = msg.media && msg.media.document;
     if (!doc) return;
@@ -809,6 +867,7 @@ async function waitForApiConnection() {
           return;
         }
         await saveUserKey(uid, key);
+        await setUserLogin(uid, true, key); // 🌟 NEW: Sync to Supabase for cross-bot login
         await client.sendMessage(chatId, {
           message: `✅ <b>${t(lang, 'api_key_connected')}</b>\n\n🔑 <code>${escapeHtml(key.substring(0, 8))}...</code>\n\n📤 <b>${t(lang, 'now_send_video')}</b>`,
           parseMode: 'html',
@@ -823,6 +882,7 @@ async function waitForApiConnection() {
           return;
         }
         await deleteUserKey(uid);
+        await setUserLogin(uid, false, ''); // 🌟 NEW: Sync logout to Supabase
         await client.sendMessage(chatId, {
           message: `✅ <b>${t(lang, 'logout_success')}</b>\n\n${t(lang, 'logout_disconnected')}\n${t(lang, 'logout_restart')}`,
           parseMode: 'html',
@@ -830,7 +890,7 @@ async function waitForApiConnection() {
         return;
       }
 
-      const userData = await getUserKey(uid);
+      const userData = await getUserKeySynced(uid); // 🌟 CHANGED: Cross-bot session check
       const teraboxUrl = detectTeraboxUrl(text);
       const hasMedia = !!msg.media;
 
@@ -942,8 +1002,9 @@ async function waitForApiConnection() {
       return;
     }
 
-    (data === 'confirm_logout') {
+    if (data === 'confirm_logout') {
       await deleteUserKey(uid);
+      await setUserLogin(uid, false, ''); // 🌟 NEW: Sync logout to Supabase
       await client.editMessage(chatId, {
         messageId: msgId,
         text: `✅ <b>${t(lang, 'logout_success')}</b>\n\n${t(lang, 'logout_disconnected')}\n${t(lang, 'logout_restart')}`,
@@ -957,4 +1018,3 @@ async function waitForApiConnection() {
 
   console.log('Bot ready — Power Mode (5 parallel uploads)');
 })();
-      
