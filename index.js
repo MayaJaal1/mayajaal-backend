@@ -203,5 +203,22 @@ app.get('/maya/:msgId', async (req, res) => {
   }
 });
 
+// ═══════════════════════════════════════════
+// ANDROID APP LINK VERIFICATION (Assetlinks)
+// ═══════════════════════════════════════════
+app.get('/.well-known/assetlinks.json', (req, res) => {
+  res.json([
+    {
+      "relation": ["delegate_permission/common.handle_all_urls"],
+      "target": {
+        "namespace": "android_app",
+        "package_name": "com.example.mayajaall",
+        "sha256_cert_fingerprints": [
+          "11:EE:5A:9A:37:60:BB:80:3F:5E:4F:9B:3B:88:C4:C2:14:6A:C4:2E:D0:60:B1:98:20:9E:58:F8:2D:7F:ED:74"
+        ]
+      }
+    }
+  ]);
+});
+
 module.exports = app;
-        
