@@ -329,7 +329,7 @@ const T = {
 function t(lang, key) {
   return (T[lang] && T[lang][key]) || T.en[key] || key;
 }
-  const app = express();
+const app = express();
 app.use(express.json());
 
 app.use((req, res, next) => {
@@ -381,19 +381,22 @@ app.get('/api/v/:id', async (req, res) => {
   return res.json({ id: videoId, name: meta.name || 'Video', size: meta.size || 0, mime: meta.mime || 'video/mp4' });
 });
 
-// Yahan naya route jod diya hai taaki app connection error na de[span_4](start_span)[span_4](end_span)[span_5](start_span)[span_5](end_span)[span_6](start_span)[span_6](end_span)
 app.get('/api/stream-info/:id', async (req, res) => {
-  const videoId = req.params.id;
-  const meta = await getMeta(videoId);
-  if (!meta) {
-    return res.status(404).json({ success: false, error: 'Video not found or expired' });
+  try {
+    const videoId = req.params.id;
+    const meta = await getMeta(videoId);
+    if (!meta || !meta.r2Key) {
+      return res.status(404).json({ success: false, error: 'Video not found or expired' });
+    }
+    return res.json({
+      success: true,
+      url: `${BASE_URL}/stream/${videoId}?t=${signVideo(videoId, 720)}`,
+      title: meta.name || 'Video',
+      uploader: '@MayaJaalBot'
+    });
+  } catch (err) {
+    return res.status(500).json({ success: false, error: err.message });
   }
-  return res.json({
-    success: true,
-    url: `${BASE_URL}/stream/${videoId}?t=${signVideo(videoId, 720)}`,
-    title: meta.name || 'Video',
-    uploader: '@MayaJaalBot'
-  });
 });
 
 app.get('/stream/:id', async (req, res) => {
@@ -480,8 +483,7 @@ async function waitForApiConnection() {
     console.log('[BOT] ⏳ Not connected yet. Retrying in 10s...');
     await new Promise(r => setTimeout(r, 10000));
   }
-}
-
+    }
 (async () => {
   await waitForApiConnection();
 
@@ -906,7 +908,7 @@ async function waitForApiConnection() {
       const newLang = data === 'set_lang_en' ? 'en' : 'hi';
       await saveUserLang(uid, newLang);
       await client.editMessage(chatId, {
-        message: msgId,
+        messageId: msgId,
         text: `✅ <b>${t(newLang, 'lang_changed')}</b>\n\n🌐 ${t(newLang, 'lang_changed_to')} <b>${newLang === 'hi' ? 'हिंदी' : 'English'}</b>`,
         parseMode: 'html',
         buttons: keyboard([[{ text: `⬅️ ${t(newLang, 'btn_main_menu')}`, callback_data: 'main_menu' }]]),
@@ -930,7 +932,7 @@ async function waitForApiConnection() {
     if (data === 'confirm_logout') {
       await deleteUserKey(uid);
       await client.editMessage(chatId, {
-        message: msgId,
+        messageId: msgId,
         text: `✅ <b>${t(lang, 'logout_success')}</b>\n\n${t(lang, 'logout_disconnected')}\n${t(lang, 'logout_restart')}`,
         parseMode: 'html',
       });
