@@ -113,9 +113,6 @@ function verifyVideoSig(videoId, token) {
   catch (e) { return false; }
 }
 
-// ============================================================
-// TRANSLATIONS (Hindi + English)
-// ============================================================
 const T = {
   en: {
     welcome_title: 'M A Y A  J A A L',
@@ -332,10 +329,7 @@ const T = {
 function t(lang, key) {
   return (T[lang] && T[lang][key]) || T.en[key] || key;
 }
-// ============================================================
-// EXPRESS SERVER
-// ============================================================
-const app = express();
+  const app = express();
 app.use(express.json());
 
 app.use((req, res, next) => {
@@ -387,6 +381,21 @@ app.get('/api/v/:id', async (req, res) => {
   return res.json({ id: videoId, name: meta.name || 'Video', size: meta.size || 0, mime: meta.mime || 'video/mp4' });
 });
 
+// Yahan naya route jod diya hai taaki app connection error na de[span_4](start_span)[span_4](end_span)[span_5](start_span)[span_5](end_span)[span_6](start_span)[span_6](end_span)
+app.get('/api/stream-info/:id', async (req, res) => {
+  const videoId = req.params.id;
+  const meta = await getMeta(videoId);
+  if (!meta) {
+    return res.status(404).json({ success: false, error: 'Video not found or expired' });
+  }
+  return res.json({
+    success: true,
+    url: `${BASE_URL}/stream/${videoId}?t=${signVideo(videoId, 720)}`,
+    title: meta.name || 'Video',
+    uploader: '@MayaJaalBot'
+  });
+});
+
 app.get('/stream/:id', async (req, res) => {
   try {
     const videoId = req.params.id;
@@ -412,9 +421,7 @@ app.get('/stream/:id', async (req, res) => {
 });
 
 app.listen(PORT, () => console.log(`Web on ${PORT}`));
-
-// ===== TERABOX HELPERS =====
-function detectTeraboxUrl(text) {
+      function detectTeraboxUrl(text) {
   if (!text) return null;
   const domains = ['terabox\\.com','terabox\\.app','terabox\\.link','terabox\\.club','terabox\\.fun','terabox\\.cc','terabox\\.top','terabox\\.online','1024tera\\.com','1024terabox\\.com','4funbox\\.com','4funbox\\.co','mirrobox\\.com','nephobox\\.com','momerybox\\.com','tibibox\\.com','teraboxapp\\.com','teraboxlink\\.com','teraboxshare\\.com','teraboxurl\\.com','teraboxdl\\.com','teraboxdownloader\\.com','terafileshare\\.com','terashare\\.com','terasharelink\\.com','terasharefile\\.com','freeterabox\\.com','gearbox\\.app','teraboxcdn\\.com','terabox\\.store','terabox\\.site','terabox\\.space','terabox\\.website','dubox\\.com','terabox\\.icu','terabox\\.xyz','diskwala\\.com'];
   const regex = new RegExp(`https?:\\/\\/[^\\s]*(${domains.join('|')})[^\\s]*`, 'i');
@@ -473,10 +480,8 @@ async function waitForApiConnection() {
     console.log('[BOT] ⏳ Not connected yet. Retrying in 10s...');
     await new Promise(r => setTimeout(r, 10000));
   }
-        }
-        // ============================================================
-// BOT
-// ============================================================
+}
+
 (async () => {
   await waitForApiConnection();
 
@@ -765,10 +770,8 @@ async function waitForApiConnection() {
       await client.deleteMessages(chatId, [status.id], { revoke: true }).catch(() => {});
       await client.sendMessage(chatId, { message: `❌ ${escapeHtml(e.message)}`, parseMode: 'html' });
     }
-      }
-    // ============================================================
-  // MESSAGE HANDLER
-  // ============================================================
+  }
+
   client.addEventHandler(async (event) => {
     try {
       const msg = event.message;
@@ -839,9 +842,6 @@ async function waitForApiConnection() {
     }
   }, new NewMessage({}));
 
-  // ============================================================
-  // CALLBACK HANDLER
-  // ============================================================
   client.addEventHandler(async (event) => {
     const q = event.query;
     if (!q) return;
