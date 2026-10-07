@@ -404,8 +404,6 @@ app.get('/stream/:id', async (req, res) => {
     const videoId = req.params.id;
     const token = req.query.t || req.query.s || '';
     if (!verifyVideoSig(videoId, token)) return res.status(403).send('Forbidden');
-    const ua = req.headers['user-agent'] || '';
-    if (!ua.includes(APP_UA_KEYWORD)) return res.status(403).send('App required');
     const meta = await getMeta(videoId);
     if (!meta?.r2Key) return res.status(404).send('Not found');
     const out = await r2.send(new GetObjectCommand({
