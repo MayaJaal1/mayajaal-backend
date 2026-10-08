@@ -12,6 +12,7 @@ const { Redis } = require('@upstash/redis');
 const { S3Client, GetObjectCommand } = require('@aws-sdk/client-s3');
 const { Upload } = require('@aws-sdk/lib-storage');
 const { getCentralConfig } = require('./config');
+const admin = require('firebase-admin');
 
 process.on('uncaughtException', (e) => console.error('[Uncaught]', e.stack || e.message));
 process.on('unhandledRejection', (e) => console.error('[Unhandled]', e?.stack || e));
@@ -32,6 +33,45 @@ const VIDEO_SECRET = (process.env.VIDEO_SECRET || '').trim();
 const APP_NAME = process.env.APP_NAME || 'MayaJaal';
 const APP_UA_KEYWORD = (process.env.APP_UA_KEYWORD || 'MayaJaalApp').trim();
 
+// ===== 🌟 FIREBASE ADMIN INITIALIZATION =====
+try {
+  if (!admin.apps.length) {
+    if (process.env.FIREBASE_PROJECT_ID) {
+      admin.initializeApp({
+        credential: admin.credential.cert({
+          projectId: process.env.FIREBASE_PROJECT_ID,
+          clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
+          privateKey: process.env.FIREBASE_PRIVATE_KEY ? process.env.FIREBASE_PRIVATE_KEY.replace(/\\n/g, '\n') : undefined,
+        })
+      });
+    } else {
+      admin.initializeApp();
+    }
+    console.log('Firebase Admin initialized successfully');
+  }
+} catch (e) {
+  console.error('[Firebase Init Error]', e.message);
+}
+
+async function saveLinkToFirebase(shortId, userId, originalUrl) {
+  try {
+    if (admin.apps.length) {
+      await admin.firestore().collection('links').doc(shortId).set({
+        userId: String(userId),
+        originalUrl: originalUrl || '',
+        views: 0,
+        user_watches: {},
+        user_contributed: {},
+        created_at: admin.firestore.FieldValue.serverTimestamp()
+      }, { merge: true });
+      console.log(`[Firebase] Link ${shortId} saved for user ${userId}`);
+    }
+  } catch (e) {
+    console.error('[Firebase Save Error]', e.message);
+  }
+}
+
+// ===== SUPABASE SESSION SYNC =====
 const SUPABASE_URL = (process.env.SUPABASE_URL || '').trim();
 const SUPABASE_KEY = (process.env.SUPABASE_KEY || '').trim();
 
@@ -64,36 +104,6 @@ async function sbUpsertUser(telegramId, updates) {
     return r.data;
   } catch (e) { console.error('[SB UPSERT]', e.response ? e.response.data : e.message); return null; }
 }
-
-// 🌟 NEW: Save link owner reference for view tracking & monetization
-async function sbSaveLink(shortId, userId, originalUrl) {
-  if (!SUPABASE_URL || !SUPABASE_KEY) return;
-  try {
-    await axios.post(
-      `${SUPABASE_URL}/rest/v1/links?on_conflict=id`,
-      {
-        id: shortId,
-        user_id: String(userId),
-        original_url: originalUrl || '',
-        views: 0,
-        created_at: new Date().toISOString()
-      },
-      { headers: { ...SB_HEADERS, 'Prefer': 'resolution=merge-duplicates' }, timeout: 8000 }
-    );
-  } catch (e) {
-    console.error('[SB SAVE LINK]', e.response ? e.response.data : e.message);
-  }
-}
-
-console.log('=== ENV ===');
-console.log('BOT_TOKEN:', !!TOKEN, '| API_ID:', !!API_ID, '| API_HASH:', !!API_HASH);
-console.log('R2:', !!(R2_ACCOUNT_ID && R2_ACCESS_KEY_ID && R2_SECRET_ACCESS_KEY && R2_BUCKET_NAME));
-console.log('VIDEO_SECRET:', VIDEO_SECRET.length >= 20 ? 'OK' : 'MISSING/WEAK!');
-console.log('SUPABASE SYNC:', !!(SUPABASE_URL && SUPABASE_KEY) ? 'OK' : 'DISABLED');
-
-if (!TOKEN || !API_ID || !API_HASH) throw new Error('Missing BOT_TOKEN / API_ID / API_HASH');
-if (!R2_ACCOUNT_ID || !R2_ACCESS_KEY_ID || !R2_SECRET_ACCESS_KEY || !R2_BUCKET_NAME) throw new Error('Missing R2 config');
-if (VIDEO_SECRET.length < 20) throw new Error('VIDEO_SECRET missing or too weak');
 
 let redis;
 try { redis = Redis.fromEnv(); console.log('Redis connected'); }
@@ -170,6 +180,7 @@ function signVideo(videoId, expiresInHours = 720) {
   const sig = crypto.createHmac('sha256', VIDEO_SECRET).update(payload).digest('hex').substring(0, 16);
   return `${exp}.${sig}`;
 }
+
 function verifyVideoSig(videoId, token) {
   if (!token || typeof token !== 'string') return false;
   const parts = token.split('.');
@@ -183,7 +194,6 @@ function verifyVideoSig(videoId, token) {
   try { return crypto.timingSafeEqual(Buffer.from(sig), Buffer.from(expected)); }
   catch (e) { return false; }
 }
-
 const T = {
   en: {
     welcome_title: 'M A Y A  J A A L',
@@ -399,8 +409,9 @@ const T = {
 
 function t(lang, key) {
   return (T[lang] && T[lang][key]) || T.en[key] || key;
-      }
-    const app = express();
+}
+
+const app = express();
 app.use(express.json());
 
 app.use((req, res, next) => {
@@ -568,8 +579,8 @@ async function waitForApiConnection() {
     console.log('[BOT] ⏳ Not connected yet. Retrying in 10s...');
     await new Promise(r => setTimeout(r, 10000));
   }
-}
-(async () => {
+    }
+    (async () => {
   await waitForApiConnection();
 
   const client = new TelegramClient(new StringSession(''), API_ID, API_HASH, {
@@ -727,7 +738,7 @@ async function waitForApiConnection() {
       try { await client.editMessage(chatId, { message: editMsgId, text, parseMode: 'html', buttons: keyboard(rows) }); return; } catch (e) { }
     }
     await client.sendMessage(chatId, { message: text, parseMode: 'html', buttons: keyboard(rows) });
-  }
+   }
       async function handleDirectFile(msg, uid, lang) {
     const chatId = msg.chatId;
     const doc = msg.media && msg.media.document;
@@ -805,10 +816,11 @@ async function waitForApiConnection() {
 
       const shortId = crypto.randomBytes(4).toString('hex');
       await saveMeta(shortId, { name: fileName, mime, r2Key, size, ts: Date.now() });
-      await sbSaveLink(shortId, uid, fileName); // 🌟 Associate link with user for earnings/views
-
       const token = signVideo(shortId, 720);
       const playUrl = `${BASE_URL}/stream/${shortId}?t=${token}`;
+
+      // 🌟 SAVING TO FIREBASE FOR VIEW & EARNINGS TRACKING
+      await saveLinkToFirebase(shortId, uid, playUrl);
 
       await client.deleteMessages(chatId, [status.id], { revoke: true }).catch(() => {});
       await client.sendMessage(chatId, {
@@ -846,10 +858,12 @@ async function waitForApiConnection() {
       await upload.done();
       const shortId = crypto.randomBytes(4).toString('hex');
       await saveMeta(shortId, { name: info.fileName, mime: 'video/mp4', r2Key, size: info.size, ts: Date.now() });
-      await sbSaveLink(shortId, uid, teraboxUrl); // 🌟 Associate Terabox link with user
-
       const token = signVideo(shortId, 720);
       const playUrl = `${BASE_URL}/stream/${shortId}?t=${token}`;
+
+      // 🌟 SAVING TO FIREBASE FOR VIEW & EARNINGS TRACKING
+      await saveLinkToFirebase(shortId, uid, playUrl);
+
       await client.deleteMessages(chatId, [status.id], { revoke: true }).catch(() => {});
       await client.sendMessage(chatId, {
         message: `✅ <b>${t(lang, 'ready_app_only')}</b>\n\n📌 <b>${escapeHtml(info.fileName)}</b>\n📦 ${(info.size / 1024 / 1024).toFixed(2)} MB\n\n🔒 <b>${t(lang, 'app_only_note')}</b>\n\n▶️ <b>${t(lang, 'player_link')}:</b>\n${playUrl}`,
@@ -1035,4 +1049,3 @@ async function waitForApiConnection() {
 
   console.log('Bot ready — Power Mode (5 parallel uploads)');
 })();
-                                 
