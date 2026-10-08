@@ -655,6 +655,7 @@ async function waitForApiConnection() {
       `<i>${t(lang, 'nav_hint')} 👇</i>`;
 
     const rows = [
+      [{ text: '💰 Income & Views', callback_data: 'menu_income' }]
       [{ text: `🔑 ${t(lang, 'btn_api')}`, callback_data: 'menu_api' }, { text: `📖 ${t(lang, 'btn_help')}`, callback_data: 'menu_help' }],
       [{ text: `🤖 ${t(lang, 'btn_allbots')}`, callback_data: 'menu_allbots' }, { text: `📊 ${t(lang, 'btn_account')}`, callback_data: 'menu_account' }],
       [{ text: `⚙️ ${t(lang, 'btn_settings')}`, callback_data: 'menu_settings' }, { text: `🚪 ${t(lang, 'btn_logout')}`, callback_data: 'menu_logout' }],
