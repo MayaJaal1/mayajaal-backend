@@ -33,7 +33,14 @@ const VIDEO_SECRET = (process.env.VIDEO_SECRET || '').trim();
 const APP_NAME = process.env.APP_NAME || 'MayaJaal';
 const APP_UA_KEYWORD = (process.env.APP_UA_KEYWORD || 'MayaJaalApp').trim();
 
+if (!TOKEN || !API_ID || !API_HASH) throw new Error('Missing BOT_TOKEN / API_ID / API_HASH');
+if (!R2_ACCOUNT_ID || !R2_ACCESS_KEY_ID || !R2_SECRET_ACCESS_KEY || !R2_BUCKET_NAME) throw new Error('Missing R2 config');
+if (VIDEO_SECRET.length < 20) throw new Error('VIDEO_SECRET missing or too weak');
+
 // ===== FIREBASE ADMIN INITIALIZATION =====
+let db = null;
+let firebaseReady = false;
+
 try {
   if (!admin.apps.length) {
     if (process.env.FIREBASE_PROJECT_ID) {
@@ -41,119 +48,164 @@ try {
         credential: admin.credential.cert({
           projectId: process.env.FIREBASE_PROJECT_ID,
           clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
-          privateKey: process.env.FIREBASE_PRIVATE_KEY ? process.env.FIREBASE_PRIVATE_KEY.replace(/\\n/g, '\n') : undefined,
-        })
+          privateKey: process.env.FIREBASE_PRIVATE_KEY
+            ? process.env.FIREBASE_PRIVATE_KEY.replace(/\\n/g, '\n')
+            : undefined,
+        }),
       });
     } else {
       admin.initializeApp();
     }
-    console.log('Firebase Admin initialized successfully');
+    console.log('[Firebase] Admin initialized');
   }
+  db = admin.firestore();
+  firebaseReady = true;
+  console.log('[Firestore] ✅ Connected');
 } catch (e) {
   console.error('[Firebase Init Error]', e.message);
+  console.error('[Firebase] Bot will run but database features disabled');
 }
 
-async function saveLinkToFirebase(shortId, userId, originalUrl) {
+function getDb() {
+  if (!firebaseReady || !db) throw new Error('Firestore not initialized');
+  return db;
+}
+
+// ===== FIREBASE USER HELPERS (replaces Supabase) =====
+async function fbGetUser(telegramId) {
+  if (!firebaseReady) return null;
   try {
-    if (admin.apps.length) {
-      await admin.firestore().collection('links').doc(shortId).set({
-        userId: String(userId),
-        originalUrl: originalUrl || '',
-        views: 0,
-        user_watches: {},
-        user_contributed: {},
-        created_at: admin.firestore.FieldValue.serverTimestamp()
-      }, { merge: true });
-      console.log(`[Firebase] Link ${shortId} saved for user ${userId}`);
-    }
+    const doc = await getDb().collection('users').doc(String(telegramId)).get();
+    return doc.exists ? { id: doc.id, ...doc.data() } : null;
+  } catch (e) {
+    console.error('[FB GET USER]', e.message);
+    return null;
+  }
+}
+
+async function fbSaveUser(telegramId, data) {
+  if (!firebaseReady) return null;
+  try {
+    const payload = {
+      username: data.username || 'user',
+      joined: data.joined || Date.now(),
+      balance: data.balance || 0,
+      links_count: data.links_count || 0,
+      clicks: data.clicks || 0,
+      api_key: data.api_key || '',
+      is_logged_in: data.is_logged_in !== undefined ? data.is_logged_in : false,
+    };
+    await getDb().collection('users').doc(String(telegramId)).set(payload, { merge: true });
+    return { id: String(telegramId), ...payload };
+  } catch (e) {
+    console.error('[FB SAVE USER]', e.message);
+    return null;
+  }
+}
+
+async function fbUpdateUser(telegramId, updates) {
+  if (!firebaseReady) return;
+  try {
+    await getDb().collection('users').doc(String(telegramId)).set(updates, { merge: true });
+  } catch (e) {
+    console.error('[FB UPDATE USER]', e.message);
+  }
+}
+
+async function fbGetUserByApiKey(apiKey) {
+  if (!firebaseReady) return null;
+  try {
+    const snap = await getDb().collection('users').where('api_key', '==', apiKey).limit(1).get();
+    if (snap.empty) return null;
+    const doc = snap.docs[0];
+    return { id: doc.id, ...doc.data() };
+  } catch (e) {
+    console.error('[FB GET USER BY API]', e.message);
+    return null;
+  }
+}
+
+// ===== SAVE VIDEO LINK TO FIREBASE (for tracking) =====
+async function saveLinkToFirebase(shortId, userId, originalUrl) {
+  if (!firebaseReady) return;
+  try {
+    await getDb().collection('links').doc(shortId).set({
+      userId: String(userId),
+      originalUrl: originalUrl || '',
+      views: 0,
+      user_watches: {},
+      user_contributed: {},
+      created_at: admin.firestore.FieldValue.serverTimestamp(),
+    }, { merge: true });
+    console.log(`[Firebase] Link ${shortId} saved for user ${userId}`);
   } catch (e) {
     console.error('[Firebase Save Error]', e.message);
   }
 }
 
-// ===== SUPABASE SESSION SYNC =====
-const SUPABASE_URL = (process.env.SUPABASE_URL || '').trim();
-const SUPABASE_KEY = (process.env.SUPABASE_KEY || '').trim();
-
-const SB_HEADERS = {
-  'apikey': SUPABASE_KEY,
-  'Authorization': `Bearer ${SUPABASE_KEY}`,
-  'Content-Type': 'application/json',
-  'Prefer': 'return=representation',
-};
-
-async function sbGetUser(telegramId) {
-  if (!SUPABASE_URL || !SUPABASE_KEY) return null;
-  try {
-    const r = await axios.get(
-      `${SUPABASE_URL}/rest/v1/users?id=eq.${encodeURIComponent(String(telegramId))}&limit=1`,
-      { headers: SB_HEADERS, timeout: 8000 }
-    );
-    return (r.data && r.data[0]) ? r.data[0] : null;
-  } catch (e) { return null; }
-}
-
-async function sbUpsertUser(telegramId, updates) {
-  if (!SUPABASE_URL || !SUPABASE_KEY) return null;
-  try {
-    const r = await axios.post(
-      `${SUPABASE_URL}/rest/v1/users?on_conflict=id`,
-      { id: String(telegramId), username: 'user', joined: Date.now(), balance: 0, links_count: 0, clicks: 0, ...updates },
-      { headers: { ...SB_HEADERS, 'Prefer': 'resolution=merge-duplicates,return=representation' }, timeout: 8000 }
-    );
-    return r.data;
-  } catch (e) { console.error('[SB UPSERT]', e.response ? e.response.data : e.message); return null; }
-}
-
+// ===== REDIS =====
 let redis;
-try { redis = Redis.fromEnv(); console.log('Redis connected'); }
-catch (e) { console.log('Redis not available'); redis = { get: async () => null, set: async () => null, del: async () => null }; }
+try {
+  redis = Redis.fromEnv();
+  console.log('Redis connected');
+} catch (e) {
+  console.log('Redis not available');
+  redis = { get: async () => null, set: async () => null, del: async () => null };
+}
 
 const memStore = new Map();
 
 async function saveMeta(id, payload) {
   memStore.set(id, payload);
-  try { await redis.set(`v:${id}`, JSON.stringify(payload), { ex: 30 * 86400 }); } catch (e) { }
+  try { await redis.set(`v:${id}`, JSON.stringify(payload), { ex: 30 * 86400 }); } catch (e) {}
 }
 async function getMeta(id) {
   if (memStore.has(id)) return memStore.get(id);
   try {
     const raw = await redis.get(`v:${id}`);
-    if (raw) { const d = typeof raw === 'string' ? JSON.parse(raw) : raw; memStore.set(id, d); return d; }
-  } catch (e) { }
+    if (raw) {
+      const d = typeof raw === 'string' ? JSON.parse(raw) : raw;
+      memStore.set(id, d);
+      return d;
+    }
+  } catch (e) {}
   return null;
 }
 async function getUserKey(tgId) {
   try {
     const raw = await redis.get(`apikey:${tgId}`);
     if (raw) return typeof raw === 'string' ? JSON.parse(raw) : raw;
-  } catch (e) { }
+  } catch (e) {}
   return null;
 }
 async function saveUserKey(tgId, key) {
-  try { await redis.set(`apikey:${tgId}`, JSON.stringify({ apiKey: key, connectedAt: Date.now() })); } catch (e) { }
+  try {
+    await redis.set(`apikey:${tgId}`, JSON.stringify({ apiKey: key, connectedAt: Date.now() }));
+  } catch (e) {}
 }
 async function deleteUserKey(tgId) {
-  try { await redis.del(`apikey:${tgId}`); } catch (e) { }
+  try { await redis.del(`apikey:${tgId}`); } catch (e) {}
 }
 async function getUserLang(tgId) {
   try {
     const raw = await redis.get(`lang:${tgId}`);
     if (raw) return typeof raw === 'string' ? raw.replace(/"/g, '') : 'en';
-  } catch (e) { }
+  } catch (e) {}
   return 'en';
 }
 async function saveUserLang(tgId, lang) {
-  try { await redis.set(`lang:${tgId}`, lang); } catch (e) { }
+  try { await redis.set(`lang:${tgId}`, lang); } catch (e) {}
 }
 
+// ===== CROSS-BOT SESSION SYNC (Firebase) =====
 async function getUserKeySynced(telegramId) {
   const local = await getUserKey(telegramId);
   if (local && local.apiKey) return local;
-  const sbUser = await sbGetUser(telegramId);
-  if (sbUser && sbUser.is_logged_in === true && sbUser.api_key) {
-    await saveUserKey(telegramId, sbUser.api_key);
-    return { apiKey: sbUser.api_key, connectedAt: Date.now() };
+
+  const user = await fbGetUser(telegramId);
+  if (user && user.is_logged_in === true && user.api_key) {
+    await saveUserKey(telegramId, user.api_key);
+    return { apiKey: user.api_key, connectedAt: Date.now() };
   }
   return null;
 }
@@ -161,15 +213,17 @@ async function getUserKeySynced(telegramId) {
 async function setUserLogin(telegramId, status, apiKey = null) {
   const updates = { is_logged_in: status };
   if (apiKey !== null) updates.api_key = apiKey;
-  await sbUpsertUser(telegramId, updates);
+  await fbUpdateUser(telegramId, updates);
 }
 
+// ===== R2 =====
 const r2 = new S3Client({
   region: 'auto',
   endpoint: `https://${R2_ACCOUNT_ID}.r2.cloudflarestorage.com`,
   credentials: { accessKeyId: R2_ACCESS_KEY_ID, secretAccessKey: R2_SECRET_ACCESS_KEY },
 });
 
+// ===== HELPERS =====
 function escapeHtml(s = '') {
   return String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 }
@@ -191,9 +245,13 @@ function verifyVideoSig(videoId, token) {
   if (Math.floor(Date.now() / 1000) > exp) return false;
   const payload = `${videoId}.${exp}`;
   const expected = crypto.createHmac('sha256', VIDEO_SECRET).update(payload).digest('hex').substring(0, 16);
-  try { return crypto.timingSafeEqual(Buffer.from(sig), Buffer.from(expected)); }
-  catch (e) { return false; }
+  try {
+    return crypto.timingSafeEqual(Buffer.from(sig), Buffer.from(expected));
+  } catch (e) { return false; }
 }
+// ============================================================
+// TRANSLATIONS (Hindi + English)
+// ============================================================
 const T = {
   en: {
     welcome_title: 'M A Y A  J A A L',
@@ -411,6 +469,9 @@ function t(lang, key) {
   return (T[lang] && T[lang][key]) || T.en[key] || key;
 }
 
+// ============================================================
+// EXPRESS SERVER
+// ============================================================
 const app = express();
 app.use(express.json());
 
@@ -429,7 +490,12 @@ app.get('/player.html', (req, res) => res.sendFile(path.join(__dirname, 'player.
 app.get('/logo.jpg', (req, res) => res.sendFile(path.join(__dirname, 'logo.jpg')));
 
 app.get('/', (req, res) => res.send('MayaJaal Online'));
-app.get('/health', (req, res) => res.json({ ok: true, uptime: process.uptime(), mode: 'app-only' }));
+app.get('/health', (req, res) => res.json({
+  ok: true,
+  uptime: process.uptime(),
+  mode: 'app-only',
+  firebase: firebaseReady,
+}));
 
 app.get('/.well-known/assetlinks.json', (req, res) => {
   res.json([
@@ -451,9 +517,12 @@ app.post('/save-key', async (req, res) => {
     const { telegram_id, key } = req.body;
     if (!telegram_id || !key) return res.status(400).json({ error: 'Missing data' });
     await saveUserKey(telegram_id, key);
+    await fbUpdateUser(telegram_id, { api_key: key, is_logged_in: true });
     console.log(`[API SAVED] tg=${telegram_id}`);
     return res.json({ success: true });
-  } catch (e) { return res.status(500).json({ error: e.message }); }
+  } catch (e) {
+    return res.status(500).json({ error: e.message });
+  }
 });
 
 app.get('/v/:id', async (req, res) => {
@@ -466,7 +535,9 @@ app.get('/v/:id', async (req, res) => {
     const meta = await getMeta(videoId);
     if (!meta) return res.status(404).send('Video not found');
     return res.sendFile(path.join(__dirname, 'player.html'));
-  } catch (e) { return res.status(500).send('err'); }
+  } catch (e) {
+    return res.status(500).send('err');
+  }
 });
 
 app.get('/api/v/:id', async (req, res) => {
@@ -475,10 +546,15 @@ app.get('/api/v/:id', async (req, res) => {
   if (!verifyVideoSig(videoId, token)) return res.status(403).json({ error: 'Invalid token' });
   const meta = await getMeta(videoId);
   if (!meta) return res.status(404).json({ error: 'Not found' });
-  return res.json({ id: videoId, name: meta.name || 'Video', size: meta.size || 0, mime: meta.mime || 'video/mp4' });
+  return res.json({
+    id: videoId,
+    name: meta.name || 'Video',
+    size: meta.size || 0,
+    mime: meta.mime || 'video/mp4',
+  });
 });
 
-// 🔒 FIXED: Token verify + same token return (no re-sign)
+// 🔒 FIXED: token verify + same token return (no re-sign)
 app.get('/api/stream-info/:id', async (req, res) => {
   try {
     const videoId = req.params.id;
@@ -499,7 +575,7 @@ app.get('/api/stream-info/:id', async (req, res) => {
       title: meta.name || 'Video',
       size: meta.size || 0,
       mime: meta.mime || 'video/mp4',
-      uploader: '@MayaJaalBot'
+      uploader: '@MayaJaalBot',
     });
   } catch (err) {
     return res.status(500).json({ success: false, error: err.message });
@@ -511,24 +587,36 @@ app.get('/stream/:id', async (req, res) => {
     const videoId = req.params.id;
     const token = req.query.t || req.query.s || '';
     if (!verifyVideoSig(videoId, token)) return res.status(403).send('Forbidden');
+
     const meta = await getMeta(videoId);
     if (!meta?.r2Key) return res.status(404).send('Not found');
+
     const out = await r2.send(new GetObjectCommand({
-      Bucket: R2_BUCKET_NAME, Key: meta.r2Key,
+      Bucket: R2_BUCKET_NAME,
+      Key: meta.r2Key,
       Range: req.headers.range || undefined,
     }));
+
     res.status(req.headers.range ? 206 : 200);
     res.setHeader('Content-Type', out.ContentType || meta.mime || 'video/mp4');
     res.setHeader('Accept-Ranges', 'bytes');
     res.setHeader('Cache-Control', 'private, max-age=3600');
     if (out.ContentRange) res.setHeader('Content-Range', out.ContentRange);
     if (out.ContentLength) res.setHeader('Content-Length', out.ContentLength);
-    out.Body.on('error', () => { if (!res.headersSent) res.status(500); res.end(); });
+    out.Body.on('error', () => {
+      if (!res.headersSent) res.status(500);
+      res.end();
+    });
     out.Body.pipe(res);
-  } catch (e) { if (!res.headersSent) res.status(500).send('err'); }
+  } catch (e) {
+    if (!res.headersSent) res.status(500).send('err');
+  }
 });
 
 app.listen(PORT, () => console.log(`Web on ${PORT}`));
+// ============================================================
+// TERABOX HELPERS
+// ============================================================
 function detectTeraboxUrl(text) {
   if (!text) return null;
   const domains = ['terabox\\.com','terabox\\.app','terabox\\.link','terabox\\.club','terabox\\.fun','terabox\\.cc','terabox\\.top','terabox\\.online','1024tera\\.com','1024terabox\\.com','4funbox\\.com','4funbox\\.co','mirrobox\\.com','nephobox\\.com','momerybox\\.com','tibibox\\.com','teraboxapp\\.com','teraboxlink\\.com','teraboxshare\\.com','teraboxurl\\.com','teraboxdl\\.com','teraboxdownloader\\.com','terafileshare\\.com','terashare\\.com','terasharelink\\.com','terasharefile\\.com','freeterabox\\.com','gearbox\\.app','teraboxcdn\\.com','terabox\\.store','terabox\\.site','terabox\\.space','terabox\\.website','dubox\\.com','terabox\\.icu','terabox\\.xyz','diskwala\\.com'];
@@ -541,7 +629,11 @@ async function getTeraboxDirectLink(shareUrl) {
   const TERABOX_COOKIE = (process.env.TERABOX_COOKIE || '').trim();
   if (!TERABOX_COOKIE) throw new Error('TERABOX_COOKIE missing');
   const UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36';
-  const pageResp = await axios.get(shareUrl, { headers: { 'User-Agent': UA, 'Cookie': TERABOX_COOKIE }, timeout: 30000, maxRedirects: 5 });
+  const pageResp = await axios.get(shareUrl, {
+    headers: { 'User-Agent': UA, 'Cookie': TERABOX_COOKIE },
+    timeout: 30000,
+    maxRedirects: 5,
+  });
   const html = String(pageResp.data);
   let shareid = null, uk = null, sign = null, timestamp = null, fs_id = null;
   let server_filename = 'video.mp4', size = 0;
@@ -551,32 +643,57 @@ async function getTeraboxDirectLink(shareUrl) {
       const y = JSON.parse(match[1]);
       shareid = y.shareid; uk = y.uk; sign = y.sign; timestamp = y.timestamp;
       const f = y.file_list?.[0];
-      if (f) { fs_id = f.fs_id; server_filename = f.server_filename || server_filename; size = f.size || 0; }
-    } catch (e) { }
+      if (f) {
+        fs_id = f.fs_id;
+        server_filename = f.server_filename || server_filename;
+        size = f.size || 0;
+      }
+    } catch (e) {}
   }
-  if (!shareid) { const m2 = html.match(/"shareid"\s*:\s*"?(\d+)"?[\s\S]{0,3000}?"uk"\s*:\s*"?(\d+)"?/); if (m2) { shareid = m2[1]; uk = m2[2]; } }
+  if (!shareid) {
+    const m2 = html.match(/"shareid"\s*:\s*"?(\d+)"?[\s\S]{0,3000}?"uk"\s*:\s*"?(\d+)"?/);
+    if (m2) { shareid = m2[1]; uk = m2[2]; }
+  }
   if (!sign) { const mS = html.match(/"sign"\s*:\s*"([^"]+)"/); if (mS) sign = mS[1]; }
   if (!timestamp) { const mT = html.match(/"timestamp"\s*:\s*(\d+)/); if (mT) timestamp = mT[1]; }
   if (!fs_id) { const m3 = html.match(/"fs_id"\s*:\s*"?(\d+)"?/); if (m3) fs_id = m3[1]; }
-  if (server_filename === 'video.mp4') { const m4 = html.match(/"server_filename"\s*:\s*"([^"]+)"/); if (m4) server_filename = m4[1]; }
+  if (server_filename === 'video.mp4') {
+    const m4 = html.match(/"server_filename"\s*:\s*"([^"]+)"/);
+    if (m4) server_filename = m4[1];
+  }
   if (!size) { const m5 = html.match(/"size"\s*:\s*(\d+)/); if (m5) size = parseInt(m5[1], 10); }
   if (!shareid || !uk) throw new Error('Share info not found');
+
   const apiHeaders = { 'User-Agent': UA, 'Cookie': TERABOX_COOKIE, 'Referer': shareUrl };
   if (!fs_id) {
     const shorturl = shareUrl.split('/s/')[1]?.split('?')[0] || '';
     try {
-      const lr = await axios.get(`https://www.terabox.com/share/list?shorturl=${shorturl}&root=1&web=1&app_id=250528`, { headers: apiHeaders, timeout: 30000 });
+      const lr = await axios.get(
+        `https://www.terabox.com/share/list?shorturl=${shorturl}&root=1&web=1&app_id=250528`,
+        { headers: apiHeaders, timeout: 30000 }
+      );
       const f = lr.data?.list?.[0];
-      if (f) { fs_id = f.fs_id; server_filename = f.server_filename || server_filename; size = f.size || size; }
-    } catch (e) { }
+      if (f) {
+        fs_id = f.fs_id;
+        server_filename = f.server_filename || server_filename;
+        size = f.size || size;
+      }
+    } catch (e) {}
   }
   if (!fs_id) throw new Error('fs_id not found');
-  const dlResp = await axios.get(`https://www.terabox.com/share/download?shareid=${shareid}&uk=${uk}&sign=${sign || ''}&timestamp=${timestamp || ''}&fs_id=${fs_id}&channel=dubox&web=1&app_id=250528`, { headers: apiHeaders, timeout: 30000 });
+
+  const dlResp = await axios.get(
+    `https://www.terabox.com/share/download?shareid=${shareid}&uk=${uk}&sign=${sign || ''}&timestamp=${timestamp || ''}&fs_id=${fs_id}&channel=dubox&web=1&app_id=250528`,
+    { headers: apiHeaders, timeout: 30000 }
+  );
   const dlink = dlResp.data?.dlink;
   if (!dlink) throw new Error('Direct link not found');
   return { url: Array.isArray(dlink) ? dlink[0] : dlink, fileName: server_filename, size };
 }
 
+// ============================================================
+// WAIT FOR CENTRAL API CONNECTION
+// ============================================================
 async function waitForApiConnection() {
   console.log('[BOT] Waiting for central API connection...');
   while (true) {
@@ -597,7 +714,8 @@ async function waitForApiConnection() {
   await waitForApiConnection();
 
   const client = new TelegramClient(new StringSession(''), API_ID, API_HASH, {
-    connectionRetries: 5, autoReconnect: true,
+    connectionRetries: 5,
+    autoReconnect: true,
   });
 
   console.log('Connecting MTProto...');
@@ -626,6 +744,7 @@ async function waitForApiConnection() {
 
   console.log(`Upload queue ready — max ${MAX_CONCURRENT_UPLOADS} parallel uploads`);
 
+  // ===== KEYBOARD HELPER =====
   function keyboard(rows) {
     return new Api.ReplyInlineMarkup({
       rows: rows.map(row => new Api.KeyboardButtonRow({
@@ -637,6 +756,7 @@ async function waitForApiConnection() {
     });
   }
 
+  // ===== WELCOME MENU =====
   async function sendWelcome(chatId, uid, editMsgId = null) {
     const lang = await getUserLang(uid);
     const userData = await getUserKeySynced(uid);
@@ -667,9 +787,7 @@ async function waitForApiConnection() {
       `<b>4.</b> ${t(lang, 'step_4')}\n\n` +
       `<i>${t(lang, 'nav_hint')} 👇</i>`;
 
-    // ✅ FIX: comma add kiya first row ke baad
     const rows = [
-      [{ text: '💰 Income & Views', callback_data: 'menu_income' }],
       [{ text: `🔑 ${t(lang, 'btn_api')}`, callback_data: 'menu_api' }, { text: `📖 ${t(lang, 'btn_help')}`, callback_data: 'menu_help' }],
       [{ text: `🤖 ${t(lang, 'btn_allbots')}`, callback_data: 'menu_allbots' }, { text: `📊 ${t(lang, 'btn_account')}`, callback_data: 'menu_account' }],
       [{ text: `⚙️ ${t(lang, 'btn_settings')}`, callback_data: 'menu_settings' }, { text: `🚪 ${t(lang, 'btn_logout')}`, callback_data: 'menu_logout' }],
@@ -679,11 +797,12 @@ async function waitForApiConnection() {
       try {
         await client.editMessage(chatId, { message: editMsgId, text, parseMode: 'html', buttons: keyboard(rows) });
         return;
-      } catch (e) { }
+      } catch (e) {}
     }
     await client.sendMessage(chatId, { message: text, parseMode: 'html', buttons: keyboard(rows) });
   }
 
+  // ===== HELP =====
   async function sendHelp(chatId, uid, editMsgId = null) {
     const lang = await getUserLang(uid);
     const text = `📖 <b>${t(lang, 'help_title')}</b>\n\n` +
@@ -704,11 +823,15 @@ async function waitForApiConnection() {
       `└ ${t(lang, 'help_step4_b')}`;
     const rows = [[{ text: `⬅️ ${t(lang, 'btn_main_menu')}`, callback_data: 'main_menu' }]];
     if (editMsgId) {
-      try { await client.editMessage(chatId, { message: editMsgId, text, parseMode: 'html', buttons: keyboard(rows) }); return; } catch (e) { }
+      try {
+        await client.editMessage(chatId, { message: editMsgId, text, parseMode: 'html', buttons: keyboard(rows) });
+        return;
+      } catch (e) {}
     }
     await client.sendMessage(chatId, { message: text, parseMode: 'html', buttons: keyboard(rows) });
   }
 
+  // ===== ALL BOTS =====
   async function sendAllBots(chatId, uid, editMsgId = null) {
     const lang = await getUserLang(uid);
     const text = `🤖 <b>${t(lang, 'all_bots_title')}</b>\n\n` +
@@ -719,11 +842,15 @@ async function waitForApiConnection() {
       `<i>🔒 ${t(lang, 'data_safe')}</i>`;
     const rows = [[{ text: `⬅️ ${t(lang, 'btn_main_menu')}`, callback_data: 'main_menu' }]];
     if (editMsgId) {
-      try { await client.editMessage(chatId, { message: editMsgId, text, parseMode: 'html', buttons: keyboard(rows) }); return; } catch (e) { }
+      try {
+        await client.editMessage(chatId, { message: editMsgId, text, parseMode: 'html', buttons: keyboard(rows) });
+        return;
+      } catch (e) {}
     }
     await client.sendMessage(chatId, { message: text, parseMode: 'html', buttons: keyboard(rows) });
   }
 
+  // ===== SETTINGS =====
   async function sendSettings(chatId, uid, editMsgId = null) {
     const lang = await getUserLang(uid);
     const text = `⚙️ <b>${t(lang, 'settings_title')}</b>\n\n` +
@@ -734,11 +861,15 @@ async function waitForApiConnection() {
       [{ text: `⬅️ ${t(lang, 'btn_main_menu')}`, callback_data: 'main_menu' }],
     ];
     if (editMsgId) {
-      try { await client.editMessage(chatId, { message: editMsgId, text, parseMode: 'html', buttons: keyboard(rows) }); return; } catch (e) { }
+      try {
+        await client.editMessage(chatId, { message: editMsgId, text, parseMode: 'html', buttons: keyboard(rows) });
+        return;
+      } catch (e) {}
     }
     await client.sendMessage(chatId, { message: text, parseMode: 'html', buttons: keyboard(rows) });
   }
 
+  // ===== LANGUAGE SELECTOR =====
   async function sendLanguageSelector(chatId, uid, editMsgId = null) {
     const lang = await getUserLang(uid);
     const text = `🌐 <b>${t(lang, 'btn_language')} / भाषा</b>\n\n` +
@@ -750,11 +881,15 @@ async function waitForApiConnection() {
       [{ text: `⬅️ ${t(lang, 'btn_main_menu')}`, callback_data: 'main_menu' }],
     ];
     if (editMsgId) {
-      try { await client.editMessage(chatId, { message: editMsgId, text, parseMode: 'html', buttons: keyboard(rows) }); return; } catch (e) { }
+      try {
+        await client.editMessage(chatId, { message: editMsgId, text, parseMode: 'html', buttons: keyboard(rows) });
+        return;
+      } catch (e) {}
     }
     await client.sendMessage(chatId, { message: text, parseMode: 'html', buttons: keyboard(rows) });
   }
 
+  // ===== DIRECT FILE UPLOAD =====
   async function handleDirectFile(msg, uid, lang) {
     const chatId = msg.chatId;
     const doc = msg.media && msg.media.document;
@@ -779,7 +914,10 @@ async function waitForApiConnection() {
 
     try {
       const fileLocation = new Api.InputDocumentFileLocation({
-        id: doc.id, accessHash: doc.accessHash, fileReference: doc.fileReference, thumbSize: '',
+        id: doc.id,
+        accessHash: doc.accessHash,
+        fileReference: doc.fileReference,
+        thumbSize: '',
       });
 
       const CHUNK = 1024 * 1024;
@@ -791,7 +929,11 @@ async function waitForApiConnection() {
         while (offset < size) {
           let res;
           try {
-            res = await client.invoke(new Api.upload.GetFile({ location: fileLocation, offset, limit: CHUNK }));
+            res = await client.invoke(new Api.upload.GetFile({
+              location: fileLocation,
+              offset,
+              limit: CHUNK,
+            }));
           } catch (err) {
             console.error('[GetFile]', err.message);
             break;
@@ -822,7 +964,10 @@ async function waitForApiConnection() {
       const upload = new Upload({
         client: r2,
         params: {
-          Bucket: R2_BUCKET_NAME, Key: r2Key, Body: stream, ContentType: mime,
+          Bucket: R2_BUCKET_NAME,
+          Key: r2Key,
+          Body: stream,
+          ContentType: mime,
           CacheControl: 'public, max-age=31536000',
         },
         queueSize: isLarge ? 4 : 1,
@@ -835,6 +980,7 @@ async function waitForApiConnection() {
       const token = signVideo(shortId, 720);
       const playUrl = `${BASE_URL}/stream/${shortId}?t=${token}`;
 
+      // Save to Firebase for tracking
       await saveLinkToFirebase(shortId, uid, playUrl);
 
       await client.deleteMessages(chatId, [status.id], { revoke: true }).catch(() => {});
@@ -849,8 +995,12 @@ async function waitForApiConnection() {
     }
   }
 
+  // ===== TERABOX HANDLER =====
   async function handleTerabox(teraboxUrl, chatId, uid, lang) {
-    const status = await client.sendMessage(chatId, { message: `🔍 <i>${t(lang, 'terabox_detected')}</i>`, parseMode: 'html' });
+    const status = await client.sendMessage(chatId, {
+      message: `🔍 <i>${t(lang, 'terabox_detected')}</i>`,
+      parseMode: 'html',
+    });
     try {
       const info = await getTeraboxDirectLink(teraboxUrl);
       await client.editMessage(chatId, {
@@ -858,19 +1008,37 @@ async function waitForApiConnection() {
         text: `⬇️ <i>${t(lang, 'downloading_uploading')}</i>\n📌 ${escapeHtml(info.fileName)}\n📦 ${(info.size / 1024 / 1024).toFixed(2)} MB`,
         parseMode: 'html',
       });
+
       const TERABOX_COOKIE = (process.env.TERABOX_COOKIE || '').trim();
       const resp = await axios.get(info.url, {
-        responseType: 'stream', maxContentLength: Infinity, maxBodyLength: Infinity, timeout: 0,
-        headers: { 'User-Agent': 'Mozilla/5.0', 'Cookie': TERABOX_COOKIE, 'Referer': teraboxUrl },
+        responseType: 'stream',
+        maxContentLength: Infinity,
+        maxBodyLength: Infinity,
+        timeout: 0,
+        headers: {
+          'User-Agent': 'Mozilla/5.0',
+          'Cookie': TERABOX_COOKIE,
+          'Referer': teraboxUrl,
+        },
       });
+
       const ext = path.extname(info.fileName) || '.mp4';
       const r2Key = `uploads/${crypto.randomBytes(8).toString('hex')}${ext}`;
       const upload = new Upload({
         client: r2,
-        params: { Bucket: R2_BUCKET_NAME, Key: r2Key, Body: resp.data, ContentType: 'video/mp4', CacheControl: 'public, max-age=31536000', Metadata: { source: 'terabox' } },
-        queueSize: 4, partSize: 10 * 1024 * 1024,
+        params: {
+          Bucket: R2_BUCKET_NAME,
+          Key: r2Key,
+          Body: resp.data,
+          ContentType: 'video/mp4',
+          CacheControl: 'public, max-age=31536000',
+          Metadata: { source: 'terabox' },
+        },
+        queueSize: 4,
+        partSize: 10 * 1024 * 1024,
       });
       await upload.done();
+
       const shortId = crypto.randomBytes(4).toString('hex');
       await saveMeta(shortId, { name: info.fileName, mime: 'video/mp4', r2Key, size: info.size, ts: Date.now() });
       const token = signVideo(shortId, 720);
@@ -888,7 +1056,7 @@ async function waitForApiConnection() {
       await client.deleteMessages(chatId, [status.id], { revoke: true }).catch(() => {});
       await client.sendMessage(chatId, { message: `❌ ${escapeHtml(e.message)}`, parseMode: 'html' });
     }
-   }
+ }
     // ============================================================
   // MESSAGE HANDLER
   // ============================================================
@@ -910,7 +1078,10 @@ async function waitForApiConnection() {
       if (text.startsWith('/api ')) {
         const key = text.replace('/api ', '').trim();
         if (key.length < 12) {
-          await client.sendMessage(chatId, { message: `❌ <b>${t(lang, 'api_key_invalid')}</b>\n\n${t(lang, 'api_key_min_12')}`, parseMode: 'html' });
+          await client.sendMessage(chatId, {
+            message: `❌ <b>${t(lang, 'api_key_invalid')}</b>\n\n${t(lang, 'api_key_min_12')}`,
+            parseMode: 'html',
+          });
           return;
         }
         await saveUserKey(uid, key);
@@ -970,13 +1141,16 @@ async function waitForApiConnection() {
   client.addEventHandler(async (event) => {
     const q = event.query;
     if (!q) return;
-    try { await q.answer(); } catch (e) { }
+
+    try { await q.answer(); } catch (e) {}
+
     const data = q.data.toString();
     const chatId = q.chatId || q.userId;
     const uid = q.userId;
     const msgId = q.msgId;
     const lang = await getUserLang(uid);
 
+    // ---- API Connect ----
     if (data === 'menu_api') {
       const userData = await getUserKey(uid);
       if (userData) {
@@ -1012,6 +1186,7 @@ async function waitForApiConnection() {
     if (data === 'menu_settings') { await sendSettings(chatId, uid, msgId); return; }
     if (data === 'menu_language') { await sendLanguageSelector(chatId, uid, msgId); return; }
 
+    // ---- Account ----
     if (data === 'menu_account') {
       const userData = await getUserKey(uid);
       await client.editMessage(chatId, {
@@ -1020,14 +1195,14 @@ async function waitForApiConnection() {
           `<b>${t(lang, 'user_id')}:</b> <code>${uid}</code>\n` +
           `<b>${t(lang, 'api_status')}:</b> ${userData ? '✅ ' + t(lang, 'connected_label') : '❌ ' + t(lang, 'not_connected_label')}\n` +
           (userData ? `<b>${t(lang, 'connected_since')}:</b> ${new Date(userData.connectedAt).toLocaleString()}\n` : '') +
-          `\n<b>${t(lang, 'bot_version')}:</b> v2.1.0`,
+          `\n<b>${t(lang, 'bot_version')}:</b> v2.2.0 (Firebase)`,
         parseMode: 'html',
         buttons: keyboard([[{ text: `⬅️ ${t(lang, 'btn_main_menu')}`, callback_data: 'main_menu' }]]),
       });
       return;
     }
 
-    // ✅ FIXED: messageId → message
+    // ---- Set language ----
     if (data === 'set_lang_en' || data === 'set_lang_hi') {
       const newLang = data === 'set_lang_en' ? 'en' : 'hi';
       await saveUserLang(uid, newLang);
@@ -1040,25 +1215,7 @@ async function waitForApiConnection() {
       return;
     }
 
-    // ✅ FIXED: user variable defined with sbGetUser
-    if (data === 'menu_income') {
-      const user = await sbGetUser(uid);
-      const balance = parseFloat(user?.balance || 0).toFixed(2);
-      const text = `📊 <b>Aapki Income aur Views Report:</b>\n\n` +
-                   `💰 <b>Earnings:</b> ₹${balance}\n` +
-                   `👀 <b>Total Views/Clicks:</b> ${user?.clicks || 0}\n` +
-                   `🔗 <b>Total Links Generated:</b> ${user?.links_count || 0}`;
-
-      await client.editMessage(chatId, {
-        message: msgId,
-        text: text,
-        parseMode: 'html',
-        buttons: keyboard([[{ text: '« Back', callback_data: 'main_menu' }]])
-      });
-      return;
-    }
-
-    // ✅ FIXED: messageId → message
+    // ---- Logout confirm ----
     if (data === 'menu_logout') {
       await client.editMessage(chatId, {
         message: msgId,
@@ -1072,7 +1229,7 @@ async function waitForApiConnection() {
       return;
     }
 
-    // ✅ FIXED: messageId → message
+    // ---- Confirm logout ----
     if (data === 'confirm_logout') {
       await deleteUserKey(uid);
       await setUserLogin(uid, false, '');
@@ -1084,8 +1241,12 @@ async function waitForApiConnection() {
       return;
     }
 
-    if (data === 'main_menu') { await sendWelcome(chatId, uid, msgId); return; }
+    // ---- Main menu ----
+    if (data === 'main_menu') {
+      await sendWelcome(chatId, uid, msgId);
+      return;
+    }
   }, new CallbackQuery({}));
 
-  console.log('Bot ready — Power Mode (5 parallel uploads)');
+  console.log('Bot ready — Power Mode (5 parallel uploads, Firebase)');
 })();
