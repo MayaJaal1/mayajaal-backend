@@ -33,7 +33,7 @@ const VIDEO_SECRET = (process.env.VIDEO_SECRET || '').trim();
 const APP_NAME = process.env.APP_NAME || 'MayaJaal';
 const APP_UA_KEYWORD = (process.env.APP_UA_KEYWORD || 'MayaJaalApp').trim();
 
-// ===== 🌟 FIREBASE ADMIN INITIALIZATION =====
+// ===== FIREBASE ADMIN INITIALIZATION =====
 try {
   if (!admin.apps.length) {
     if (process.env.FIREBASE_PROJECT_ID) {
@@ -478,17 +478,27 @@ app.get('/api/v/:id', async (req, res) => {
   return res.json({ id: videoId, name: meta.name || 'Video', size: meta.size || 0, mime: meta.mime || 'video/mp4' });
 });
 
+// 🔒 FIXED: Token verify + same token return (no re-sign)
 app.get('/api/stream-info/:id', async (req, res) => {
   try {
     const videoId = req.params.id;
+    const token = req.query.t || req.query.s || '';
+
+    if (!verifyVideoSig(videoId, token)) {
+      return res.status(403).json({ success: false, error: 'Invalid or expired token' });
+    }
+
     const meta = await getMeta(videoId);
     if (!meta || !meta.r2Key) {
       return res.status(404).json({ success: false, error: 'Video not found or expired' });
     }
+
     return res.json({
       success: true,
-      url: `${BASE_URL}/stream/${videoId}?t=${signVideo(videoId, 720)}`,
+      url: `${BASE_URL}/stream/${videoId}?t=${token}`,
       title: meta.name || 'Video',
+      size: meta.size || 0,
+      mime: meta.mime || 'video/mp4',
       uploader: '@MayaJaalBot'
     });
   } catch (err) {
@@ -519,7 +529,6 @@ app.get('/stream/:id', async (req, res) => {
 });
 
 app.listen(PORT, () => console.log(`Web on ${PORT}`));
-
 function detectTeraboxUrl(text) {
   if (!text) return null;
   const domains = ['terabox\\.com','terabox\\.app','terabox\\.link','terabox\\.club','terabox\\.fun','terabox\\.cc','terabox\\.top','terabox\\.online','1024tera\\.com','1024terabox\\.com','4funbox\\.com','4funbox\\.co','mirrobox\\.com','nephobox\\.com','momerybox\\.com','tibibox\\.com','teraboxapp\\.com','teraboxlink\\.com','teraboxshare\\.com','teraboxurl\\.com','teraboxdl\\.com','teraboxdownloader\\.com','terafileshare\\.com','terashare\\.com','terasharelink\\.com','terasharefile\\.com','freeterabox\\.com','gearbox\\.app','teraboxcdn\\.com','terabox\\.store','terabox\\.site','terabox\\.space','terabox\\.website','dubox\\.com','terabox\\.icu','terabox\\.xyz','diskwala\\.com'];
@@ -579,8 +588,12 @@ async function waitForApiConnection() {
     console.log('[BOT] ⏳ Not connected yet. Retrying in 10s...');
     await new Promise(r => setTimeout(r, 10000));
   }
-    }
-    (async () => {
+}
+
+// ============================================================
+// BOT MAIN
+// ============================================================
+(async () => {
   await waitForApiConnection();
 
   const client = new TelegramClient(new StringSession(''), API_ID, API_HASH, {
@@ -654,8 +667,9 @@ async function waitForApiConnection() {
       `<b>4.</b> ${t(lang, 'step_4')}\n\n` +
       `<i>${t(lang, 'nav_hint')} 👇</i>`;
 
+    // ✅ FIX: comma add kiya first row ke baad
     const rows = [
-      [{ text: '💰 Income & Views', callback_data: 'menu_income' }]
+      [{ text: '💰 Income & Views', callback_data: 'menu_income' }],
       [{ text: `🔑 ${t(lang, 'btn_api')}`, callback_data: 'menu_api' }, { text: `📖 ${t(lang, 'btn_help')}`, callback_data: 'menu_help' }],
       [{ text: `🤖 ${t(lang, 'btn_allbots')}`, callback_data: 'menu_allbots' }, { text: `📊 ${t(lang, 'btn_account')}`, callback_data: 'menu_account' }],
       [{ text: `⚙️ ${t(lang, 'btn_settings')}`, callback_data: 'menu_settings' }, { text: `🚪 ${t(lang, 'btn_logout')}`, callback_data: 'menu_logout' }],
@@ -739,8 +753,9 @@ async function waitForApiConnection() {
       try { await client.editMessage(chatId, { message: editMsgId, text, parseMode: 'html', buttons: keyboard(rows) }); return; } catch (e) { }
     }
     await client.sendMessage(chatId, { message: text, parseMode: 'html', buttons: keyboard(rows) });
-   }
-      async function handleDirectFile(msg, uid, lang) {
+  }
+
+  async function handleDirectFile(msg, uid, lang) {
     const chatId = msg.chatId;
     const doc = msg.media && msg.media.document;
     if (!doc) return;
@@ -820,7 +835,6 @@ async function waitForApiConnection() {
       const token = signVideo(shortId, 720);
       const playUrl = `${BASE_URL}/stream/${shortId}?t=${token}`;
 
-      // 🌟 SAVING TO FIREBASE FOR VIEW & EARNINGS TRACKING
       await saveLinkToFirebase(shortId, uid, playUrl);
 
       await client.deleteMessages(chatId, [status.id], { revoke: true }).catch(() => {});
@@ -862,7 +876,6 @@ async function waitForApiConnection() {
       const token = signVideo(shortId, 720);
       const playUrl = `${BASE_URL}/stream/${shortId}?t=${token}`;
 
-      // 🌟 SAVING TO FIREBASE FOR VIEW & EARNINGS TRACKING
       await saveLinkToFirebase(shortId, uid, playUrl);
 
       await client.deleteMessages(chatId, [status.id], { revoke: true }).catch(() => {});
@@ -875,8 +888,10 @@ async function waitForApiConnection() {
       await client.deleteMessages(chatId, [status.id], { revoke: true }).catch(() => {});
       await client.sendMessage(chatId, { message: `❌ ${escapeHtml(e.message)}`, parseMode: 'html' });
     }
-  }
-
+   }
+    // ============================================================
+  // MESSAGE HANDLER
+  // ============================================================
   client.addEventHandler(async (event) => {
     try {
       const msg = event.message;
@@ -949,6 +964,9 @@ async function waitForApiConnection() {
     }
   }, new NewMessage({}));
 
+  // ============================================================
+  // CALLBACK HANDLER
+  // ============================================================
   client.addEventHandler(async (event) => {
     const q = event.query;
     if (!q) return;
@@ -1009,35 +1027,41 @@ async function waitForApiConnection() {
       return;
     }
 
+    // ✅ FIXED: messageId → message
     if (data === 'set_lang_en' || data === 'set_lang_hi') {
       const newLang = data === 'set_lang_en' ? 'en' : 'hi';
       await saveUserLang(uid, newLang);
       await client.editMessage(chatId, {
-        messageId: msgId,
+        message: msgId,
         text: `✅ <b>${t(newLang, 'lang_changed')}</b>\n\n🌐 ${t(newLang, 'lang_changed_to')} <b>${newLang === 'hi' ? 'हिंदी' : 'English'}</b>`,
         parseMode: 'html',
         buttons: keyboard([[{ text: `⬅️ ${t(newLang, 'btn_main_menu')}`, callback_data: 'main_menu' }]]),
       });
       return;
     }
-         if (data === 'menu_income') {
-      const balance = parseFloat(user.balance || 0).toFixed(2);
+
+    // ✅ FIXED: user variable defined with sbGetUser
+    if (data === 'menu_income') {
+      const user = await sbGetUser(uid);
+      const balance = parseFloat(user?.balance || 0).toFixed(2);
       const text = `📊 <b>Aapki Income aur Views Report:</b>\n\n` +
                    `💰 <b>Earnings:</b> ₹${balance}\n` +
-                   `👀 <b>Total Views/Clicks:</b> ${user.clicks || 0}\n` +
-                   `🔗 <b>Total Links Generated:</b> ${user.links_count || 0}`;
-      
-      await client.editMessage(chatId, { 
-        message: msgId, 
-        text: text, 
-        parseMode: 'html', 
-        buttons: keyboard([[{ text: '« Back', callback_data: 'main_menu' }]]) 
+                   `👀 <b>Total Views/Clicks:</b> ${user?.clicks || 0}\n` +
+                   `🔗 <b>Total Links Generated:</b> ${user?.links_count || 0}`;
+
+      await client.editMessage(chatId, {
+        message: msgId,
+        text: text,
+        parseMode: 'html',
+        buttons: keyboard([[{ text: '« Back', callback_data: 'main_menu' }]])
       });
       return;
     }
+
+    // ✅ FIXED: messageId → message
     if (data === 'menu_logout') {
       await client.editMessage(chatId, {
-        messageId: msgId,
+        message: msgId,
         text: `🚪 <b>${t(lang, 'logout_title')}</b>\n\n${t(lang, 'logout_confirm_text')}\n\n${t(lang, 'logout_safe')}`,
         parseMode: 'html',
         buttons: keyboard([
@@ -1048,11 +1072,12 @@ async function waitForApiConnection() {
       return;
     }
 
+    // ✅ FIXED: messageId → message
     if (data === 'confirm_logout') {
       await deleteUserKey(uid);
       await setUserLogin(uid, false, '');
       await client.editMessage(chatId, {
-        messageId: msgId,
+        message: msgId,
         text: `✅ <b>${t(lang, 'logout_success')}</b>\n\n${t(lang, 'logout_disconnected')}\n${t(lang, 'logout_restart')}`,
         parseMode: 'html',
       });
