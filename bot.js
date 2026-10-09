@@ -8,6 +8,7 @@ const { Readable } = require('stream');
 const axios = require('axios');
 const crypto = require('crypto');
 const path = require('path');
+const fs = require('fs');
 const { Redis } = require('@upstash/redis');
 const { S3Client, GetObjectCommand } = require('@aws-sdk/client-s3');
 const { Upload } = require('@aws-sdk/lib-storage');
@@ -37,25 +38,21 @@ if (!TOKEN || !API_ID || !API_HASH) throw new Error('Missing BOT_TOKEN / API_ID 
 if (!R2_ACCOUNT_ID || !R2_ACCESS_KEY_ID || !R2_SECRET_ACCESS_KEY || !R2_BUCKET_NAME) throw new Error('Missing R2 config');
 if (VIDEO_SECRET.length < 20) throw new Error('VIDEO_SECRET missing or too weak');
 
-// ===== FIREBASE ADMIN INITIALIZATION =====
+// ===== FIREBASE ADMIN INITIALIZATION (JSON file) =====
 let db = null;
 let firebaseReady = false;
 
 try {
   if (!admin.apps.length) {
-    if (process.env.FIREBASE_PROJECT_ID) {
-      admin.initializeApp({
-        credential: admin.credential.cert({
-          projectId: process.env.FIREBASE_PROJECT_ID,
-          clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
-          privateKey: process.env.FIREBASE_PRIVATE_KEY
-            ? process.env.FIREBASE_PRIVATE_KEY.replace(/\\n/g, '\n')
-            : undefined,
-        }),
-      });
-    } else {
-      admin.initializeApp();
+    const keyPath = path.join(__dirname, 'serviceAccountKey.json');
+    if (!fs.existsSync(keyPath)) {
+      throw new Error('Service account JSON not found: ' + keyPath);
     }
+    const serviceAccount = JSON.parse(fs.readFileSync(keyPath, 'utf8'));
+    admin.initializeApp({
+      credential: admin.credential.cert(serviceAccount),
+      projectId: serviceAccount.project_id,
+    });
     console.log('[Firebase] Admin initialized');
   }
   db = admin.firestore();
@@ -71,7 +68,7 @@ function getDb() {
   return db;
 }
 
-// ===== FIREBASE USER HELPERS (replaces Supabase) =====
+// ===== FIREBASE USER HELPERS =====
 async function fbGetUser(telegramId) {
   if (!firebaseReady) return null;
   try {
@@ -1056,7 +1053,7 @@ async function waitForApiConnection() {
       await client.deleteMessages(chatId, [status.id], { revoke: true }).catch(() => {});
       await client.sendMessage(chatId, { message: `❌ ${escapeHtml(e.message)}`, parseMode: 'html' });
     }
- }
+  }
     // ============================================================
   // MESSAGE HANDLER
   // ============================================================
@@ -1074,6 +1071,23 @@ async function waitForApiConnection() {
       if (text === '/allbots') { await sendAllBots(chatId, uid); return; }
       if (text === '/settings') { await sendSettings(chatId, uid); return; }
       if (text === '/language') { await sendLanguageSelector(chatId, uid); return; }
+
+      // /api (bina key) — help message
+      if (text === '/api') {
+        await client.sendMessage(chatId, {
+          message: `🔑 <b>${t(lang, 'api_connect_title')}</b>\n\n` +
+            `<b>Format:</b> <code>/api YOUR_KEY</code>\n\n` +
+            `<b>Example:</b>\n<code>/api abc123def456</code>\n\n` +
+            `📌 <b>${t(lang, 'need_new_key')}</b>\n` +
+            `${t(lang, 'api_connect_step1')} → ${t(lang, 'api_connect_step3')}`,
+          parseMode: 'html',
+          buttons: keyboard([
+            [{ text: `🔑 ${t(lang, 'btn_generate_key')}`, url: `${BASE_URL}/index.html?tg=${uid}` }],
+            [{ text: `⬅️ ${t(lang, 'btn_main_menu')}`, callback_data: 'main_menu' }],
+          ]),
+        });
+        return;
+      }
 
       if (text.startsWith('/api ')) {
         const key = text.replace('/api ', '').trim();
