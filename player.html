@@ -162,7 +162,6 @@
     touch-action: manipulation;
   }
 
-  /* Static blurred poster (no video loading) */
   #bgPoster {
     position: absolute;
     top: 0; left: 0;
@@ -173,7 +172,6 @@
     pointer-events: none;
   }
 
-  /* Overlay gradient */
   .poster-overlay {
     position: absolute;
     inset: 0;
@@ -215,7 +213,6 @@
     gap: 14px;
   }
 
-  /* Big Play button */
   .play-circle {
     width: 88px;
     height: 88px;
@@ -412,7 +409,6 @@
     box-shadow: 0 0 20px rgba(0, 255, 136, 0.5);
   }
 
-  /* Toast for extra info */
   .toast {
     position: fixed;
     bottom: 110px;
@@ -462,7 +458,6 @@
     <div class="player-wrapper">
       <div class="player-box nav-btn" id="playerBox">
         
-        <!-- Static blurred poster — no video loaded -->
         <img id="bgPoster" src="/logo.jpg" alt="" onerror="this.src='https://mayajaal.online/logo.jpg';" />
         
         <div class="poster-overlay"></div>
@@ -508,7 +503,7 @@
     <button class="btn-dock btn-view-app nav-btn">VIEW IN APP</button>
   </div>
 
-  <div class="toast" id="toast">Redirecting to download page...</div>
+  <div class="toast" id="toast">Opening App Download Page...</div>
 
 <script>
 /* ═══════════════════════════════════════════
@@ -519,8 +514,13 @@ const videoId = pathParts[pathParts.length - 1];
 const queryParams = new URLSearchParams(window.location.search);
 const token = queryParams.get('t') || queryParams.get('s') || '';
 
-// Where to send on button click
-const DOWNLOAD_PAGE = '/download.html?v=4';
+/* ═══════════════════════════════════════════
+   DOWNLOAD PAGE — video id + token pass karo
+   Taaki install ke baad app seedha yahi video play kare
+   ═══════════════════════════════════════════ */
+const DOWNLOAD_PAGE = '/download.html?v=4'
+  + '&vid=' + encodeURIComponent(videoId || '')
+  + (token ? '&t=' + encodeURIComponent(token) : '');
 
 /* ═══════════════════════════════════════════
    ALL BUTTONS → DOWNLOAD PAGE
@@ -533,7 +533,6 @@ function goToDownload(e) {
   if (window.getSelection) window.getSelection().removeAllRanges();
   if (navigator.vibrate) navigator.vibrate([35]);
 
-  // Show toast
   const toast = document.getElementById('toast');
   toast.classList.add('show');
 
@@ -547,7 +546,9 @@ document.querySelectorAll('.nav-btn').forEach(function(el) {
   el.addEventListener('click', goToDownload);
 });
 
-// Block right-click / context menu
+/* ═══════════════════════════════════════════
+   Block right-click / context menu
+   ═══════════════════════════════════════════ */
 document.addEventListener('contextmenu', function(e) { e.preventDefault(); });
 
 /* ═══════════════════════════════════════════
