@@ -41,7 +41,7 @@ if (VIDEO_SECRET.length < 20) throw new Error('VIDEO_SECRET missing or too weak'
 
 // ===== FIREBASE ADMIN INITIALIZATION =====
 let db = null;         // Firestore (purana code compatible)
-let rtdb = null;       // Realtime DB (website + player yahi use karte hain)
+let rtdb = null;       // Realtime DB (website + player + bot sync)
 let firebaseReady = false;
 
 try {
@@ -77,7 +77,7 @@ function getRTDB() {
   return rtdb;
 }
 
-// ===== FIREBASE HELPERS (Firestore — purane code compatible) =====
+// ===== FIRESTORE HELPERS (purane code compatible) =====
 async function fbGetUser(telegramId) {
   if (!firebaseReady) return null;
   try {
@@ -142,13 +142,13 @@ async function saveLinkToFirebase(shortId, userId, originalUrl) {
       user_contributed: {},
       created_at: admin.firestore.FieldValue.serverTimestamp(),
     }, { merge: true });
-    console.log(`[Firebase] Link ${shortId} saved for user ${userId}`);
+    console.log(`[Firestore] Link ${shortId} saved for user ${userId}`);
   } catch (e) {
-    console.error('[Firebase Save Error]', e.message);
+    console.error('[Firestore Save Error]', e.message);
   }
 }
 
-// ===== REALTIME DB HELPERS (website + player sync) =====
+// ===== REALTIME DB HELPERS (website + player + bot sync) =====
 // Website ne users/{firebaseUid}/apiKey me key save ki hai — us se user dhundo
 async function findUserByApiKeyRTDB(key) {
   if (!firebaseReady) return null;
@@ -164,7 +164,7 @@ async function findUserByApiKeyRTDB(key) {
   }
 }
 
-// Telegram ID se Firebase user dhundo (RTDB me telegram/chatId save karte hain)
+// Telegram ID se Firebase user dhundo
 async function findUserByTelegram(tgId) {
   if (!firebaseReady) return null;
   try {
@@ -179,7 +179,7 @@ async function findUserByTelegram(tgId) {
   }
 }
 
-// User ke dashboard ko read karo (website wala same data)
+// User ke dashboard ko read karo
 async function getDashboard(firebaseUid) {
   if (!firebaseReady) return {};
   try {
@@ -207,7 +207,7 @@ async function getUserLinks(firebaseUid, limit = 10) {
   }
 }
 
-// Upload ke baad dashboard me counters badhao
+// Upload ke baad dashboard counters badhao
 async function incrementDashboard(firebaseUid, field, byVal = 1) {
   if (!firebaseReady) return;
   try {
@@ -365,7 +365,6 @@ function verifyVideoSig(videoId, token) {
     return crypto.timingSafeEqual(Buffer.from(sig), Buffer.from(expected));
   } catch (e) { return false; }
 }
-
 // ============================================================
 // TRANSLATIONS (Hindi + English)
 // ============================================================
@@ -480,7 +479,6 @@ const T = {
     app_only_note: 'Will play only in App',
     player_link: 'Player Link',
     max_size: 'Max',
-    // NEW STATS STRINGS
     stats_title: 'MAYAJAAL STATS',
     stats_email: 'Email',
     stats_links: 'Total Links',
@@ -622,7 +620,6 @@ const T = {
     app_only_note: 'सिर्फ ऐप में चलेगा',
     player_link: 'प्लेयर लिंक',
     max_size: 'अधिकतम',
-    // NEW STATS STRINGS
     stats_title: 'मायाजाल स्टैट्स',
     stats_email: 'ईमेल',
     stats_links: 'कुल लिंक',
@@ -711,7 +708,6 @@ app.post('/save-key', async (req, res) => {
     if (!telegram_id || !key) return res.status(400).json({ error: 'Missing data' });
     await saveUserKey(telegram_id, key);
     await fbUpdateUser(telegram_id, { api_key: key, is_logged_in: true });
-    // Also link to RTDB if user exists by apiKey
     const fbUser = await findUserByApiKeyRTDB(key);
     if (fbUser) {
       await getRTDB().ref(`users/${fbUser.uid}/telegram`).update({
@@ -726,7 +722,7 @@ app.post('/save-key', async (req, res) => {
   }
 });
 
-// Player page
+// Player page (opens player.html)
 app.get('/v/:id', async (req, res) => {
   try {
     const videoId = req.params.id;
@@ -742,6 +738,7 @@ app.get('/v/:id', async (req, res) => {
   }
 });
 
+// Metadata endpoint (used by player.html to show title)
 app.get('/api/v/:id', async (req, res) => {
   const videoId = req.params.id;
   const token = req.query.t || req.query.s || '';
@@ -756,7 +753,7 @@ app.get('/api/v/:id', async (req, res) => {
   });
 });
 
-// Stream info endpoint (player page yahi call karta hai)
+// Stream-info endpoint (player page yahi call karta hai if needed)
 app.get('/api/stream-info/:id', async (req, res) => {
   try {
     const videoId = req.params.id;
@@ -784,7 +781,88 @@ app.get('/api/stream-info/:id', async (req, res) => {
   }
 });
 
-// Actual video stream from R2
+// ============================================================
+// APP VIEW COUNTING ENDPOINT
+// App jab video 10 second tak play kare, ye call karega
+// POST /api/view/{videoId}?t={token}
+// Body: { playedSeconds: 10, deviceId: "xxx" }
+// ============================================================
+app.post('/api/view/:id', express.json(), async (req, res) => {
+  try {
+    const videoId = req.params.id;
+    const token = req.query.t || req.query.s || req.body.token || '';
+    const playedSeconds = Number(req.body.playedSeconds || req.body.played_seconds || 0);
+    const deviceId = String(
+      req.body.deviceId ||
+      req.body.device_id ||
+      req.headers['x-device-id'] ||
+      ''
+    ).substring(0, 64);
+
+    // 1. Verify token (HMAC)
+    if (!verifyVideoSig(videoId, token)) {
+      return res.status(403).json({ success: false, error: 'Invalid token' });
+    }
+
+    // 2. Minimum 10 seconds playback required
+    if (playedSeconds < 10) {
+      return res.status(400).json({ success: false, error: 'Minimum 10s playback required' });
+    }
+
+    // 3. Get link record from RTDB
+    let link = null;
+    try {
+      const snap = await getRTDB().ref(`links/${videoId}`).once('value');
+      link = snap.val();
+    } catch (e) {
+      console.error('[view] RTDB read error', e.message);
+    }
+
+    if (!link || !link.ownerUid) {
+      return res.status(404).json({ success: false, error: 'Link not found' });
+    }
+
+    // 4. Rate-limit: same token+device 30 min me sirf 1 view
+    const rlKey = `view_rl:${videoId}:${crypto.createHash('md5')
+      .update(token + '|' + deviceId)
+      .digest('hex')
+      .substring(0, 16)}`;
+    try {
+      const already = await redis.get(rlKey);
+      if (already) {
+        return res.json({ success: true, counted: false, reason: 'Already counted recently' });
+      }
+      await redis.set(rlKey, '1', { ex: 1800 });
+    } catch (e) {}
+
+    // 5. Increment link views + user dashboard (RTDB)
+    const ownerUid = link.ownerUid;
+    const today = new Date().toISOString().split('T')[0];
+
+    try {
+      await getRTDB().ref(`links/${videoId}/views`).transaction(v => (v || 0) + 1);
+      await getRTDB().ref(`users/${ownerUid}/dashboard`).transaction(d => {
+        d = d || {};
+        d.totalViews = (d.totalViews || 0) + 1;
+        d.todayViews = (d.todayViews || 0) + 1;
+        d.viewsByDay = d.viewsByDay || {};
+        d.viewsByDay[today] = (d.viewsByDay[today] || 0) + 1;
+        return d;
+      });
+    } catch (e) {
+      console.error('[view] RTDB write error', e.message);
+      return res.status(500).json({ success: false, error: 'DB write failed' });
+    }
+
+    console.log(`[VIEW] +1 for ${videoId} owner=${ownerUid} device=${deviceId.substring(0, 8)}`);
+    return res.json({ success: true, counted: true });
+  } catch (err) {
+    console.error('[view] error', err.message);
+    return res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// Actual video stream from R2 (app isse use karti hai)
 app.get('/stream/:id', async (req, res) => {
   try {
     const videoId = req.params.id;
@@ -817,7 +895,6 @@ app.get('/stream/:id', async (req, res) => {
 });
 
 app.listen(PORT, () => console.log(`Web on ${PORT}`));
-
 // ============================================================
 // TERABOX HELPERS
 // ============================================================
@@ -1094,7 +1171,7 @@ async function waitForApiConnection() {
     await client.sendMessage(chatId, { message: text, parseMode: 'html', buttons: keyboard(rows) });
   }
 
-  // ===== NEW: STATS (Dashboard from RTDB) =====
+  // ===== STATS (Dashboard from RTDB — same data as website) =====
   async function sendStats(chatId, uid, editMsgId = null) {
     const lang = await getUserLang(uid);
     const fbUser = await findUserByTelegram(uid);
@@ -1151,7 +1228,7 @@ async function waitForApiConnection() {
     await client.sendMessage(chatId, { message: text, parseMode: 'html', buttons: keyboard(rows) });
   }
 
-  // ===== NEW: MY LINKS (Last 10 with views + per-link earnings) =====
+  // ===== MY LINKS (Last 10 with views + per-link earnings) =====
   async function sendMyLinks(chatId, uid, editMsgId = null) {
     const lang = await getUserLang(uid);
     const fbUser = await findUserByTelegram(uid);
@@ -1200,7 +1277,7 @@ async function waitForApiConnection() {
     await client.sendMessage(chatId, { message: linksText, parseMode: 'html', buttons: keyboard(rows) });
   }
 
-  // ===== NEW: EARNINGS MODEL (Tier table with current tier highlighted) =====
+  // ===== EARNINGS MODEL (Tier table with current tier highlighted) =====
   async function sendEarnings(chatId, uid, editMsgId = null) {
     const lang = await getUserLang(uid);
     const fbUser = await findUserByTelegram(uid);
@@ -1252,7 +1329,6 @@ async function waitForApiConnection() {
     }
     await client.sendMessage(chatId, { message: tierText, parseMode: 'html', buttons: keyboard(rows) });
   }
-
   // ===== DIRECT FILE UPLOAD (with RTDB tracking + player link) =====
 async function handleDirectFile(msg, uid, lang) {
   const chatId = msg.chatId;
@@ -1346,10 +1422,10 @@ async function handleDirectFile(msg, uid, lang) {
     // ---- Player link (view count yahi se hoga) ----
     const playerUrl = `${BASE_URL}/v/${shortId}?t=${token}`;
 
-    // ---- Save to Firestore (purana) ----
+    // ---- Save to Firestore (purana code compatible) ----
     await saveLinkToFirebase(shortId, uid, playerUrl);
 
-    // ---- Save to Realtime DB (new — website/player/bot sync) ----
+    // ---- Save to Realtime DB (website/player/bot sync) ----
     const fbUser = await findUserByTelegram(uid);
     if (fbUser) {
       try {
@@ -1360,6 +1436,7 @@ async function handleDirectFile(msg, uid, lang) {
           mime: mime,
           views: 0,
           createdAt: Date.now(),
+          source: 'upload',
         });
         await incrementDashboard(fbUser.uid, 'totalLinks', 1);
         console.log(`[RTDB] Link ${shortId} saved for ${fbUser.email}`);
@@ -1454,7 +1531,7 @@ async function handleTerabox(teraboxUrl, chatId, uid, lang) {
     // ---- Save to Firestore (purana) ----
     await saveLinkToFirebase(shortId, uid, playerUrl);
 
-    // ---- Save to Realtime DB (new) ----
+    // ---- Save to Realtime DB ----
     const fbUser = await findUserByTelegram(uid);
     if (fbUser) {
       try {
@@ -1505,7 +1582,7 @@ async function handleTerabox(teraboxUrl, chatId, uid, lang) {
     await client.sendMessage(chatId, { message: `❌ ${escapeHtml(e.message)}`, parseMode: 'html' });
   }
 }
-  // ============================================================
+    // ============================================================
   // MESSAGE HANDLER
   // ============================================================
   client.addEventHandler(async (event) => {
@@ -1524,7 +1601,7 @@ async function handleTerabox(teraboxUrl, chatId, uid, lang) {
       if (text === '/settings') { await sendSettings(chatId, uid); return; }
       if (text === '/language') { await sendLanguageSelector(chatId, uid); return; }
 
-      // ---- NEW: Stats/Links/Earnings commands ----
+      // ---- Stats/Links/Earnings commands ----
       if (text === '/stats') { await sendStats(chatId, uid); return; }
       if (text === '/mylinks') { await sendMyLinks(chatId, uid); return; }
       if (text === '/earnings') { await sendEarnings(chatId, uid); return; }
@@ -1688,13 +1765,9 @@ async function handleTerabox(teraboxUrl, chatId, uid, lang) {
       return;
     }
 
-    // ---- NEW: Stats menu ----
+    // ---- Stats / Links / Earnings menus ----
     if (data === 'menu_stats') { await sendStats(chatId, uid, msgId); return; }
-
-    // ---- NEW: My Links menu ----
     if (data === 'menu_links') { await sendMyLinks(chatId, uid, msgId); return; }
-
-    // ---- NEW: Earnings menu ----
     if (data === 'menu_earnings') { await sendEarnings(chatId, uid, msgId); return; }
 
     // ---- Other menus ----
@@ -1768,5 +1841,4 @@ async function handleTerabox(teraboxUrl, chatId, uid, lang) {
   console.log('Bot ready — Power Mode v2.3.0 (5 parallel uploads, RTDB Sync, Stats in Bot)');
 })();
 
-
-
+// ============ END OF FILE ============
