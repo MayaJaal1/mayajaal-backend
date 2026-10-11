@@ -1,14 +1,17 @@
 const admin = require('firebase-admin');
-const serviceAccount = require('./serviceAccountKey.json');
+const serviceAccount = require('./serviceAccountKey.json'); 
 
 if (!admin.apps.length) {
   admin.initializeApp({
     credential: admin.credential.cert(serviceAccount),
+    // Tumhari .env file me RTDB_URL pehle se hai, wahi use kar rahe hain
     databaseURL: process.env.RTDB_URL || "https://mayajaal-app-default-rtdb.firebaseio.com/"
   });
 }
 
-const db = admin.database();
+// ⚠️ Yahan Firestore ki jagah Realtime
+ Database use ho raha hai
+const db = admin.database(); 
 
 let cachedConfig = null;
 let lastFetch = 0;
@@ -19,6 +22,7 @@ async function getCentralConfig(force = false) {
   }
 
   try {
+    // Realtime Database me data fetch karne ka tarika
     const snapshot = await db.ref('bot_config/main').once('value');
     const data = snapshot.val();
 
