@@ -1,14 +1,18 @@
-const axios = require('axios');
+const admin = require('firebase-admin');
 require('dotenv').config();
 
-const SUPABASE_URL = process.env.SUPABASE_URL;
-const SUPABASE_KEY = process.env.SUPABASE_KEY;
+// Firebase initialize karna (agar pehle se initialized nahi hai)
+if (!admin.apps.length) {
+  admin.initializeApp({
+    credential: admin.credential.cert({
+      projectId: process.env.FIREBASE_PROJECT_ID,
+      clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
+      privateKey: process.env.FIREBASE_PRIVATE_KEY.replace(/\\n/g, '\n'),
+    }),
+  });
+}
 
-const SB_HEADERS = {
-  'apikey': SUPABASE_KEY,
-  'Authorization': `Bearer ${SUPABASE_KEY}`,
-  'Content-Type': 'application/json',
-};
+const db = admin.firestore();
 
 let cachedConfig = null;
 let lastFetch = 0;
@@ -19,13 +23,21 @@ async function getCentralConfig(force = false) {
   }
 
   try {
-    const r = await axios.get(
-      `${SUPABASE_URL}/rest/v1/bot_config?id=eq.1`,
-      { headers: SB_HEADERS, timeout: 5000 }
-    );
-    cachedConfig = r.data[0] || null;
+    // Firestore se config fetch karna
+    // Dhyan rakhna: Yahan 'bot_config' collection aur 'main' document ka naam hai. 
+    // Agar tumhare Firebase me kuch aur naam hai, toh usko change kar lena.
+    const docRef = db.collection('bot_config').doc('main'); 
+    const doc = await docRef.get();
+
+    if (!doc.exists) {
+      console.log('[CONFIG] Firebase me koi config nahi mili');
+      return cachedConfig;
+    }
+
+    cachedConfig = doc.data();
     lastFetch = Date.now();
     return cachedConfig;
+
   } catch (e) {
     console.error('[CONFIG] Fetch failed:', e.message);
     return cachedConfig;
