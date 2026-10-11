@@ -1,0 +1,9 @@
+node_modules/
+.env
+.env.*
+serviceAccountKey.json
+*.bak
+*.save
+*.save.*
+package-lock.json
+patch.js
