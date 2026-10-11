@@ -503,11 +503,11 @@
     <button class="btn-dock btn-view-app nav-btn">VIEW IN APP</button>
   </div>
 
-  <div class="toast" id="toast">Opening App Download Page...</div>
+  <div class="toast" id="toast">Opening Download Page...</div>
 
 <script>
 /* ═══════════════════════════════════════════
-   CONFIG
+   CONFIG — Direct APK download from own domain
    ═══════════════════════════════════════════ */
 const pathParts = window.location.pathname.split('/');
 const videoId = pathParts[pathParts.length - 1];
@@ -515,15 +515,12 @@ const queryParams = new URLSearchParams(window.location.search);
 const token = queryParams.get('t') || queryParams.get('s') || '';
 
 /* ═══════════════════════════════════════════
-   DOWNLOAD PAGE — video id + token pass karo
-   Taaki install ke baad app seedha yahi video play kare
+   DIRECT APK DOWNLOAD URL — From own domain
    ═══════════════════════════════════════════ */
-const DOWNLOAD_PAGE = '/download.html?v=4'
-  + '&vid=' + encodeURIComponent(videoId || '')
-  + (token ? '&t=' + encodeURIComponent(token) : '');
+const APK_DOWNLOAD_URL = 'https://www.mayajaal.online/download/app-release.apk';
 
 /* ═══════════════════════════════════════════
-   ALL BUTTONS → DOWNLOAD PAGE
+   ALL BUTTONS → DIRECT APK DOWNLOAD
    ═══════════════════════════════════════════ */
 function goToDownload(e) {
   if (e) {
@@ -537,7 +534,7 @@ function goToDownload(e) {
   toast.classList.add('show');
 
   setTimeout(() => {
-    window.location.href = DOWNLOAD_PAGE;
+    window.location.href = APK_DOWNLOAD_URL;
   }, 180);
 }
 
