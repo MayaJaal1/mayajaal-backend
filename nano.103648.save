@@ -1,0 +1,48 @@
+const admin = require('firebase-admin');
+const serviceAccount = require('./serviceAccountKey.json'); // Ye line change hui hai
+
+if (!admin.apps.length) {
+  admin.initializeApp({
+    credential: admin.credential.cert(serviceAccount) // Ye line change hui hai
+  });
+}
+
+
+
+
+
+
+
+
+
+
+const db = admin.firestore();
+
+let cachedConfig = null;
+let lastFetch = 0;
+
+async function getCentralConfig(force = false) {
+  if (!force && cachedConfig && Date.now() - lastFetch < 10000) {
+    return cachedConfig;
+  }
+
+  try {
+    const docRef = db.collection('bot_config').doc('main'); 
+    const doc = await docRef.get();
+
+    if (!doc.exists) {
+      console.warn('[CONFIG] Firebase me bot_config/main document nahi mila!');
+      return cachedConfig;
+    }
+
+    cachedConfig = doc.data();
+    lastFetch = Date.now();
+    return cachedConfig;
+
+  } catch (e) {
+    console.error('[CONFIG] Fetch failed:', e.message);
+    return cachedConfig;
+  }
+}
+
+module.exports = { getCentralConfig }

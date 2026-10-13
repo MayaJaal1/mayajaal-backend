@@ -1,9 +1,20 @@
-node_modules/
-.env
-.env.*
+# Sensitive files - NEVER upload to GitHub
 serviceAccountKey.json
+.env
+*.env
+.env.*
+
+# Backups
+*.backup
 *.bak
-*.save
-*.save.*
-package-lock.json
-patch.js
+*.safe
+*.fix
+bot.js.*
+*.log
+
+# Dependencies
+node_modules/
+
+# System files
+.DS_Store
+Thumbs.db

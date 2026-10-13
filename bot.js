@@ -976,23 +976,15 @@ async function getTeraboxDirectLink(shareUrl) {
 // WAIT FOR CENTRAL API CONNECTION
 // ============================================================
 async function waitForApiConnection() {
-  console.log('[BOT] Waiting for central API connection...');
-  while (true) {
-    const cfg = await getCentralConfig();
-    if (cfg && cfg.api_connected === true) {
-      console.log('[BOT] ✅ Central API Connected:', cfg.api_base);
-      return cfg;
-    }
-    console.log('[BOT] ⏳ Not connected yet. Retrying in 10s...');
-    await new Promise(r => setTimeout(r, 10000));
-  }
+    console.log('[BOT] ⚡ Local VPS mode active. No Render needed.');
+    return { api_connected: true, api_base: 'http://127.0.0.1:8080' };
 }
 
 // ============================================================
 // BOT MAIN
 // ============================================================
 (async () => {
-  await waitForApiConnection();
+  console.log("[BOT] ⚡ VPS mode active. Skipping wait.");
 
   const client = new TelegramClient(new StringSession(''), API_ID, API_HASH, {
     connectionRetries: 5,
@@ -1174,7 +1166,7 @@ async function waitForApiConnection() {
   // ===== STATS (Dashboard from RTDB — same data as website) =====
   async function sendStats(chatId, uid, editMsgId = null) {
     const lang = await getUserLang(uid);
-    const fbUser = await findUserByTelegram(uid);
+    const fbUser = null; // RTDB skip - link aage bhejo
 
     if (!fbUser) {
       const msgText = `🔒 <b>${t(lang, 'api_key_required')}</b>\n\n` +
@@ -1429,7 +1421,7 @@ async function handleDirectFile(msg, uid, lang) {
     const fbUser = await findUserByTelegram(uid);
     if (fbUser) {
       try {
-        await getRTDB().ref(`links/${shortId}`).set({
+         getRTDB().ref(`links/${shortId}`).set({
           ownerUid: fbUser.uid,
           filename: fileName,
           size: size,
@@ -1535,7 +1527,7 @@ async function handleTerabox(teraboxUrl, chatId, uid, lang) {
     const fbUser = await findUserByTelegram(uid);
     if (fbUser) {
       try {
-        await getRTDB().ref(`links/${shortId}`).set({
+         getRTDB().ref(`links/${shortId}`).set({
           ownerUid: fbUser.uid,
           filename: info.fileName,
           size: info.size,
