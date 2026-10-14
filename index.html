@@ -1,719 +1,396 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
 <head>
-<meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-<title>MAYA JAAL · Matrix Key</title>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#020705">
+<title>MayaJaal — The Digital Network</title>
+<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-database-compat.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <style>
-  * { margin: 0; padding: 0; box-sizing: border-box; }
-  
-  html, body {
-    min-height: 100%;
-    background: #000;
-    font-family: 'Courier New', monospace;
-    overflow-x: hidden;
-    color: #00ff88;
-  }
-
-  #matrix {
-    position: fixed;
-    top: 0; left: 0;
-    width: 100%; height: 100%;
-    z-index: 0;
-    opacity: 0.55;
-    transition: filter 0.3s;
-  }
-
-  /* Flash shockwave effect */
-  .flash-bang {
-    position: fixed;
-    inset: 0;
-    background: radial-gradient(circle, rgba(0,255,136,0.45) 0%, rgba(0,0,0,0) 80%);
-    z-index: 999;
-    pointer-events: none;
-    opacity: 0;
-    transition: opacity 0.08s ease-out;
-  }
-  .flash-bang.active {
-    opacity: 1;
-  }
-
-  .overlay {
-    position: relative;
-    z-index: 2;
-    min-height: 100vh;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    padding: 24px 16px;
-    background: radial-gradient(circle at center, rgba(0,0,0,0.3) 0%, rgba(0,0,0,0.85) 80%);
-  }
-
-  .card {
-    width: 100%;
-    max-width: 720px;
-    background: rgba(0, 15, 8, 0.88);
-    border: 1px solid rgba(0, 255, 136, 0.35);
-    border-radius: 14px;
-    padding: 30px 24px;
-    backdrop-filter: blur(8px);
-    box-shadow:
-      0 0 30px rgba(0, 255, 136, 0.15),
-      inset 0 0 40px rgba(0, 255, 136, 0.04);
-    animation: fadeIn 0.8s ease-out;
-    transition: transform 0.15s, box-shadow 0.2s;
-  }
-
-  .card.glitch-shake {
-    animation: cardShake 0.35s cubic-bezier(.36,.07,.19,.97) both;
-    box-shadow: 0 0 60px rgba(0, 255, 136, 0.6), inset 0 0 50px rgba(0, 255, 136, 0.2);
-  }
-
-  @keyframes cardShake {
-    10%, 90% { transform: translate3d(-2px, 0, 0); }
-    20%, 80% { transform: translate3d(3px, -2px, 0); filter: hue-rotate(90deg); }
-    30%, 50%, 70% { transform: translate3d(-5px, 2px, 0); }
-    40%, 60% { transform: translate3d(5px, 0, 0); filter: hue-rotate(0deg); }
-  }
-
-  @keyframes fadeIn {
-    from { opacity: 0; transform: translateY(20px); }
-    to   { opacity: 1; transform: translateY(0); }
-  }
-
-  .logo-container {
-    text-align: center;
-    margin-bottom: 12px;
-  }
-
-  .logo-container img {
-    width: 120px;
-    height: 120px;
-    border-radius: 50%;
-    object-fit: cover;
-    box-shadow: 0 0 25px rgba(0, 255, 136, 0.7),
-                0 0 60px rgba(0, 255, 136, 0.3);
-    animation: logoPulse 3s infinite alternate ease-in-out;
-    border: 2px solid rgba(0, 255, 136, 0.6);
-    display: inline-block;
-    background: #000;
-  }
-
-  @keyframes logoPulse {
-    0%   { transform: scale(1);    box-shadow: 0 0 20px rgba(0,255,136,0.5); }
-    100% { transform: scale(1.05); box-shadow: 0 0 40px rgba(0,255,136,0.9); }
-  }
-
-  .matrix-title {
-    font-family: 'Courier New', monospace;
-    font-size: clamp(26px, 8vw, 42px);
-    font-weight: 900;
-    color: #00ff88;
-    text-align: center;
-    letter-spacing: 6px;
-    text-transform: uppercase;
-    text-shadow:
-      0 0 10px #00ff88,
-      0 0 20px #00ff88,
-      0 0 40px rgba(0,255,136,0.6);
-    margin: 14px 0 6px;
-  }
-
-  .brand {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 10px;
-    margin-bottom: 6px;
-    margin-top: 10px;
-  }
-
-  .dot {
-    width: 9px; height: 9px;
-    border-radius: 50%;
-    background: #00ff88;
-    box-shadow: 0 0 10px #00ff88;
-    animation: pulse 1.6s infinite;
-  }
-
-  @keyframes pulse {
-    0%,100% { opacity: 1; }
-    50%     { opacity: 0.3; }
-  }
-
-  .brand span {
-    font-size: 12px;
-    letter-spacing: 3px;
-    text-transform: uppercase;
-    color: #00ff88;
-    opacity: 0.8;
-  }
-
-  h1 {
-    font-size: 22px;
-    font-weight: 700;
-    color: #d6ffe8;
-    margin-bottom: 8px;
-    letter-spacing: 1px;
-    text-align: center;
-  }
-
-  .subtitle {
-    font-size: 12.5px;
-    color: #4fbf8b;
-    margin-bottom: 20px;
-    line-height: 1.6;
-    text-align: center;
-  }
-
-  .status-line {
-    font-size: 12px;
-    color: #00ff88;
-    margin-bottom: 10px;
-    letter-spacing: 1px;
-    min-height: 16px;
-    opacity: 0.85;
-  }
-
-  .status-line::before { content: "> "; opacity: 0.6; }
-
-  .debug-box {
-    font-size: 11px;
-    color: #ffaa00;
-    background: #1a0f00;
-    border: 1px solid #553300;
-    padding: 10px 12px;
-    border-radius: 6px;
-    margin-bottom: 14px;
-    min-height: 20px;
-    word-break: break-all;
-    line-height: 1.5;
-    letter-spacing: 0.3px;
-  }
-  .debug-box.ok  { color: #00ff88; background: #001a0e; border-color: #00ff88; }
-  .debug-box.err { color: #ff5555; background: #1a0000; border-color: #ff3333; }
-
-  .key-box {
-    position: relative;
-    background: #000;
-    border: 1px solid rgba(0, 255, 136, 0.4);
-    border-radius: 10px;
-    padding: 20px 85px 20px 18px;
-    margin-bottom: 16px;
-    overflow: hidden;
-    min-height: 66px;
-    display: flex;
-    align-items: center;
-    cursor: pointer;
-    transition: border-color 0.2s;
-  }
-
-  .key-box:hover {
-    border-color: #00ff88;
-  }
-
-  .key-box::after {
-    content: "";
-    position: absolute;
-    inset: 0;
-    background: linear-gradient(90deg, transparent, rgba(0,255,136,0.12), transparent);
-    transform: translateX(-100%);
-    animation: scan 2.5s infinite;
-    pointer-events: none;
-  }
-
-  @keyframes scan {
-    0%   { transform: translateX(-100%); }
-    100% { transform: translateX(100%); }
-  }
-
-  #apiKey {
-    font-size: 16px;
-    color: #00ff88;
-    word-break: break-all;
-    letter-spacing: 2px;
-    text-shadow: 0 0 6px rgba(0,255,136,0.6);
-    font-weight: bold;
-    user-select: all;
-  }
-
-  .caret {
-    display: inline-block;
-    width: 9px;
-    height: 17px;
-    background: #00ff88;
-    margin-left: 3px;
-    vertical-align: middle;
-    animation: blink 0.9s step-end infinite;
-    box-shadow: 0 0 8px #00ff88;
-  }
-
-  @keyframes blink { 50% { opacity: 0; } }
-
-  .copy-btn {
-    position: absolute;
-    right: 10px;
-    top: 50%;
-    transform: translateY(-50%);
-    background: rgba(0, 255, 136, 0.08);
-    border: 1px solid rgba(0, 255, 136, 0.6);
-    color: #00ff88;
-    padding: 9px 14px;
-    border-radius: 6px;
-    cursor: pointer;
-    font-size: 11px;
-    letter-spacing: 1.5px;
-    font-weight: bold;
-    transition: all 0.2s;
-    font-family: inherit;
-    z-index: 2;
-  }
-
-  .copy-btn:hover {
-    background: #00ff88;
-    color: #000;
-    box-shadow: 0 0 16px rgba(0, 255, 136, 0.8);
-  }
-
-  .copy-btn.copied {
-    background: #00ff88;
-    color: #000;
-    box-shadow: 0 0 25px #00ff88;
-  }
-
-  .actions {
-    display: flex;
-    gap: 12px;
-    margin-top: 22px;
-    flex-wrap: wrap;
-  }
-
-  .btn {
-    flex: 1;
-    min-width: 140px;
-    padding: 13px 18px;
-    border-radius: 8px;
-    font-size: 12px;
-    font-family: inherit;
-    letter-spacing: 1.5px;
-    text-transform: uppercase;
-    cursor: pointer;
-    text-decoration: none;
-    text-align: center;
-    transition: all 0.25s;
-    border: 1px solid transparent;
-  }
-
-  .btn-primary {
-    background: linear-gradient(135deg, #00ff88, #00c96a);
-    color: #001a0e;
-    font-weight: 700;
-    box-shadow: 0 0 20px rgba(0, 255, 136, 0.35);
-  }
-
-  .btn-primary:hover {
-    box-shadow: 0 0 30px rgba(0, 255, 136, 0.6);
-    transform: translateY(-1px);
-  }
-
-  .btn-ghost {
-    background: transparent;
-    color: #00ff88;
-    border: 1px solid rgba(0, 255, 136, 0.4);
-  }
-
-  .btn-ghost:hover {
-    background: rgba(0, 255, 136, 0.08);
-  }
-
-  .footer-note {
-    margin-top: 26px;
-    padding-top: 18px;
-    border-top: 1px dashed rgba(0, 255, 136, 0.2);
-    font-size: 11.5px;
-    color: #4fbf8b;
-    line-height: 1.7;
-    letter-spacing: 0.3px;
-  }
-
-  .footer-note code {
-    background: rgba(0, 255, 136, 0.08);
-    padding: 2px 6px;
-    border-radius: 4px;
-    color: #7fffb8;
-    font-size: 11px;
-  }
-
-  .stat-row {
-    display: flex;
-    gap: 12px;
-    margin-top: 16px;
-    flex-wrap: wrap;
-  }
-
-  .stat {
-    flex: 1;
-    min-width: 110px;
-    padding: 12px 14px;
-    background: rgba(0, 255, 136, 0.04);
-    border-left: 2px solid #00ff88;
-    border-radius: 4px;
-  }
-
-  .stat-label {
-    font-size: 10px;
-    letter-spacing: 2px;
-    text-transform: uppercase;
-    color: #4fbf8b;
-    margin-bottom: 4px;
-  }
-
-  .stat-value {
-    font-size: 13px;
-    color: #d6ffe8;
-  }
-
-  @media (max-width: 520px) {
-    .card { padding: 22px 16px; }
-    .logo-container img { width: 95px; height: 95px; }
-    h1 { font-size: 19px; }
-    #apiKey { font-size: 13px; letter-spacing: 1.2px; }
-    .key-box { padding: 16px 72px 16px 14px; }
-    .matrix-title { letter-spacing: 3px; }
-  }
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{background:#020705;color:#effff5;font-family:Inter,system-ui,-apple-system,sans-serif;min-height:100vh;overflow-x:hidden;-webkit-font-smoothing:antialiased;-webkit-tap-highlight-color:transparent}
+button{font-family:inherit;cursor:pointer;border:0;background:none;color:inherit}
+a{color:inherit;text-decoration:none}
+input,select,textarea{font-family:inherit}
+#matrix{position:fixed;inset:0;width:100%;height:100%;z-index:0;opacity:.45;pointer-events:none}
+.vig{position:fixed;inset:0;z-index:1;pointer-events:none;background:radial-gradient(ellipse at 50% 25%,transparent 0%,rgba(0,0,0,.4) 55%,#000 100%)}
+.loading-screen{position:fixed;inset:0;z-index:9999;background:#020705;display:flex;flex-direction:column;align-items:center;justify-content:center;transition:opacity .4s ease}
+.loading-screen.hide{opacity:0;pointer-events:none}
+.loading-eye{width:100px;height:100px;animation:loadPulse 1.4s ease-in-out infinite}
+@keyframes loadPulse{0%,100%{transform:scale(1);filter:drop-shadow(0 0 20px rgba(0,255,120,.4))}50%{transform:scale(1.08);filter:drop-shadow(0 0 40px rgba(0,255,120,.8))}}
+.loading-text{margin-top:18px;color:#00ff78;font-size:.78rem;letter-spacing:.3em;text-transform:uppercase;animation:loadBlink 1.4s ease-in-out infinite}
+@keyframes loadBlink{0%,100%{opacity:.5}50%{opacity:1}}
+.loading-dots{margin-top:12px;display:flex;gap:8px}
+.loading-dots span{width:8px;height:8px;border-radius:50%;background:#00ff78;box-shadow:0 0 12px #00ff78;animation:dotBounce 1.4s ease-in-out infinite}
+.loading-dots span:nth-child(2){animation-delay:.2s}
+.loading-dots span:nth-child(3){animation-delay:.4s}
+@keyframes dotBounce{0%,80%,100%{transform:scale(.4);opacity:.3}40%{transform:scale(1);opacity:1}}
+.login-screen{position:relative;z-index:2;min-height:100vh;display:none;align-items:center;justify-content:center;padding:24px 16px}
+.login-screen.show{display:flex;animation:screenFade .4s ease}
+@keyframes screenFade{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}
+.login-card{width:100%;max-width:440px;background:linear-gradient(135deg,rgba(5,28,17,.95),rgba(2,10,7,.95));border:1px solid rgba(0,255,120,.3);border-radius:22px;padding:40px 28px;text-align:center;backdrop-filter:blur(12px);box-shadow:0 0 60px rgba(0,255,120,.15);position:relative;overflow:hidden}
+.login-card::before{content:"";position:absolute;top:0;left:0;right:0;height:1px;background:linear-gradient(90deg,transparent,#00ff78,transparent);opacity:.7}
+.login-eye{width:100px;height:100px;margin:0 auto 14px;display:block;filter:drop-shadow(0 0 25px rgba(0,255,120,.5))}
+.login-card h1{font-size:2.4rem;font-weight:900;letter-spacing:-1.5px;color:#00ff78;margin-bottom:6px;text-shadow:0 0 20px rgba(0,255,120,.5)}
+.login-card h1 span{color:#d7ffe7;font-weight:400}
+.tagline{color:#91b8a4;font-size:.88rem;margin-bottom:26px;line-height:1.5}
+.google-btn{display:flex;align-items:center;justify-content:center;gap:12px;width:100%;background:#fff;color:#1a1a1a;padding:15px;border-radius:12px;font-size:.95rem;font-weight:600;transition:.2s}
+.google-btn:hover:not(:disabled){transform:translateY(-2px);box-shadow:0 10px 30px rgba(255,255,255,.15)}
+.google-btn:disabled{opacity:.6;cursor:wait}
+.google-btn svg{width:20px;height:20px;flex-shrink:0}
+.err-msg{margin-top:14px;padding:11px 14px;border-radius:10px;background:#1a0e0e;border:1px solid #ff6b6b;color:#ffb3b3;font-size:.78rem;display:none;text-align:left}
+.err-msg.on{display:block}
+.features{margin-top:24px;padding-top:20px;border-top:1px dashed rgba(0,255,120,.2);display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px}
+.feat .fi{font-size:1.3rem;margin-bottom:4px}
+.feat .ft{font-size:.62rem;color:#6f9981;text-transform:uppercase;letter-spacing:.08em}
+.login-foot{margin-top:18px;font-size:.72rem;color:#6f9981;line-height:1.6}
+.top-bar{position:fixed;top:0;left:0;right:0;z-index:100;background:rgba(2,7,5,.95);backdrop-filter:blur(12px);border-bottom:1px solid rgba(0,255,120,.2);padding:10px 14px;display:flex;align-items:center;justify-content:space-between;gap:10px}
+.top-left{display:flex;align-items:center;gap:10px;flex:1;min-width:0}
+.menu-btn{width:42px;height:42px;border-radius:12px;background:#04180e;border:1px solid rgba(0,255,120,.3);display:flex;flex-direction:column;justify-content:center;align-items:center;gap:5px;padding:10px;flex-shrink:0}
+.menu-btn span{display:block;width:20px;height:2px;background:#00ff78;border-radius:2px;transition:.3s}
+.menu-btn.open span:nth-child(1){transform:translateY(7px) rotate(45deg)}
+.menu-btn.open span:nth-child(2){opacity:0}
+.menu-btn.open span:nth-child(3){transform:translateY(-7px) rotate(-45deg)}
+.top-brand{font-weight:900;font-size:1.3rem;letter-spacing:-1px;color:#00ff78;text-shadow:0 0 10px rgba(0,255,120,.4);white-space:nowrap}
+.top-brand span{color:#d7ffe7;font-weight:400}
+.top-right{display:flex;align-items:center;gap:8px}
+.icon-btn{width:42px;height:42px;border-radius:12px;background:#04180e;border:1px solid rgba(0,255,120,.3);display:flex;align-items:center;justify-content:center;font-size:1.15rem;position:relative;transition:.2s}
+.icon-btn:hover{background:#052a15}
+.icon-btn.bell{animation:bellShake 3s ease-in-out infinite}
+@keyframes bellShake{0%,85%,100%{transform:rotate(0)}88%{transform:rotate(-12deg)}91%{transform:rotate(12deg)}94%{transform:rotate(-8deg)}97%{transform:rotate(8deg)}}
+.notif-dot{position:absolute;top:6px;right:6px;width:9px;height:9px;border-radius:50%;background:#ff4d4d;box-shadow:0 0 8px #ff4d4d;animation:pulseDot 1.6s infinite}
+.profile-btn{display:flex;align-items:center;gap:8px;background:#04180e;border:1px solid rgba(0,255,120,.3);border-radius:99px;padding:4px 10px 4px 4px;transition:.2s;max-width:180px}
+.profile-btn:hover{background:#052a15}
+.profile-btn .p-img{width:32px;height:32px;border-radius:50%;border:2px solid #00ff78;object-fit:cover;background:#000;position:relative;flex-shrink:0}
+.profile-btn .p-name{font-size:.78rem;color:#00ff78;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.side-menu{position:fixed;top:0;left:-340px;width:300px;height:100vh;background:#03110a;border-right:1px solid rgba(0,255,120,.3);z-index:200;transition:left .3s cubic-bezier(.4,0,.2,1);padding:76px 14px 20px;overflow-y:auto}
+.side-menu.open{left:0}
+.menu-overlay{position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:199;opacity:0;pointer-events:none;transition:.3s}
+.menu-overlay.open{opacity:1;pointer-events:auto}
+.menu-user{display:flex;align-items:center;gap:10px;padding:12px;background:#04180e;border-radius:12px;margin-bottom:14px;border:1px solid rgba(0,255,120,.2)}
+.menu-user img{width:44px;height:44px;border-radius:50%;border:2px solid #00ff78;object-fit:cover;background:#000;flex-shrink:0}
+.menu-user .mu-name{font-size:.78rem;overflow:hidden;flex:1;min-width:0}
+.menu-user .mu-name b{display:flex;align-items:center;gap:6px;color:#00ff78;font-size:.88rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-bottom:2px}
+.menu-user .mu-name span{color:#91b8a4;font-size:.7rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;display:block}
+.menu-item{display:flex;align-items:center;gap:12px;padding:13px 12px;color:#effff5;border-radius:10px;font-size:.9rem;width:100%;text-align:left;transition:.2s;font-family:inherit;border:0;background:none}
+.menu-item:hover{background:#041a0e;color:#00ff78}
+.menu-item .ico{color:#00ff78;font-size:1.15rem;width:24px;text-align:center;flex-shrink:0}
+.menu-item .lbl{flex:1;text-align:left}
+.menu-item .badge{background:#00ff78;color:#001b0c;font-size:.62rem;font-weight:800;padding:2px 8px;border-radius:99px}
+.menu-section{margin-top:16px;padding-top:16px;border-top:1px solid rgba(0,255,120,.2)}
+.menu-section h4{font-size:.68rem;color:#6f9981;text-transform:uppercase;letter-spacing:.15em;margin-bottom:8px;padding-left:12px}
+.social-btn{display:flex;align-items:center;gap:12px;padding:12px;color:#effff5;border-radius:10px;font-size:.88rem;width:100%;text-align:left;transition:.2s;background:none;border:0;text-decoration:none}
+.social-btn:hover{background:#041a0e;color:#00ff78}
+.social-logo{width:26px;height:26px;border-radius:8px;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.social-logo svg{width:18px;height:18px;fill:#fff}
+.social-logo.ig{background:linear-gradient(45deg,#f09433,#e6683c,#dc2743,#cc2366,#bc1888)}
+.social-logo.yt{background:#ff0000}
+.social-logo.tg{background:#229ED9}
+.app{display:none;position:relative;z-index:2;padding-top:70px;padding-bottom:40px}
+.app.on{display:block}
+.wrap{width:min(1180px,calc(100% - 24px));margin:auto;padding:16px 0}
+.hero{text-align:center;padding:14px 0 8px}
+.eyebrow{color:#00ff78;letter-spacing:.3em;font-size:.68rem;font-weight:800;margin-bottom:8px}
+.hero h1{font-size:clamp(1.7rem,5.5vw,2.8rem);margin:6px 0;letter-spacing:-1px;font-weight:900}
+.hero h1 em{font-style:normal;color:#00ff78}
+.sub{color:#91b8a4;max-width:560px;margin:8px auto;line-height:1.6;font-size:.9rem}
+.eye-box{width:min(640px,100%);margin:14px auto;position:relative;filter:drop-shadow(0 0 25px rgba(0,255,120,.3))}
+.eye-box svg{width:100%;height:auto;display:block}
+.eyelid{transform-box:fill-box;transition:transform .09s ease-in-out}
+.eyelid.top{transform-origin:50% 100%;transform:scaleY(0)}
+.eyelid.bot{transform-origin:50% 0%;transform:scaleY(0)}
+.blink .eyelid.top{transform:scaleY(1)}
+.blink .eyelid.bot{transform:scaleY(1)}
+.status{display:inline-flex;gap:8px;align-items:center;color:#9bffbd;border:1px solid rgba(0,255,120,.25);background:#04170d;padding:7px 14px;border-radius:99px;font-size:.75rem;margin-top:6px}
+.dot{width:7px;height:7px;border-radius:50%;background:#00ff78;box-shadow:0 0 10px #00ff78;display:inline-block;animation:pulseDot 1.6s infinite}
+@keyframes pulseDot{0%,100%{opacity:1}50%{opacity:.35}}
+.card{background:linear-gradient(135deg,rgba(5,28,17,.95),rgba(2,10,7,.95));border:1px solid rgba(0,255,120,.3);border-radius:18px;padding:20px;margin-top:18px;position:relative;overflow:hidden}
+.card::before{content:"";position:absolute;top:0;left:0;right:0;height:1px;background:linear-gradient(90deg,transparent,#00ff78,transparent);opacity:.5}
+.card h2{font-size:.78rem;color:#00ff78;letter-spacing:.15em;text-transform:uppercase;margin-bottom:8px;display:flex;align-items:center;gap:8px}
+.card-desc{color:#91b8a4;font-size:.78rem;margin-bottom:14px;line-height:1.5}
+.api-row{display:flex;gap:10px;align-items:center;background:#020a06;border:1px solid rgba(0,255,120,.3);border-radius:12px;padding:14px 16px;flex-wrap:wrap}
+.key-text{flex:1;font-family:'Courier New',monospace;color:#00ff78;font-size:.88rem;word-break:break-all;letter-spacing:1.5px;font-weight:bold;min-width:200px;text-shadow:0 0 8px rgba(0,255,120,.4)}
+.copy{background:#00ff78;color:#001b0c;padding:10px 20px;border-radius:8px;font-weight:800;font-size:.78rem;transition:.2s;white-space:nowrap;display:flex;align-items:center;gap:6px}
+.copy:hover{background:#00e86b}
+.copy.copied{background:#fff}
+.bot-hint{margin-top:12px;padding:12px 14px;background:#04180e;border-radius:10px;border-left:3px solid #00ff78;font-size:.78rem;color:#91b8a4;line-height:1.7}
+.bot-hint code{background:rgba(0,255,120,.12);padding:3px 8px;border-radius:5px;color:#7fffb8;font-family:'Courier New',monospace;word-break:break-all;font-size:.78rem}
+.activate-btn{display:flex;align-items:center;justify-content:center;gap:8px;background:#00ff78;color:#001b0c;padding:13px 20px;border-radius:11px;font-weight:800;font-size:.88rem;text-align:center;margin-top:14px;transition:.2s}
+.activate-btn:hover{background:#00e86b}
+.dash-title{display:flex;align-items:center;justify-content:space-between;margin:22px 0 12px;flex-wrap:wrap;gap:10px}
+.dash-title h2{font-size:1.05rem;letter-spacing:.05em;display:flex;align-items:center;gap:8px}
+.dash-title h2 span{color:#00ff78}
+.live{font-size:.7rem;color:#9bffbd;border:1px solid rgba(0,255,120,.3);padding:5px 12px;border-radius:99px;display:inline-flex;align-items:center;gap:6px}
+.grid{display:grid;grid-template-columns:repeat(2,1fr);gap:11px;margin-bottom:14px}
+.stat{background:#04180e;border:1px solid rgba(0,255,120,.25);border-radius:12px;padding:15px;text-align:center;transition:.2s}
+.stat:hover{border-color:rgba(0,255,120,.5);transform:translateY(-2px)}
+.stat h4{margin:0 0 7px;color:#91b8a4;font-size:.66rem;font-weight:normal;text-transform:uppercase;letter-spacing:.06em}
+.stat .v{font-size:1.35rem;font-weight:bold;color:#00ff78;word-break:break-word}
+.stat .v.gold{color:#ffd700}
+.chart-box{background:#04180e;border:1px solid rgba(0,255,120,.25);border-radius:14px;padding:16px;height:320px;position:relative}
+.chart-box h4{margin:0 0 14px;font-size:.88rem;color:#effff5;font-weight:normal;display:flex;justify-content:space-between;align-items:center}
+.chart-box h4 span{color:#6f9981;font-size:.72rem}
+.withdraw-box{margin-top:18px;padding:18px;border:1px solid rgba(255,215,0,.3);border-radius:18px;background:linear-gradient(135deg,rgba(30,25,5,.9),rgba(10,8,2,.9))}
+.withdraw-box h3{color:#ffd700;font-size:.85rem;letter-spacing:.12em;text-transform:uppercase;margin-bottom:12px;display:flex;align-items:center;gap:8px}
+.withdraw-info{color:#c9b876;font-size:.78rem;line-height:1.7;margin-bottom:14px}
+.withdraw-btn{display:flex;align-items:center;justify-content:center;gap:8px;width:100%;padding:13px;border-radius:11px;font-weight:800;font-size:.88rem;background:linear-gradient(90deg,#ffd700,#ffb800);color:#1a1300;transition:.2s}
+.withdraw-btn:hover{transform:translateY(-2px);box-shadow:0 8px 24px rgba(255,215,0,.3)}
+.withdraw-btn:disabled{opacity:.5;cursor:not-allowed;transform:none}
+.bots-section{margin-top:22px;padding:18px;border:1px solid rgba(0,255,120,.25);border-radius:18px;background:linear-gradient(135deg,rgba(5,28,17,.9),rgba(2,10,7,.9))}
+.bots-section h3{color:#00ff78;font-size:.78rem;letter-spacing:.15em;text-transform:uppercase;margin-bottom:14px}
+.bot-links{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.bot-link{display:flex;align-items:center;gap:14px;padding:15px;border:1px solid rgba(0,255,120,.25);border-radius:12px;background:#04180e;transition:.2s}
+.bot-link:hover{border-color:#00ff78;background:#052a15;transform:translateY(-2px)}
+.bot-link .b-ico{font-size:1.5rem;color:#00ff78;flex-shrink:0}
+.bot-link .b-info h4{font-size:.92rem;margin-bottom:3px;color:#effff5}
+.bot-link .b-info p{font-size:.72rem;color:#91b8a4}
+.info-section{margin-top:22px;padding:18px;border:1px solid rgba(0,255,120,.25);border-radius:18px;background:#04180e}
+.info-section h3{color:#00ff78;font-size:.78rem;letter-spacing:.15em;text-transform:uppercase;margin-bottom:12px}
+.info-grid{display:grid;grid-template-columns:1fr;gap:10px}
+.info-item{display:flex;gap:10px;padding:12px;background:#020a06;border-radius:10px;font-size:.82rem;color:#91b8a4;line-height:1.6}
+.info-item .num{color:#00ff78;font-weight:800;flex-shrink:0}
+.app-download{margin-top:22px;padding:20px;border:1px solid rgba(0,255,120,.3);border-radius:18px;background:linear-gradient(135deg,rgba(5,28,17,.95),rgba(2,10,7,.95));text-align:center}
+.app-download h3{color:#00ff78;font-size:1rem;margin-bottom:8px}
+.app-download p{color:#91b8a4;font-size:.82rem;margin-bottom:14px;line-height:1.5}
+.dl-btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;background:linear-gradient(90deg,#00ff78,#00c963);color:#001b0c;padding:14px 28px;border-radius:11px;font-weight:800;font-size:.9rem;transition:.2s}
+.dl-btn:hover{transform:translateY(-2px);box-shadow:0 8px 24px rgba(0,255,120,.3)}
+.footer{text-align:center;padding:30px 0 16px;color:#6f9981;font-size:.75rem;border-top:1px dashed rgba(0,255,120,.15);margin-top:26px}
+.modal-bg{position:fixed;inset:0;background:rgba(0,0,0,.8);backdrop-filter:blur(6px);z-index:300;display:none;align-items:center;justify-content:center;padding:16px}
+.modal-bg.on{display:flex;animation:screenFade .3s ease}
+.modal{width:min(560px,100%);max-height:85vh;overflow-y:auto;border:1px solid #00c963;background:#03110a;border-radius:18px;padding:22px}
+.modal-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;padding-bottom:12px;border-bottom:1px solid rgba(0,255,120,.2);position:sticky;top:0;background:#03110a;z-index:1}
+.modal-head h2{font-size:1.15rem;color:#00ff78;display:flex;align-items:center;gap:8px}
+.close-x{color:#00ff78;font-size:1.7rem;line-height:1;padding:0 6px;background:none;border:0}
+.modal-body{color:#b6d5c2;line-height:1.65;font-size:.88rem}
+.modal-body h3{color:#00ff78;font-size:.95rem;margin:14px 0 8px}
+.modal-body p{margin-bottom:10px}
+.modal-body ul{margin:8px 0 12px 20px}
+.modal-body li{margin-bottom:6px}
+.modal-body a{color:#00ff78;text-decoration:underline;word-break:break-word}
+.form-row{margin:14px 0}
+.form-row label{display:block;font-size:.82rem;color:#dfffea;margin-bottom:6px}
+.form-row select,.form-row input{width:100%;background:#020a06;color:#fff;border:1px solid rgba(0,255,120,.3);border-radius:10px;padding:11px;font-family:inherit;font-size:.88rem;outline:none}
+.form-row select:focus,.form-row input:focus{border-color:#00ff78}
+.btn-save{background:#00ff78;color:#001b0c;padding:12px 20px;border-radius:10px;font-weight:800;font-size:.88rem;width:100%}
+.verify-badge{display:inline-flex;align-items:center;justify-content:center;flex-shrink:0}
+.verify-badge svg{width:16px;height:16px;color:#00ff78;filter:drop-shadow(0 0 4px rgba(0,255,120,.6))}
+.verify-badge.gold svg{color:#ffd700}
+.verify-badge.blue svg{color:#1DA1F2}
+.toast{position:fixed;bottom:80px;left:50%;transform:translateX(-50%) translateY(20px);background:#03110a;border:1px solid #00ff78;color:#00ff78;padding:12px 22px;border-radius:12px;font-size:.85rem;font-weight:600;z-index:9999;opacity:0;pointer-events:none;transition:.3s;box-shadow:0 8px 32px rgba(0,255,120,.25)}
+.toast.on{opacity:1;transform:translateX(-50%) translateY(0)}
+@media(min-width:600px){.grid{grid-template-columns:repeat(3,1fr)}.login-card{padding:48px 40px}.login-card h1{font-size:2.6rem}.info-grid{grid-template-columns:1fr 1fr}}
+@media(min-width:900px){.grid{grid-template-columns:repeat(6,1fr)}.chart-box{height:380px}}
+@media(max-width:520px){.login-card{padding:32px 22px}.login-card h1{font-size:2rem}.top-brand{font-size:1.05rem}.profile-btn .p-name{display:none}.profile-btn{padding:3px}.icon-btn{width:38px;height:38px;font-size:1rem}.menu-btn{width:38px;height:38px}.key-text{font-size:.78rem;letter-spacing:1px}.bot-links{grid-template-columns:1fr}.chart-box{height:280px;padding:14px}.card{padding:16px 14px}}
 </style>
 </head>
 <body>
-
-<div class="flash-bang" id="flashBang"></div>
 <canvas id="matrix"></canvas>
-
-<div class="overlay">
-  <div class="card" id="mainCard">
-
-    <!-- 🌟 ORIGINAL 3D MAYA JAAL PHOTO LOGO -->
-    <div class="logo-container">
-      <img 
-        src="https://files.catbox.moe/k3159k.jpg" 
-        alt="Maya Jaal Logo" 
-        referrerpolicy="no-referrer"
-        crossorigin="anonymous"
-      />
-    </div>
-
-    <div class="matrix-title">MAYA JAAL</div>
-
-    <div class="brand">
-      <div class="dot"></div>
-      <span>Secure Neural Node</span>
-    </div>
-
-    <h1>Your Matrix Key</h1>
-    <p class="subtitle">
-      Aapki unique encrypted Matrix Key connect karne ke liye taiyar hai. Ek tap se copy karein aur bot mein activate karein.
-    </p>
-
-    <div class="status-line" id="status">initializing secure channel...</div>
-
-    <div class="debug-box" id="debug">Debug: waiting...</div>
-
-    <div class="key-box" onclick="copyKey()" title="Click to copy">
-      <span id="apiKey"></span><span class="caret" id="caret" style="display:none"></span>
-      <button class="copy-btn" id="copyBtn" style="display:none;" onclick="event.stopPropagation(); copyKey();">COPY</button>
-    </div>
-
-    <div class="stat-row" id="statRow" style="display:none;">
-      <div class="stat">
-        <div class="stat-label">Status</div>
-        <div class="stat-value" style="color:#00ff88;">● Active</div>
-      </div>
-      <div class="stat">
-        <div class="stat-label">Security</div>
-        <div class="stat-value">SHA-256</div>
-      </div>
-      <div class="stat">
-        <div class="stat-label">Created</div>
-        <div class="stat-value" id="createdAt">—</div>
-      </div>
-    </div>
-
-    <div class="actions">
-      <a href="https://t.me/Mayajaalfilebot" target="_blank" class="btn btn-primary">Open Telegram Bot</a>
-      <button class="btn btn-ghost" onclick="regenerate()">Regenerate Key</button>
-    </div>
-
-    <div class="footer-note">
-      <strong style="color:#7fffb8;">Kaise use karein:</strong><br/>
-      1. Upar wali Matrix Key par tap karke copy karein.<br/>
-      2. Telegram bot kholiye aur <code>/api YOUR_KEY</code> bhejein.<br/>
-      3. Bot se direct file stream &amp; manage karein.<br/>
-      <span style="color:#ff6b6b;">⚠ Ye key kisi ke sath share na karein.</span>
-    </div>
-  </div>
+<div class="vig"></div>
+<div class="loading-screen" id="loadingScreen">
+<svg class="loading-eye" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg"><defs><radialGradient id="ldIris" cx="50%" cy="45%" r="60%"><stop offset="0%" stop-color="#0a3d24"/><stop offset="40%" stop-color="#0a7a42"/><stop offset="75%" stop-color="#00ff78"/><stop offset="100%" stop-color="#041a0e"/></radialGradient><clipPath id="ldClip"><path d="M8 50 Q25 15 50 18 Q75 15 92 50 Q75 85 50 82 Q25 85 8 50 Z"/></clipPath></defs><path d="M8 50 Q25 15 50 18 Q75 15 92 50 Q75 85 50 82 Q25 85 8 50 Z" fill="#f0f7f2" stroke="#0a1f12" stroke-width="1.5"/><g clip-path="url(#ldClip)"><ellipse cx="50" cy="50" rx="16" ry="18" fill="url(#ldIris)"/><ellipse cx="50" cy="50" rx="7" ry="8" fill="#000"/><circle cx="45" cy="43" r="3" fill="#fff" opacity=".95"/></g><path d="M8 50 Q25 15 50 18 Q75 15 92 50" fill="none" stroke="#00ff78" stroke-width="2" stroke-linecap="round"/><path d="M8 50 Q25 85 50 82 Q75 85 92 50" fill="none" stroke="#00c963" stroke-width="1.5"/></svg>
+<div class="loading-text">Initializing</div>
+<div class="loading-dots"><span></span><span></span><span></span></div>
 </div>
+<div class="login-screen" id="loginScreen">
+<div class="login-card">
+<svg class="login-eye" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg"><defs><radialGradient id="lgIris" cx="50%" cy="45%" r="60%"><stop offset="0%" stop-color="#0a3d24"/><stop offset="40%" stop-color="#0a7a42"/><stop offset="75%" stop-color="#00ff78"/><stop offset="100%" stop-color="#041a0e"/></radialGradient><clipPath id="lgClip"><path d="M8 50 Q25 15 50 18 Q75 15 92 50 Q75 85 50 82 Q25 85 8 50 Z"/></clipPath></defs><path d="M8 50 Q25 15 50 18 Q75 15 92 50 Q75 85 50 82 Q25 85 8 50 Z" fill="#f0f7f2" stroke="#0a1f12" stroke-width="1.5"/><g clip-path="url(#lgClip)"><ellipse cx="50" cy="50" rx="16" ry="18" fill="url(#lgIris)"/><ellipse cx="50" cy="50" rx="7" ry="8" fill="#000"/><circle cx="45" cy="43" r="3" fill="#fff" opacity=".95"/><circle cx="56" cy="55" r="1.5" fill="#fff" opacity=".7"/></g><path d="M8 50 Q25 15 50 18 Q75 15 92 50" fill="none" stroke="#00ff78" stroke-width="2" stroke-linecap="round"/><path d="M8 50 Q25 85 50 82 Q75 85 92 50" fill="none" stroke="#00c963" stroke-width="1.5"/></svg>
+<h1>maya<span>Jaal</span></h1>
+<p class="tagline" id="i18nLoginTag">Sign in with Google to access your dashboard, API key & earnings</p>
+<button class="google-btn" id="googleBtn">
+<svg viewBox="0 0 48 48"><path fill="#FFC107" d="M43.6 20.5H42V20H24v8h11.3C33.7 32.9 29.3 36 24 36c-6.6 0-12-5.4-12-12s5.4-12 12-12c3.1 0 5.8 1.2 7.9 3.1l5.7-5.7C34 6.1 29.3 4 24 4 12.9 4 4 12.9 4 24s8.9 20 20 20 20-8.9 20-20c0-1.3-.1-2.3-.4-3.5z"/><path fill="#FF3D00" d="M6.3 14.7l6.6 4.8C14.7 15.1 19 12 24 12c3.1 0 5.8 1.2 7.9 3.1l5.7-5.7C34 6.1 29.3 4 24 4 16.3 4 9.7 8.3 6.3 14.7z"/><path fill="#4CAF50" d="M24 44c5.2 0 9.9-2 13.4-5.2l-6.2-5.2C29.2 35.3 26.7 36 24 36c-5.2 0-9.6-3.1-11.3-7.6l-6.5 5C9.5 39.6 16.2 44 24 44z"/><path fill="#1976D2" d="M43.6 20.5H42V20H24v8h11.3c-.8 2.3-2.3 4.2-4.1 5.6l6.2 5.2C40.9 35.9 44 30.5 44 24c0-1.3-.1-2.3-.4-3.5z"/></svg>
+<span id="googleBtnText">Sign in with Google</span>
+</button>
+<div class="err-msg" id="errMsg"></div>
+<div class="features">
+<div class="feat"><div class="fi">🔑</div><div class="ft" id="i18nFeatApi">API Key</div></div>
+<div class="feat"><div class="fi">📊</div><div class="ft" id="i18nFeatStats">Live Stats</div></div>
+<div class="feat"><div class="fi">⚡</div><div class="ft" id="i18nFeatSync">Bot Sync</div></div>
+</div>
+<p class="login-foot" id="i18nLoginFoot">Your data is linked to your Gmail. Come back anytime — same API & data.</p>
+</div>
+</div>
+<div class="top-bar" id="topBar" style="display:none">
+<div class="top-left">
+<button class="menu-btn" id="menuBtn" aria-label="Menu"><span></span><span></span><span></span></button>
+<div class="top-brand">maya<span>Jaal</span></div>
+</div>
+<div class="top-right">
+<button class="icon-btn bell" id="notifBtn" aria-label="Notifications">🔔<span class="notif-dot" id="notifDot" style="display:none"></span></button>
+<button class="profile-btn" id="profileBtn">
+<img class="p-img" id="topPic" src="" alt="">
+<span class="p-name" id="topName">User</span>
+</button>
+</div>
+</div>
+<div class="side-menu" id="sideMenu">
+<div class="menu-user">
+<img id="mPic" src="" alt="">
+<div class="mu-name">
+<b><span id="mName">User</span> <span class="verify-badge" id="mBadge" style="display:none"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l2.4 2.1 3.2-.3.7 3.1 2.9 1.4-1.5 2.9 1.5 2.9-2.9 1.4-.7 3.1-3.2-.3L12 20l-2.4-2.1-3.2.3-.7-3.1-2.9-1.4 1.5-2.9-1.5-2.9 2.9-1.4.7-3.1 3.2.3L12 2zm-1.3 13.2l5-5-1.4-1.4-3.6 3.6-1.6-1.6-1.4 1.4 3 3z"/></svg></span></b>
+<span id="mEmail">email</span>
+</div>
+</div>
+<button class="menu-item" data-act="profile"><span class="ico">👤</span><span class="lbl" id="i18nProfile">Profile</span></button>
+<button class="menu-item" data-act="download"><span class="ico">📥</span><span class="lbl" id="i18nDownload">Download App</span><span class="badge">NEW</span></button>
+<button class="menu-item" data-act="withdraw"><span class="ico">💸</span><span class="lbl" id="i18nWithdraw">Withdrawal</span></button>
+<button class="menu-item" data-act="info"><span class="ico">ℹ️</span><span class="lbl" id="i18nInfo">Information</span></button>
+<button class="menu-item" data-act="settings"><span class="ico">⚙️</span><span class="lbl" id="i18nSettings">Settings</span></button>
+<button class="menu-item" data-act="support"><span class="ico">☏</span><span class="lbl" id="i18nHelp">Help & Support</span></button>
+<button class="menu-item" data-act="privacy"><span class="ico">🛡️</span><span class="lbl" id="i18nPrivacy">Privacy Policy</span></button>
+<button class="menu-item" data-act="terms"><span class="ico">📜</span><span class="lbl" id="i18nTerms">Terms & Conditions</span></button>
+<div class="menu-section">
+<h4 id="i18nSocial">Join Us</h4>
+<a class="social-btn" href="https://instagram.com/maya_jaal_official" target="_blank" rel="noopener"><span class="social-logo ig"><svg viewBox="0 0 24 24"><path d="M12 2.2c3.2 0 3.6 0 4.9.1 1.2.1 1.8.3 2.2.4.6.2 1 .5 1.4.9.4.4.7.8.9 1.4.2.4.3 1 .4 2.2.1 1.3.1 1.7.1 4.9s0 3.6-.1 4.9c-.1 1.2-.3 1.8-.4 2.2-.2.6-.5 1-.9 1.4-.4.4-.8.7-1.4.9-.4.2-1 .3-2.2.4-1.3.1-1.7.1-4.9.1s-3.6 0-4.9-.1c-1.2-.1-1.8-.3-2.2-.4-.6-.2-1-.5-1.4-.9-.4-.4-.7-.8-.9-1.4-.2-.4-.3-1-.4-2.2-.1-1.3-.1-1.7-.1-4.9s0-3.6.1-4.9c.1-1.2.3-1.8.4-2.2.2-.6.5-1 .9-1.4.4-.4.8-.7 1.4-.9.4-.2 1-.3 2.2-.4 1.3-.1 1.7-.1 4.9-.1zm0 3.8c-3.3 0-6 2.7-6 6s2.7 6 6 6 6-2.7 6-6-2.7-6-6-6zm0 9.9c-2.2 0-3.9-1.7-3.9-3.9s1.7-3.9 3.9-3.9 3.9 1.7 3.9 3.9-1.7 3.9-3.9 3.9zm6.4-10.1c0 .8-.6 1.4-1.4 1.4s-1.4-.6-1.4-1.4.6-1.4 1.4-1.4 1.4.6 1.4 1.4z"/></svg></span><span>Instagram</span></a>
+<a class="social-btn" href="https://youtube.com/@mayajaalofficial00" target="_blank" rel="noopener"><span class="social-logo yt"><svg viewBox="0 0 24 24"><path d="M23 7s-.2-1.5-.9-2.2c-.8-.9-1.7-.9-2.1-1C17.6 3.5 12 3.5 12 3.5s-5.6 0-8 .3c-.4.1-1.3.1-2.1 1C1.2 5.5 1 7 1 7S.8 8.8.8 10.5v1.6c0 1.7.2 3.5.2 3.5s.2 1.5.9 2.2c.8.9 1.9.8 2.4.9 1.7.2 7.7.3 7.7.3s5.6 0 8-.3c.4-.1 1.3-.1 2.1-1 .7-.7.9-2.2.9-2.2s.2-1.8.2-3.5v-1.6c0-1.7-.2-3.5-.2-3.5zM9.7 14.7V8.9l6 2.9-6 2.9z"/></svg></span><span>YouTube</span></a>
+<a class="social-btn" href="https://t.me/MayaJaalSupport" target="_blank" rel="noopener"><span class="social-logo tg"><svg viewBox="0 0 24 24"><path d="M9.8 15.7l-.3 3.8c.4 0 .8-.2 1.1-.5l2.7-2.6 5.5 4.1c1 .6 1.7.3 2-.9l3.6-17.1c.3-1.5-.5-2.1-1.5-1.7L1.7 9.6c-1.5.6-1.4 1.4-.3 1.8l5.6 1.7L19.7 6c.6-.4 1.2-.2.7.3"/></svg></span><span>Telegram</span></a>
+</div>
+<div class="menu-section">
+<h4>Logout</h4>
+<button class="menu-item" id="logoutMenuBtn" style="color:#ff6b6b"><span class="ico" style="color:#ff6b6b">⎋</span><span class="lbl">Logout</span></button>
+</div>
+</div>
+<div class="menu-overlay" id="menuOverlay"></div>
+<div class="app" id="appScreen">
+<div class="wrap">
+<div class="hero">
+<div class="eyebrow" id="i18nEyebrow">VIDEOS · LINKS · BEYOND</div>
+<h1><em id="i18nWelcome">ENTER THE</em> MAYAJAAL</h1>
+<p class="sub" id="i18nTagline">Your digital universe. One portal for your files, links, tools and community.</p>
+<div class="eye-box" id="eyeBox">
+<svg viewBox="0 0 800 340" xmlns="http://www.w3.org/2000/svg"><defs><radialGradient id="sclera" cx="50%" cy="50%" r="70%"><stop offset="0%" stop-color="#ffffff"/><stop offset="50%" stop-color="#f0f7f2"/><stop offset="80%" stop-color="#cadad0"/><stop offset="100%" stop-color="#7d9486"/></radialGradient><radialGradient id="iris" cx="50%" cy="45%" r="60%"><stop offset="0%" stop-color="#0a3d24"/><stop offset="35%" stop-color="#0a7a42"/><stop offset="65%" stop-color="#00c963"/><stop offset="88%" stop-color="#00ff78"/><stop offset="100%" stop-color="#041a0e"/></radialGradient><radialGradient id="pupil" cx="50%" cy="45%" r="60%"><stop offset="0%" stop-color="#000"/><stop offset="80%" stop-color="#020503"/><stop offset="100%" stop-color="#0a1f12"/></radialGradient><radialGradient id="shadow" cx="50%" cy="0%" r="100%"><stop offset="0%" stop-color="#000" stop-opacity=".55"/><stop offset="60%" stop-color="#000" stop-opacity=".15"/><stop offset="100%" stop-color="#000" stop-opacity="0"/></radialGradient><clipPath id="eyeClip"><path d="M30 170 Q200 -10 400 20 Q600 -10 770 170 Q600 330 400 320 Q200 330 30 170 Z"/></clipPath></defs><path d="M30 170 Q200 -10 400 20 Q600 -10 770 170 Q600 330 400 320 Q200 330 30 170 Z" fill="url(#sclera)"/><g clip-path="url(#eyeClip)"><rect x="0" y="0" width="800" height="130" fill="url(#shadow)"/><ellipse cx="400" cy="170" rx="128" ry="138" fill="url(#iris)"/><g id="fibers"></g><ellipse cx="400" cy="170" rx="58" ry="62" fill="url(#pupil)"/><ellipse cx="348" cy="110" rx="30" ry="27" fill="#fff" opacity=".95"/><ellipse cx="338" cy="102" rx="12" ry="10" fill="#fff"/><circle cx="460" cy="222" r="12" fill="#c6ffdc" opacity=".7"/><circle cx="325" cy="140" r="6" fill="#fff" opacity=".85"/><circle cx="430" cy="115" r="5" fill="#fff" opacity=".55"/><path class="eyelid top" d="M30 170 Q200 -10 400 20 Q600 -10 770 170 L770 -30 L30 -30 Z" fill="#030803"/><path class="eyelid bot" d="M30 170 Q200 330 400 320 Q600 330 770 170 L770 370 L30 370 Z" fill="#030803"/></g><path d="M30 170 Q200 -10 400 20 Q600 -10 770 170" fill="none" stroke="#0a1f12" stroke-width="4" stroke-linecap="round"/><path d="M30 170 Q200 330 400 320 Q600 330 770 170" fill="none" stroke="#0a1f12" stroke-width="3" stroke-linecap="round"/><g stroke="#050a07" stroke-width="3" stroke-linecap="round" fill="none"><path d="M90 55 Q82 20 78 5"/><path d="M170 25 Q165 -8 160 -22"/><path d="M250 12 Q247 -18 244 -35"/><path d="M330 5 Q328 -25 325 -42"/><path d="M410 8 Q408 -22 405 -40"/><path d="M490 18 Q488 -12 485 -28"/><path d="M570 38 Q568 8 565 -5"/><path d="M650 68 Q648 40 645 25"/><path d="M720 105 Q718 80 715 65"/></g></svg>
+</div>
+<div class="status"><span class="dot"></span> MATRIX EYE SYSTEM · <span id="i18nOnline">ONLINE</span></div>
+</div>
+<div class="card">
+<h2>🔑 <span id="i18nApiTitle">Your API Key</span></h2>
+<p class="card-desc" id="i18nApiDesc">Yeh key aapke Gmail se linked hai. Hamesha same rahegi.</p>
+<div class="api-row"><div class="key-text" id="apiKeyEl">Loading...</div><button class="copy" id="copyBtn">📋 <span id="i18nCopy">COPY</span></button></div>
+<div class="bot-hint" id="i18nBotHint">Bot me bhejein: <code id="cmdEl">/api YOUR_KEY</code></div>
+<a href="https://t.me/Mayajaalfilebot" id="botBtn" target="_blank" class="activate-btn">⚡ <span id="i18nActivate">Activate in Telegram Bot</span></a>
+</div>
+<div class="dash-title"><h2><span>▣</span> <span id="i18nDashTitle">EARNINGS DASHBOARD</span></h2><span class="live"><span class="dot"></span> <span id="liveTxt">Live</span></span></div>
+<div class="grid">
+<div class="stat"><h4 id="i18nTotalLinks">Total Links</h4><div class="v" id="sLinks">0</div></div>
+<div class="stat"><h4 id="i18nTotalViews">Total Views</h4><div class="v" id="sViews">0</div></div>
+<div class="stat"><h4 id="i18nTodayViews">Today Views</h4><div class="v" id="sTodayViews">0</div></div>
+<div class="stat"><h4 id="i18nConv">Conversions</h4><div class="v" id="sConv">0</div></div>
+<div class="stat"><h4 id="i18nTotalInc">Total Income</h4><div class="v gold" id="sInc">₹0</div></div>
+<div class="stat"><h4 id="i18nTodayInc">Today Income</h4><div class="v gold" id="sTodayInc">₹0</div></div>
+</div>
+<div class="chart-box"><h4><span id="i18nChartTitle">Views (Last 7 Days)</span><span id="chartRange">7d</span></h4><canvas id="chartViews"></canvas></div>
+<div class="withdraw-box">
+<h3>💸 <span id="i18nWithdrawTitle">WITHDRAWAL</span></h3>
+<div class="withdraw-info" id="i18nWithdrawInfo">Minimum withdrawal $5 (approximately ₹420). Payment via UPI within 24 hours on working days. Working day payments are instant — may take up to 24 hours.</div>
+<button class="withdraw-btn" id="withdrawBtn" disabled>💸 <span id="i18nWithdrawBtn">Request Withdrawal</span></button>
+</div>
+<div class="bots-section">
+<h3>▷ <span id="i18nBotsTitle">OFFICIAL BOTS</span></h3>
+<div class="bot-links">
+<a class="bot-link" href="https://t.me/Mayajaalfilebot" target="_blank"><span class="b-ico">➤</span><div class="b-info"><h4>MayaJaal File Bot</h4><p>Upload & file links</p></div></a>
+<a class="bot-link" href="https://t.me/MayaJaalBulkConverterbot" target="_blank"><span class="b-ico">⇄</span><div class="b-info"><h4>Bulk Converter Bot</h4><p>Convert multiple links</p></div></a>
+</div>
+</div>
+<div class="info-section">
+<h3>ℹ️ <span id="i18nInfoTitle">HOW TO EARN</span></h3>
+<div class="info-grid">
+<div class="info-item"><span class="num">1.</span><span id="i18nInfo1">Upload videos and share the links on WhatsApp, Facebook, Instagram, Telegram.</span></div>
+<div class="info-item"><span class="num">2.</span><span id="i18nInfo2">Copy your API key above and send it to the Telegram bot to activate.</span></div>
+<div class="info-item"><span class="num">3.</span><span id="i18nInfo3">Earn $1 for every 1,000 views. Higher tiers earn more — up to $55 for 20k views.</span></div>
+<div class="info-item"><span class="num">4.</span><span id="i18nInfo4">Withdraw at $5 minimum via UPI. Payment within 24 hours on working days.</span></div>
+</div>
+</div>
+<div class="app-download">
+<h3>📱 <span id="i18nDlTitle">Download MayaJaal App</span></h3>
+<p id="i18nDlDesc">Install the app for faster uploads, offline features and a smoother experience.</p>
+<a href="/download.html" class="dl-btn" id="dlBtn">📥 <span id="i18nDlBtn">Download App</span></a>
+</div>
+<div class="footer">© <span id="year"></span> MayaJaal · Built for mobile & desktop</div>
+</div>
+</div>
+<div class="modal-bg" id="modalBg"><div class="modal"><div class="modal-head"><h2 id="mTitle">MayaJaal</h2><button class="close-x" id="mClose">×</button></div><div class="modal-body" id="mBody"></div></div></div>
+<div class="toast" id="toast">✅ Copied!</div>
 <script>
-/* ═══════════════════════════════════════════
-   CONFIG & PARAMS
-   ═══════════════════════════════════════════ */
-const params = new URLSearchParams(window.location.search);
-const telegramId = params.get('tg');
-
-const BACKEND_URL = window.location.origin.includes('localhost') 
-  ? 'https://mayajaal.online' 
-  : window.location.origin;
-
-const debugEl = document.getElementById('debug');
-const mainCard = document.getElementById('mainCard');
-const flashBang = document.getElementById('flashBang');
-
-function setDebug(msg, type) {
-  debugEl.textContent = 'Debug: ' + msg;
-  debugEl.className = 'debug-box' + (type ? ' ' + type : '');
+var firebaseConfig={apiKey:"AIzaSyDI5hgBbaUeTpXcPIlAnq5yDjIenfY-ylM",authDomain:"mayajaal-app.firebaseapp.com",databaseURL:"https://mayajaal-app-default-rtdb.asia-southeast1.firebasedatabase.app",projectId:"mayajaal-app",storageBucket:"mayajaal-app.firebasestorage.app",messagingSenderId:"96139047750",appId:"1:96139047750:web:850537e9c436dd7d012b47"};
+firebase.initializeApp(firebaseConfig);
+var auth=firebase.auth(),db=firebase.database();
+var provider=new firebase.auth.GoogleAuthProvider();
+provider.setCustomParameters({prompt:'select_account'});
+auth.setPersistence(firebase.auth.Auth.Persistence.LOCAL).catch(function(e){});
+var currentUser=null,currentKey="",dashRef=null,viewsChart=null;
+var $=function(id){return document.getElementById(id)};
+$('year').textContent=new Date().getFullYear();
+var canvas=$('matrix'),ctx=canvas.getContext('2d'),drops=[],fontSize=14;
+function resizeCanvas(){var dpr=Math.min(devicePixelRatio||1,2);canvas.width=innerWidth*dpr;canvas.height=innerHeight*dpr;canvas.style.width=innerWidth+'px';canvas.style.height=innerHeight+'px';ctx.setTransform(dpr,0,0,dpr,0,0);var cols=Math.ceil(innerWidth/fontSize);drops=[];for(var i=0;i<cols;i++)drops.push(Math.random()*-80)}
+function drawMatrix(){ctx.fillStyle='rgba(0,5,3,.1)';ctx.fillRect(0,0,innerWidth,innerHeight);ctx.font=fontSize+'px monospace';var ch='ア0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ';for(var i=0;i<drops.length;i++){var c=ch[Math.floor(Math.random()*ch.length)];ctx.fillStyle=Math.random()>.93?'#c6ffdc':'#00c963';ctx.fillText(c,i*fontSize,drops[i]*fontSize);if(drops[i]*fontSize>innerHeight&&Math.random()>.975)drops[i]=0;drops[i]+=.5}requestAnimationFrame(drawMatrix)}
+resizeCanvas();drawMatrix();addEventListener('resize',resizeCanvas);
+var fibers=$('fibers');
+if(fibers){for(var i=0;i<90;i++){var a=(i*Math.PI*2/90)+Math.random()*.1;var r1=55+Math.random()*10,r2=105+Math.random()*20;var x1=400+Math.cos(a)*r1,y1=170+Math.sin(a)*r1;var x2=400+Math.cos(a)*r2,y2=170+Math.sin(a)*r2;var l=document.createElementNS('http://www.w3.org/2000/svg','line');l.setAttribute('x1',x1);l.setAttribute('y1',y1);l.setAttribute('x2',x2);l.setAttribute('y2',y2);l.setAttribute('stroke','#031c0e');l.setAttribute('stroke-width',(Math.random()*1.4+.3).toFixed(2));l.setAttribute('opacity',(Math.random()*.5+.3).toFixed(2));fibers.appendChild(l)}}
+var eyeBox=$('eyeBox');
+function doBlink(){if(!eyeBox)return;eyeBox.classList.add('blink');setTimeout(function(){eyeBox.classList.remove('blink')},150)}
+function scheduleBlink(){var d=2500+Math.random()*3000;setTimeout(function(){doBlink();setTimeout(doBlink,280);scheduleBlink()},d)}
+scheduleBlink();
+var googleBtn=$('googleBtn');
+function resetLoginBtn(){if(!googleBtn)return;googleBtn.disabled=false;var t=$('googleBtnText');if(t)t.textContent='Sign in with Google'}
+googleBtn.onclick=function(){googleBtn.disabled=true;$('googleBtnText').textContent='Connecting...';$('errMsg').classList.remove('on');auth.signInWithPopup(provider).catch(function(err){if(err.code==='auth/popup-blocked'||err.code==='auth/operation-not-supported-in-this-environment'){auth.signInWithRedirect(provider)}else{resetLoginBtn();var em=$('errMsg');em.textContent='❌ '+(err.message||'Login failed');em.classList.add('on')}})};
+auth.getRedirectResult().catch(function(err){if(err&&err.code&&err.code!=='auth/no-auth-event'&&err.code!=='auth/popup-closed-by-user'){var em=$('errMsg');if(em){em.textContent='❌ '+(err.message||'Login failed');em.classList.add('on')}}resetLoginBtn()});
+window.addEventListener('pageshow',function(){resetLoginBtn()});
+function hideLoading(){var ls=$('loadingScreen');if(ls&&!ls.classList.contains('hide')){ls.classList.add('hide');setTimeout(function(){ls.style.display='none'},400)}}
+function toast(msg){var t=$('toast');t.textContent=msg;t.classList.add('on');setTimeout(function(){t.classList.remove('on')},2000)}
+function updateVerifyBadge(){if(!currentUser)return;var ref=db.ref('users/'+currentUser.uid+'/dashboard');ref.once('value',function(s){var d=s.val()||{};var views=d.totalViews||0;var links=d.totalLinks||0;var score=views+links*10;var tier=0;if(score>=100)tier=1;if(score>=500)tier=2;if(score>=2000)tier=3;if(score>=10000)tier=4;var b=$('mBadge');if(!b)return;if(tier===0){b.style.display='none'}else{b.style.display='inline-flex';b.className='verify-badge '+(tier>=4?'gold':tier>=3?'blue':'');b.innerHTML='<svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l2.4 2.1 3.2-.3.7 3.1 2.9 1.4-1.5 2.9 1.5 2.9-2.9 1.4-.7 3.1-3.2-.3L12 20l-2.4-2.1-3.2.3-.7-3.1-2.9-1.4 1.5-2.9-1.5-2.9 2.9-1.4.7-3.1 3.2.3L12 2zm-1.3 13.2l5-5-1.4-1.4-3.6 3.6-1.6-1.6-1.4 1.4 3 3z"/></svg>'}})}
+auth.onAuthStateChanged(function(user){
+if(user){
+currentUser=user;
+$('uPic')&&(0);$('topPic').src=user.photoURL||'';$('topName').textContent=user.displayName||'User';
+$('mPic').src=user.photoURL||'';$('mName').textContent=user.displayName||'User';$('mEmail').textContent=user.email||'';
+$('loginScreen').classList.remove('show');$('loginScreen').style.display='none';
+$('appScreen').classList.add('on');$('topBar').style.display='flex';$('menuBtn').style.display='flex';
+ensureUserRecord();generateOrLoadKey();startDashboardListener();updateVerifyBadge();
+window.scrollTo(0,0);hideLoading();
+}else{
+currentUser=null;$('appScreen').classList.remove('on');$('topBar').style.display='none';
+$('loginScreen').style.display='flex';setTimeout(function(){$('loginScreen').classList.add('show')},20);
+if(dashRef){dashRef.off();dashRef=null}hideLoading();
+}});
+function ensureUserRecord(){if(!currentUser)return;var ref=db.ref('users/'+currentUser.uid);ref.once('value',function(snap){var d=snap.val()||{};var updates={email:currentUser.email,name:currentUser.displayName,lastSeen:Date.now()};if(!d.createdAt)updates.createdAt=Date.now();if(!d.dashboard)updates.dashboard={totalLinks:0,totalViews:0,todayViews:0,todayConversions:0,totalIncome:0,todayIncome:0,viewsByDay:{}};ref.update(updates)})}
+function generateKey(){var chars='ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';var arr=new Uint32Array(24);crypto.getRandomValues(arr);var out='';for(var i=0;i<24;i++)out+=chars[arr[i]%chars.length];return out}
+function generateOrLoadKey(){if(!currentUser)return;var ref=db.ref('users/'+currentUser.uid+'/apiKey');ref.once('value',function(snap){var ex=snap.val();if(ex){currentKey=ex;renderKey()}else{var nk=generateKey();ref.set(nk).then(function(){currentKey=nk;renderKey()})}})}
+function renderKey(){$('apiKeyEl').textContent=currentKey;$('cmdEl').textContent='/api '+currentKey;$('botBtn').href='https://t.me/Mayajaalfilebot?start=api_'+currentKey}
+$('copyBtn').onclick=function(){if(!currentKey)return;var cmd='/api '+currentKey;var done=function(){var b=$('copyBtn');b.textContent='✅ COPIED';b.classList.add('copied');if(navigator.vibrate)navigator.vibrate(50);toast('✅ API Key Copied!');setTimeout(function(){b.innerHTML='📋 COPY';b.classList.remove('copied')},2000)};if(navigator.clipboard){navigator.clipboard.writeText(cmd).then(done).catch(function(){var ta=document.createElement('textarea');ta.value=cmd;document.body.appendChild(ta);ta.select();document.execCommand('copy');document.body.removeChild(ta);done()})}else{var ta=document.createElement('textarea');ta.value=cmd;document.body.appendChild(ta);ta.select();document.execCommand('copy');document.body.removeChild(ta);done()}};
+function startDashboardListener(){if(dashRef)dashRef.off();dashRef=db.ref('users/'+currentUser.uid+'/dashboard');dashRef.on('value',function(snap){var d=snap.val()||{};$('sLinks').textContent=d.totalLinks||0;$('sViews').textContent=d.totalViews||0;$('sTodayViews').textContent=d.todayViews||0;$('sConv').textContent=d.todayConversions||0;$('sInc').textContent='₹'+(d.totalIncome||0);$('sTodayInc').textContent='₹'+(d.todayIncome||0);updateChart(d.viewsByDay||{});$('liveTxt').textContent='Live';var inc=d.totalIncome||0;$('withdrawBtn').disabled=inc<420;var wb=$('withdrawBtn');if(inc>=420){wb.innerHTML='💸 REQUEST WITHDRAWAL · ₹'+inc}else{wb.innerHTML='💸 REQUEST WITHDRAWAL (MIN ₹420)'};updateVerifyBadge()},function(err){$('liveTxt').textContent='Error'})}
+function updateChart(vb){var days=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];var labels=[],values=[];var today=new Date();for(var k=6;k>=0;k--){var dt=new Date(today);dt.setDate(today.getDate()-k);var key=dt.getFullYear()+'-'+String(dt.getMonth()+1).padStart(2,'0')+'-'+String(dt.getDate()).padStart(2,'0');labels.push(days[dt.getDay()]);values.push(vb[key]||0)}var el=$('chartViews');if(!el)return;if(!viewsChart){viewsChart=new Chart(el.getContext('2d'),{type:'line',data:{labels:labels,datasets:[{label:'Views',data:values,borderColor:'#00ff78',backgroundColor:'rgba(0,255,120,.12)',borderWidth:3,tension:.35,fill:true,pointBackgroundColor:'#00ff78',pointBorderColor:'#001b0c',pointBorderWidth:2,pointRadius:6,pointHoverRadius:9}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{backgroundColor:'#03110a',borderColor:'#00ff78',borderWidth:1,titleColor:'#00ff78',bodyColor:'#effff5',padding:12,displayColors:false,callbacks:{label:function(c){return 'Views: '+c.parsed.y.toLocaleString()}}}},scales:{y:{beginAtZero:true,grid:{color:'rgba(0,255,120,.1)'},ticks:{color:'#91b8a4',font:{size:11}}},x:{grid:{display:false},ticks:{color:'#91b8a4',font:{size:11}}}}}})}else{viewsChart.data.labels=labels;viewsChart.data.datasets[0].data=values;viewsChart.update()}}
+var menuBtn=$('menuBtn'),sideMenu=$('sideMenu'),overlay=$('menuOverlay');
+function toggleMenu(open){if(open===undefined)open=!sideMenu.classList.contains('open');sideMenu.classList.toggle('open',open);menuBtn.classList.toggle('open',open);overlay.classList.toggle('open',open)}
+menuBtn.addEventListener('click',function(){toggleMenu()});
+overlay.addEventListener('click',function(){toggleMenu(false)});
+$('profileBtn').onclick=function(){toggleMenu(true)};
+$('notifBtn').onclick=function(){openModal('🔔 Notifications','<p>No new notifications.</p><p>Earning updates and bot alerts will appear here.</p>');$('notifDot').style.display='none'};
+function openModal(title,body){$('mTitle').textContent=title;$('mBody').innerHTML=body;$('modalBg').classList.add('on');toggleMenu(false);var sv=document.getElementById('saveSettingsBtn');if(sv){sv.onclick=function(){setLang(document.getElementById('modalLang').value);closeModal();toast('✅ Settings saved')}}}
+function closeModal(){$('modalBg').classList.remove('on')}
+$('mClose').onclick=closeModal;
+$('modalBg').onclick=function(e){if(e.target.id==='modalBg')closeModal()};
+$('withdrawBtn').onclick=function(){openModal('💸 Request Withdrawal','<p>Withdrawals are processed via UPI on working days.</p><p><b>Minimum:</b> $5 (≈₹420)</p><p><b>Time:</b> Within 24 hours on working days. Working day payments are instant.</p><p>Send a withdrawal request to <a href="mailto:mayajaalsupport@gmail.com">mayajaalsupport@gmail.com</a> with your UPI ID and API key.</p><p>Or contact us on Telegram: <a href="https://t.me/MayaJaalSupport" target="_blank">@MayaJaalSupport</a></p>')};
+function act(a){
+if(a==='profile'){if(!currentUser)return;openModal('👤 Profile','<div style="text-align:center;margin-bottom:14px"><img src="'+(currentUser.photoURL||'')+'" style="width:80px;height:80px;border-radius:50%;border:3px solid #00ff78;object-fit:cover" onerror="this.style.display=\'none\'"><h3 style="margin-top:10px;color:#00ff78">'+(currentUser.displayName||'User')+'</h3><p style="color:#91b8a4;font-size:.82rem">'+(currentUser.email||'')+'</p></div><p><b>API Key:</b> <code style="color:#00ff78;font-family:monospace">'+currentKey+'</code></p><p><b>Account created:</b> '+(currentUser.metadata.creationTime||'')+'</p><p><b>Last sign-in:</b> '+(currentUser.metadata.lastSignInTime||'')+'</p>')}
+else if(a==='download'){openModal('📥 Download App','<p>Download the official MayaJaal Android app for a smoother experience.</p><p><a href="/download.html" class="dl-btn" style="display:inline-flex;margin-top:10px;text-decoration:none">📥 Download App</a></p>')}
+else if(a==='withdraw'){openModal('💸 Withdrawal','<p><b>Minimum:</b> $5 (≈₹420)</p><p><b>Method:</b> UPI</p><p><b>Time:</b> Within 24 hours on working days. Working day payments are instant.</p><p>Contact: <a href="mailto:mayajaalsupport@gmail.com">mayajaalsupport@gmail.com</a></p>')}
+else if(a==='info'){openModal('ℹ️ Information','<h3>How to earn</h3><ul><li>Upload videos and share links</li><li>Activate your API key in the Telegram bot</li><li>Earn $1 per 1,000 views</li><li>Higher tiers earn more: $25 at 10k, $55 at 20k</li><li>Withdraw at $5 minimum via UPI</li></ul><h3>Earning Rates</h3><ul><li>1,000 views → $1</li><li>2,000 views → $2</li><li>After 2k, every 1,000 views → $2</li><li>10,000 views → $25</li><li>20,000 views → $55</li><li>1,000 app shares (with login) → $1.5–$2</li></ul>')}
+else if(a==='settings'){var cl='en';try{cl=localStorage.getItem('mj_lang')||'en'}catch(e){}openModal('⚙️ Settings','<div class="form-row"><label>🌐 Language / भाषा</label><select id="modalLang"><option value="en">English</option><option value="hi">हिन्दी (Hindi)</option><option value="es">Español</option><option value="fr">Français</option><option value="de">Deutsch</option><option value="pt">Português</option><option value="ru">Русский</option><option value="ar">العربية</option><option value="zh">中文</option><option value="ja">日本語</option><option value="bn">বাংলা</option><option value="ta">தமிழ்</option><option value="ur">اردو</option></select></div><button class="btn-save" id="saveSettingsBtn">Save Settings</button>');setTimeout(function(){document.getElementById('modalLang').value=cl},50)}
+else if(a==='support'){openModal('☏ Help & Support','<p>📧 <a href="mailto:mayajaalsupport@gmail.com">mayajaalsupport@gmail.com</a></p><p>💬 Telegram: <a href="https://t.me/MayaJaalSupport" target="_blank">@MayaJaalSupport</a></p><p>⏰ We respond within 24 hours on working days.</p>')}
+else if(a==='privacy'){openModal('🛡️ Privacy Policy','<p><b>Data we collect:</b></p><ul><li>Email, name, profile photo (from Google Sign-In)</li><li>API key (unique per account)</li><li>Dashboard data (links, views, earnings)</li></ul><p><b>How we use it:</b> To provide our services, sync your data across devices, and process payments.</p><p><b>Your rights:</b> You can request deletion of your data anytime by emailing <a href="mailto:mayajaalsupport@gmail.com">mayajaalsupport@gmail.com</a>.</p><p>We never sell your data to third parties.</p>')}
+else if(a==='terms'){openModal('📜 Terms & Conditions','<p>By using MayaJaal, you agree to:</p><ul><li>Use the service legally and ethically</li><li>Not share your API key with others</li><li>Not abuse, spam, or manipulate the system</li><li>Follow all applicable copyright laws</li><li>Accept that payments are processed on working days within 24 hours</li></ul><p>We reserve the right to suspend accounts that violate these terms.</p>')}
 }
-
-setDebug('telegram_id = ' + (telegramId || 'MISSING! URL mein ?tg= parameter chahiye'), telegramId ? '' : 'err');
-
-/* ═══════════════════════════════════════════
-   MATRIX RAIN ENGINE
-   ═══════════════════════════════════════════ */
-const canvas = document.getElementById('matrix');
-const ctx = canvas.getContext('2d');
-
-let cols, drops;
-let speedFactor = 1;
-const chars = 'アイウエオカキクケコサシスセソタチツテトナニヌネノ0123456789ABCDEFXYZ@#$%&*<>{}'.split('');
-
-function resize() {
-  canvas.width = window.innerWidth;
-  canvas.height = window.innerHeight;
-  cols = Math.floor(canvas.width / 14);
-  drops = new Array(cols).fill(1);
-}
-resize();
-window.addEventListener('resize', resize);
-
-function drawMatrix() {
-  ctx.fillStyle = 'rgba(0, 0, 0, 0.07)';
-  ctx.fillRect(0, 0, canvas.width, canvas.height);
-  ctx.font = '14px "Courier New", monospace';
-  
-  for (let i = 0; i < drops.length; i++) {
-    const text = chars[Math.floor(Math.random() * chars.length)];
-    const x = i * 14;
-    const y = drops[i] * 14;
-    ctx.fillStyle = '#ccffe5';
-    ctx.fillText(text, x, y);
-    ctx.fillStyle = '#00ff88';
-    ctx.fillText(text, x, y - 14);
-    if (y > canvas.height && Math.random() > 0.975) drops[i] = 0;
-    drops[i] += speedFactor;
-  }
-}
-let matrixInterval = setInterval(drawMatrix, 40);
-
-/* ═══════════════════════════════════════════
-   CYBER HAPTIC & SYNTH SOUND EFFECTS
-   ═══════════════════════════════════════════ */
-function playCyberBeep() {
-  try {
-    const AudioContext = window.AudioContext || window.webkitAudioContext;
-    if (!AudioContext) return;
-    const actx = new AudioContext();
-    
-    const osc1 = actx.createOscillator();
-    const gain1 = actx.createGain();
-    osc1.type = 'sawtooth';
-    osc1.frequency.setValueAtTime(587.33, actx.currentTime);
-    osc1.frequency.exponentialRampToValueAtTime(880, actx.currentTime + 0.08);
-    gain1.gain.setValueAtTime(0.12, actx.currentTime);
-    gain1.gain.exponentialRampToValueAtTime(0.01, actx.currentTime + 0.12);
-    osc1.connect(gain1);
-    gain1.connect(actx.destination);
-    osc1.start();
-    osc1.stop(actx.currentTime + 0.12);
-
-    setTimeout(() => {
-      const osc2 = actx.createOscillator();
-      const gain2 = actx.createGain();
-      osc2.type = 'sine';
-      osc2.frequency.setValueAtTime(1174.66, actx.currentTime);
-      osc2.frequency.exponentialRampToValueAtTime(1760, actx.currentTime + 0.12);
-      gain2.gain.setValueAtTime(0.15, actx.currentTime);
-      gain2.gain.exponentialRampToValueAtTime(0.001, actx.currentTime + 0.18);
-      osc2.connect(gain2);
-      gain2.connect(actx.destination);
-      osc2.start();
-      osc2.stop(actx.currentTime + 0.18);
-    }, 70);
-  } catch (e) {}
-}
-
-function triggerHapticFeedback() {
-  if (navigator.vibrate) {
-    navigator.vibrate([50, 40, 90]);
-  }
-}
-
-/* ═══════════════════════════════════════════
-   KEY GENERATION & SERVER SYNC
-   ═══════════════════════════════════════════ */
-const chars24 = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
-const hexChars = '0123456789abcdef';
-
-function randomFrom(set, len) {
-  let out = '';
-  const arr = new Uint32Array(len);
-  crypto.getRandomValues(arr);
-  for (let i = 0; i < len; i++) out += set[arr[i] % set.length];
-  return out;
-}
-
-function generateKey() {
-  return randomFrom(chars24, 24);
-}
-
-const apiKeyEl = document.getElementById('apiKey');
-const caretEl = document.getElementById('caret');
-const copyBtn = document.getElementById('copyBtn');
-const statusEl = document.getElementById('status');
-const statRow = document.getElementById('statRow');
-const createdAtEl = document.getElementById('createdAt');
-
-let currentKey = '';
-
-async function saveKeyToServer(key) {
-  setDebug('saving key to backend...');
-  if (!telegramId) {
-    setDebug('❌ URL mein ?tg= MISSING — key link nahi ho payegi!', 'err');
-    return;
-  }
-  try {
-    const url = BACKEND_URL + '/save-key';
-    const res = await fetch(url, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ telegram_id: telegramId, key: key })
-    });
-    const data = await res.json();
-    if (res.ok && data.success) {
-      setDebug('✅ Key linked! Telegram ID: ' + telegramId, 'ok');
-    } else {
-      setDebug('❌ Save error: ' + JSON.stringify(data), 'err');
-    }
-  } catch (err) {
-    setDebug('❌ Network error: ' + err.message, 'err');
-  }
-}
-
-function scrambleEffect(target, duration, onDone) {
-  const totalFrames = Math.floor(duration / 30);
-  let frame = 0;
-  const revealStart = Math.floor(totalFrames * 0.55);
-
-  const timer = setInterval(function () {
-    frame++;
-    let display = '';
-    for (let i = 0; i < target.length; i++) {
-      if (frame >= revealStart + i) display += target[i];
-      else display += hexChars[Math.floor(Math.random() * hexChars.length)];
-    }
-    apiKeyEl.textContent = display;
-    if (frame >= totalFrames) {
-      clearInterval(timer);
-      apiKeyEl.textContent = target;
-      if (onDone) onDone();
-    }
-  }, 30);
-}
-
-function runGenerationFlow() {
-  apiKeyEl.textContent = '';
-  caretEl.style.display = 'none';
-  copyBtn.style.display = 'none';
-  statRow.style.display = 'none';
-  currentKey = '';
-
-  const steps = [
-    'establishing neural link...',
-    'verifying node integrity...',
-    'extracting quantum entropy...',
-    'signing cryptographic token...',
-    'matrix key active ✓'
-  ];
-
-  let stepIndex = 0;
-  statusEl.textContent = steps[0];
-
-  const stepTimer = setInterval(function () {
-    stepIndex++;
-    if (stepIndex < steps.length) {
-      statusEl.textContent = steps[stepIndex];
-    } else {
-      clearInterval(stepTimer);
-      currentKey = generateKey();
-      caretEl.style.display = 'inline-block';
-
-      saveKeyToServer(currentKey);
-
-      scrambleEffect(currentKey, 1600, function () {
-        caretEl.style.display = 'none';
-        copyBtn.style.display = 'block';
-        statRow.style.display = 'flex';
-        createdAtEl.textContent = new Date().toLocaleTimeString();
-      });
-    }
-  }, 360);
-}
-
-/* ═══════════════════════════════════════════
-   ADVANCED COPY EXPERIENCE
-   ═══════════════════════════════════════════ */
-function copyKey() {
-  if (!currentKey) return;
-
-  navigator.clipboard.writeText(currentKey).then(function () {
-    playCyberBeep();
-    triggerHapticFeedback();
-
-    flashBang.classList.add('active');
-    mainCard.classList.add('glitch-shake');
-    speedFactor = 4;
-    
-    setTimeout(() => flashBang.classList.remove('active'), 120);
-    setTimeout(() => {
-      mainCard.classList.remove('glitch-shake');
-      speedFactor = 1;
-    }, 450);
-
-    copyBtn.textContent = 'COPIED ⚡';
-    copyBtn.classList.add('copied');
-    statusEl.textContent = 'ACCESS KEY COPIED TO CLIPBOARD ✓';
-
-    setTimeout(function () {
-      copyBtn.textContent = 'COPY';
-      copyBtn.classList.remove('copied');
-      statusEl.textContent = 'matrix key active ✓';
-    }, 2200);
-  }).catch(() => {
-    const ta = document.createElement('textarea');
-    ta.value = currentKey;
-    document.body.appendChild(ta);
-    ta.select();
-    document.execCommand('copy');
-    document.body.removeChild(ta);
-    playCyberBeep();
-    triggerHapticFeedback();
-    copyBtn.textContent = 'COPIED ⚡';
-  });
-}
-
-function regenerate() {
-  runGenerationFlow();
-}
-
-window.addEventListener('load', function () {
-  setTimeout(runGenerationFlow, 350);
-});
+document.addEventListener('click',function(e){var b=e.target.closest('[data-act]');if(b){e.preventDefault();act(b.dataset.act)}});
+$('logoutMenuBtn').onclick=function(){toggleMenu(false);if(confirm('Logout karna hai?')){$('loadingScreen').style.display='flex';$('loadingScreen').classList.remove('hide');auth.signOut()}};
+var translations={
+en:{eyebrow:'VIDEOS · LINKS · BEYOND',welcome:'ENTER THE',tagline:'Your digital universe. One portal for your files, links, tools and community.',online:'ONLINE',apiTitle:'Your API Key',apiDesc:'Yeh key aapke Gmail se linked hai. Hamesha same rahegi.',copy:'COPY',botHint:'Bot me bhejein:',activate:'Activate in Telegram Bot',dashTitle:'EARNINGS DASHBOARD',totalLinks:'Total Links',totalViews:'Total Views',todayViews:'Today Views',conv:'Conversions',totalInc:'Total Income',todayInc:'Today Income',chartTitle:'Views (Last 7 Days)',botsTitle:'OFFICIAL BOTS',infoTitle:'HOW TO EARN',withdrawTitle:'WITHDRAWAL',withdrawBtn:'Request Withdrawal',dlTitle:'Download MayaJaal App',dlBtn:'Download App',loginTag:'Sign in with Google to access your dashboard, API key & earnings',loginFoot:'Your data is linked to your Gmail. Come back anytime — same API & data.',profile:'Profile',download:'Download App',withdraw:'Withdrawal',info:'Information',settings:'Settings',help:'Help & Support',privacy:'Privacy Policy',terms:'Terms & Conditions',social:'Join Us',featApi:'API Key',featStats:'Live Stats',featSync:'Bot Sync',info1:'Upload videos and share the links on WhatsApp, Facebook, Instagram, Telegram.',info2:'Copy your API key above and send it to the Telegram bot to activate.',info3:'Earn $1 for every 1,000 views. Higher tiers earn more — up to $55 for 20k views.',info4:'Withdraw at $5 minimum via UPI. Payment within 24 hours on working days.',withdrawInfo:'Minimum withdrawal $5 (approximately ₹420). Payment via UPI within 24 hours on working days. Working day payments are instant — may take up to 24 hours.',dlDesc:'Install the app for faster uploads, offline features and a smoother experience.'},
+hi:{eyebrow:'वीडियो · लिंक · और भी',welcome:'स्वागत है',tagline:'आपकी डिजिटल दुनिया — फाइल, लिंक, टूल और कम्युनिटी एक जगह।',online:'चालू',apiTitle:'आपकी API Key',apiDesc:'यह key आपके Gmail से जुड़ी है। हमेशा वही रहेगी।',copy:'कॉपी',botHint:'बॉट को भेजें:',activate:'टेलीग्राम बॉट में एक्टिवेट करें',dashTitle:'कमाई डैशबोर्ड',totalLinks:'कुल लिंक',totalViews:'कुल व्यूज़',todayViews:'आज के व्यूज़',conv:'कन्वर्ज़न',totalInc:'कुल कमाई',todayInc:'आज की कमाई',chartTitle:'व्यूज़ (पिछले 7 दिन)',botsTitle:'ऑफिशियल बॉट',infoTitle:'कैसे कमाएँ',withdrawTitle:'निकासी',withdrawBtn:'निकासी का अनुरोध',dlTitle:'MayaJaal ऐप डाउनलोड करें',dlBtn:'ऐप डाउनलोड',loginTag:'Google से साइन इन करें — डैशबोर्ड, API key और कमाई देखें',loginFoot:'आपका डेटा Gmail से जुड़ा है। कभी भी वापस आएँ — वही API और डेटा।',profile:'प्रोफाइल',download:'ऐप डाउनलोड',withdraw:'निकासी',info:'जानकारी',settings:'सेटिंग',help:'सहायता',privacy:'प्राइवेसी पॉलिसी',terms:'नियम व शर्तें',social:'जुड़ें',featApi:'API Key',featStats:'लाइव आँकड़े',featSync:'बॉट सिंक',info1:'वीडियो अपलोड करें और लिंक WhatsApp, Facebook, Instagram, Telegram पर शेयर करें।',info2:'अपनी API key कॉपी करें और Telegram बॉट को भेजें।',info3:'हर 1,000 व्यूज़ पर $1। ऊँचे टियर में ज़्यादा — 20k व्यूज़ पर $55 तक।',info4:'$5 पर UPI से निकासी। कार्य दिवसों पर 24 घंटे में भुगतान।',withdrawInfo:'न्यूनतम निकासी $5 (लगभग ₹420)। UPI से 24 घंटे में भुगतान, कार्य दिवसों पर। कार्य दिवस पर भुगतान तुरंत — 24 घंटे तक लग सकते हैं।',dlDesc:'तेज़ अपलोड, ऑफलाइन फीचर और बेहतर अनुभव के लिए ऐप इंस्टॉल करें।'},
+es:{eyebrow:'VIDEOS · ENLACES · MÁS',welcome:'ENTRA EN',tagline:'Tu universo digital. Un portal para tus archivos, enlaces, herramientas y comunidad.',online:'EN LÍNEA',apiTitle:'Tu API Key',apiDesc:'Esta clave está vinculada a tu Gmail. Siempre será la misma.',copy:'COPIAR',botHint:'Envía al bot:',activate:'Activar en bot de Telegram',dashTitle:'PANEL DE GANANCIAS',totalLinks:'Enlaces totales',totalViews:'Vistas totales',todayViews:'Vistas hoy',conv:'Conversiones',totalInc:'Ingresos totales',todayInc:'Ingresos hoy',chartTitle:'Vistas (últimos 7 días)',botsTitle:'BOTS OFICIALES',infoTitle:'CÓMO GANAR',withdrawTitle:'RETIRO',withdrawBtn:'Solicitar retiro',dlTitle:'Descargar app MayaJaal',dlBtn:'Descargar app',loginTag:'Inicia con Google para ver tu panel, API key y ganancias',loginFoot:'Tus datos están vinculados a Gmail. Vuelve cuando quieras.',profile:'Perfil',download:'Descargar app',withdraw:'Retiro',info:'Información',settings:'Ajustes',help:'Ayuda',privacy:'Privacidad',terms:'Términos',social:'Síguenos',featApi:'API Key',featStats:'Estadísticas',featSync:'Sincronización',info1:'Sube videos y comparte enlaces.',info2:'Copia tu API key y envíala al bot.',info3:'Gana $1 por 1,000 vistas.',info4:'Retira desde $5 vía UPI.',withdrawInfo:'Retiro mínimo $5. Pago vía UPI en 24 horas en días laborables.',dlDesc:'Instala la app para una mejor experiencia.'}
+};
+function setLang(lang){var d=translations[lang]||translations.en;var map={i18nEyebrow:'eyebrow',i18nWelcome:'welcome',i18nTagline:'tagline',i18nOnline:'online',i18nApiTitle:'apiTitle',i18nApiDesc:'apiDesc',i18nCopy:'copy',i18nBotHint:'botHint',i18nActivate:'activate',i18nDashTitle:'dashTitle',i18nTotalLinks:'totalLinks',i18nTotalViews:'totalViews',i18nTodayViews:'todayViews',i18nConv:'conv',i18nTotalInc:'totalInc',i18nTodayInc:'todayInc',i18nChartTitle:'chartTitle',i18nBotsTitle:'botsTitle',i18nInfoTitle:'infoTitle',i18nWithdrawTitle:'withdrawTitle',i18nWithdrawBtn:'withdrawBtn',i18nDlTitle:'dlTitle',i18nDlBtn:'dlBtn',i18nLoginTag:'loginTag',i18nLoginFoot:'loginFoot',i18nProfile:'profile',i18nDownload:'download',i18nWithdraw:'withdraw',i18nInfo:'info',i18nSettings:'settings',i18nHelp:'help',i18nPrivacy:'privacy',i18nTerms:'terms',i18nSocial:'social',i18nFeatApi:'featApi',i18nFeatStats:'featStats',i18nFeatSync:'featSync',i18nInfo1:'info1',i18nInfo2:'info2',i18nInfo3:'info3',i18nInfo4:'info4',i18nWithdrawInfo:'withdrawInfo',i18nDlDesc:'dlDesc'};for(var id in map){var el=$(id);if(el)el.textContent=d[map[id]]}var bh=$('i18nBotHint');if(bh){var code=$('cmdEl');bh.innerHTML=(d.botHint||'')+' <code id="cmdEl"></code>';var c2=$('cmdEl');if(c2)c2.textContent='/api '+(currentKey||'YOUR_KEY')}document.documentElement.lang=lang;document.documentElement.dir=(lang==='ar'||lang==='ur')?'rtl':'ltr';try{localStorage.setItem('mj_lang',lang)}catch(e){}}
+try{setLang(localStorage.getItem('mj_lang')||'en')}catch(e){setLang('en')}
 </script>
 </body>
 </html>
