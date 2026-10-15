@@ -165,6 +165,39 @@
   }
   .hidden { display: none !important; }
 
+  /* ===== APK DOWNLOAD BOX ===== */
+  .apk-download-box {
+    text-align: center;
+    max-width: 480px;
+    margin: 0 auto 30px;
+  }
+  .apk-download-box .apk-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    width: 100%;
+    background: linear-gradient(135deg, #00c896, #00a67e);
+    color: #fff;
+    padding: 18px 30px;
+    border-radius: 14px;
+    font-size: 1.1rem;
+    font-weight: 800;
+    box-shadow: 0 10px 30px rgba(0,200,150,0.4);
+    transition: 0.3s;
+    letter-spacing: 0.5px;
+  }
+  .apk-download-box .apk-btn:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 15px 40px rgba(0,200,150,0.6);
+  }
+  .apk-download-box .apk-btn:active { transform: translateY(0); }
+  .apk-download-box .apk-note {
+    margin-top: 12px;
+    font-size: 0.85rem;
+    color: var(--muted);
+  }
+
   /* SUCCESS OVERLAY */
   .success-overlay {
     position: fixed; inset: 0; z-index: 9999;
@@ -229,7 +262,7 @@
 <header class="hero">
   <h1 data-i18n="hero_title">Welcome to <span>MayaJaal.online</span> 🚀</h1>
   <p data-i18n="hero_sub">Connect your API key, download the app, and start earning money online. Upload videos, share links, and earn from views.</p>
-  <a href="/download.html" class="btn" data-i18n="hero_btn1">📥 Download App Now</a>
+  <a href="https://github.com/MayaJaal1/Mayajaall/releases/latest" id="apkDownloadBtn" class="btn btn-green" download>📥 Download App</a>
   <a href="#earning" class="btn btn-outline" data-i18n="hero_btn2">💰 View Earning Rates</a>
 </header>
 
@@ -237,7 +270,7 @@
   <h2 class="section-title" data-i18n="api_title">🔗 Connect Your <span>API Key</span></h2>
   <p class="section-sub" data-i18n="api_sub">Your unique encrypted Matrix Key is ready to connect. One tap to copy, then activate in the bot.</p>
 
-  <!-- LOGIN CARD (Jab user logged out ho) -->
+  <!-- LOGIN CARD (Only this remains) -->
   <div id="login-section">
     <div class="login-card">
       <div class="login-icon">🔐</div>
@@ -252,20 +285,14 @@
       </div>
     </div>
   </div>
+</section>
 
-  <!-- API KEY CARD (Jab user logged in ho) -->
-  <div id="api-section-logged-in" class="hidden">
-    <div class="api-card">
-      <div class="user-greeting" id="user-greeting">👋 Welcome!</div>
-      <h3>🔐 Your API Key</h3>
-      <div class="api-key-box">
-        <div class="api-key" id="apiKeyDisplay">YOUR_API_KEY_WILL_APPEAR_HERE</div>
-        <button class="copy-btn" onclick="copyApiKey()" data-i18n="copy_btn">📋 Copy</button>
-      </div>
-      <p class="api-note" data-i18n="api_note">Send <strong>/api YOUR_KEY</strong> to the bot to activate.</p>
-      <a href="https://www.mayajaal.online" class="btn btn-green" style="margin-top:20px;display:inline-block;">🚀 Go to Dashboard</a>
-    </div>
-  </div>
+<!-- APK Download Section -->
+<section class="apk-download-box">
+  <a href="https://github.com/MayaJaal1/Mayajaall/releases/latest" id="apkDownloadBtn2" class="apk-btn" download>
+    📥 Download MayaJaal App (APK)
+  </a>
+  <p class="apk-note">Direct download · Latest version</p>
 </section>
 
 <section id="features" class="fade-in">
@@ -331,7 +358,7 @@
   <div class="cta-box">
     <h3 data-i18n="cta_h">🎯 Start Today!</h3>
     <p data-i18n="cta_p">Download app → connect bot → upload video → convert link → share → get views → earn $5 → withdraw via UPI!</p>
-    <a href="/download.html" class="btn btn-green" data-i18n="cta_btn">📥 Download App Now</a>
+    <a href="https://github.com/MayaJaal1/Mayajaall/releases/latest" id="apkDownloadBtn3" class="btn btn-green" download>📥 Download App</a>
     <a href="https://t.me/Mayajaalfilebot" target="_blank" class="btn" data-i18n="cta_b2">🤖 Open Upload Bot</a>
   </div>
 </section>
@@ -342,14 +369,14 @@
   <p style="margin-top:10px;font-size:0.8rem;">© 2025 MayaJaal.online</p>
 </footer>
 
-<a href="/download.html" class="float-cta" data-i18n="float_btn">📥 Download App</a>
+<a href="https://github.com/MayaJaal1/Mayajaall/releases/latest" id="apkDownloadBtn4" class="float-cta" download>📥 Download App</a>
 
-<!-- SUCCESS OVERLAY -->
+<!-- SUCCESS OVERLAY (brief) -->
 <div class="success-overlay" id="successOverlay">
   <div class="success-card">
     <div class="success-icon">✅</div>
     <h3>Login Successful!</h3>
-    <p>Redirecting to your dashboard...</p>
+    <p>Redirecting to dashboard...</p>
     <div class="loader"></div>
   </div>
 </div>
@@ -673,7 +700,7 @@ const translations = {
   }
 };
 
-// Generate API Key
+// Generate API Key (needed for bot activation, stored in DB)
 const apiKey = "MATRIX-" + Math.random().toString(36).substring(2, 18).toUpperCase();
 
 function copyApiKey() {
@@ -728,7 +755,7 @@ if (savedLang) {
 }
 </script>
 
-<!-- ===== FIREBASE GOOGLE LOGIN LOGIC (WORKING + REDIRECT) ===== -->
+<!-- ===== FIREBASE GOOGLE LOGIN LOGIC (FAST + DIRECT DOWNLOAD) ===== -->
 <script type="module">
   import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
   import { getAuth, signInWithPopup, GoogleAuthProvider, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
@@ -751,76 +778,50 @@ if (savedLang) {
   provider.setCustomParameters({ prompt: 'select_account' });
 
   const loginSection = document.getElementById('login-section');
-  const loggedInSection = document.getElementById('api-section-logged-in');
   const loginBtn = document.getElementById('google-login-btn');
   const loginBtnText = document.getElementById('google-btn-text');
-  const userGreeting = document.getElementById('user-greeting');
-  const apiKeyDisplay = document.getElementById('apiKeyDisplay');
-  const successOverlay = document.getElementById('successOverlay');
 
   function resetLoginBtn(){
     if (loginBtn) loginBtn.disabled = false;
     if (loginBtnText) loginBtnText.textContent = 'Sign in with Google';
   }
 
-  function saveUserAndRedirect(user){
-    // Save user info to localStorage (so main page can read it)
-    const userData = {
-      uid: user.uid,
-      name: user.displayName || user.email,
-      email: user.email,
-      photo: user.photoURL || '',
-      loginTime: Date.now()
-    };
-    localStorage.setItem('mayajaal_user', JSON.stringify(userData));
-    localStorage.setItem('mayajaal_uid', user.uid);
-    localStorage.setItem('mayajaal_apiKey', apiKey);
-
-    // Save to Firebase DB
-    try {
-      set(ref(db, 'users/' + user.uid), {
-        uid: user.uid,
-        name: user.displayName || '',
-        email: user.email || '',
-        photo: user.photoURL || '',
-        apiKey: apiKey,
-        lastLogin: serverTimestamp(),
-        loginCount: Date.now()
-      }).catch(err => console.log('DB save error:', err));
-    } catch(e){ console.log('DB error:', e); }
-
-    // Show success overlay
-    successOverlay.classList.add('on');
-
-    // Redirect to main page after 1.5 seconds
-    setTimeout(() => {
-      window.location.href = 'https://www.mayajaal.online';
-    }, 1500);
-  }
-
-  // Login state listener
+  // Login state listener - redirect immediately if logged in
   onAuthStateChanged(auth, (user) => {
     if (user) {
-      // Logged in
-      loginSection.classList.add('hidden');
-      loggedInSection.classList.remove('hidden');
-      userGreeting.textContent = `👋 Welcome, ${user.displayName || user.email}!`;
-      apiKeyDisplay.textContent = apiKey;
+      // Save user info to localStorage for main page
+      const userData = {
+        uid: user.uid,
+        name: user.displayName || user.email,
+        email: user.email,
+        photo: user.photoURL || '',
+        loginTime: Date.now()
+      };
+      localStorage.setItem('mayajaal_user', JSON.stringify(userData));
+      localStorage.setItem('mayajaal_uid', user.uid);
+      localStorage.setItem('mayajaal_apiKey', apiKey);
 
-      // If just logged in (not from cached), redirect
-      const justLoggedIn = sessionStorage.getItem('mj_just_logged_in');
-      if (justLoggedIn) {
-        sessionStorage.removeItem('mj_just_logged_in');
-        saveUserAndRedirect(user);
-      }
+      // Save to Firebase DB
+      try {
+        set(ref(db, 'users/' + user.uid), {
+          uid: user.uid,
+          name: user.displayName || '',
+          email: user.email || '',
+          photo: user.photoURL || '',
+          apiKey: apiKey,
+          lastLogin: serverTimestamp()
+        }).catch(err => console.log('DB save error:', err));
+      } catch(e){ console.log('DB error:', e); }
+
+      // Redirect to main page IMMEDIATELY
+      window.location.href = 'https://www.mayajaal.online';
     } else {
-      // Logged out
-      loginSection.classList.remove('hidden');
-      loggedInSection.classList.add('hidden');
+      // Not logged in - show login card
+      if (loginSection) loginSection.style.display = 'block';
     }
   });
 
-  // Login button
+  // Login button click
   if (loginBtn) {
     loginBtn.addEventListener('click', () => {
       loginBtn.disabled = true;
@@ -829,8 +830,7 @@ if (savedLang) {
       signInWithPopup(auth, provider)
         .then((result) => {
           console.log("✅ Login successful:", result.user.displayName);
-          sessionStorage.setItem('mj_just_logged_in', '1');
-          // onAuthStateChanged will handle the rest
+          // onAuthStateChanged will handle redirect
         })
         .catch((error) => {
           console.error("❌ Login error:", error);
@@ -843,17 +843,52 @@ if (savedLang) {
     });
   }
 
-  // Logout function (global, agar kabhi zaroorat pade)
+  // Logout function (global)
   window.logoutUser = function() {
     signOut(auth).then(() => {
       localStorage.removeItem('mayajaal_user');
       localStorage.removeItem('mayajaal_uid');
       localStorage.removeItem('mayajaal_apiKey');
-      console.log("Logged out");
+      window.location.href = 'https://www.mayajaal.online/download';
     }).catch((error) => {
       alert("Logout failed: " + error.message);
     });
   };
+
+  // ===== APK DOWNLOAD BUTTON SETUP =====
+  // Automatically find the APK asset from GitHub latest release
+  (async function setupApkDownload() {
+    const btns = [
+      document.getElementById('apkDownloadBtn'),
+      document.getElementById('apkDownloadBtn2'),
+      document.getElementById('apkDownloadBtn3'),
+      document.getElementById('apkDownloadBtn4')
+    ].filter(Boolean);
+
+    if (btns.length === 0) return;
+
+    try {
+      const res = await fetch('https://api.github.com/repos/MayaJaal1/Mayajaall/releases/latest', {
+        headers: { 'Accept': 'application/vnd.github.v3+json' }
+      });
+      const data = await res.json();
+      
+      if (data && data.assets && data.assets.length > 0) {
+        const apk = data.assets.find(a => a.name && a.name.toLowerCase().endsWith('.apk'));
+        if (apk && apk.browser_download_url) {
+          btns.forEach(btn => {
+            btn.href = apk.browser_download_url;
+            btn.setAttribute('download', apk.name);
+          });
+          console.log('✅ APK download link set:', apk.name);
+        } else {
+          console.log('⚠️ APK asset not found in latest release');
+        }
+      }
+    } catch(e) {
+      console.log('⚠️ Could not fetch release info, using fallback URL');
+    }
+  })();
 </script>
 
 </body>
