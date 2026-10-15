@@ -146,6 +146,7 @@
     box-shadow: 0 12px 35px rgba(255,255,255,0.2);
   }
   .google-btn:active { transform: translateY(0); }
+  .google-btn:disabled { opacity: 0.7; cursor: wait; }
   .google-btn img { width: 24px; height: 24px; }
   .login-footer-note {
     margin-top: 25px;
@@ -163,6 +164,38 @@
     margin-bottom: 15px;
   }
   .hidden { display: none !important; }
+
+  /* SUCCESS OVERLAY */
+  .success-overlay {
+    position: fixed; inset: 0; z-index: 9999;
+    background: rgba(15,15,35,0.95);
+    display: none; align-items: center; justify-content: center;
+    backdrop-filter: blur(8px);
+  }
+  .success-overlay.on { display: flex; }
+  .success-card {
+    background: linear-gradient(145deg, #1a1a2e, #16213e);
+    border: 1px solid rgba(0,200,150,0.5);
+    border-radius: 24px; padding: 45px 35px; text-align: center;
+    max-width: 400px; width: 90%;
+    box-shadow: 0 25px 70px rgba(0,200,150,0.3);
+    animation: popIn 0.4s ease-out;
+  }
+  @keyframes popIn {
+    0% { transform: scale(0.85); opacity: 0; }
+    100% { transform: scale(1); opacity: 1; }
+  }
+  .success-icon { font-size: 60px; margin-bottom: 15px; }
+  .success-card h3 { color: #00c896; font-size: 1.5rem; margin-bottom: 10px; }
+  .success-card p { color: #a0a0b8; font-size: 0.95rem; margin-bottom: 20px; }
+  .loader {
+    width: 40px; height: 40px; margin: 0 auto;
+    border: 4px solid rgba(0,200,150,0.2);
+    border-top: 4px solid #00c896;
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+  }
+  @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
 </style>
 </head>
 <body>
@@ -212,7 +245,7 @@
       <p class="login-sub">Sign in with Google to unlock your unique API key and start earning instantly.</p>
       <button id="google-login-btn" class="google-btn">
         <img src="https://upload.wikimedia.org/wikipedia/commons/5/53/Google_%22G%22_Logo.svg" alt="Google Logo">
-        Sign in with Google
+        <span id="google-btn-text">Sign in with Google</span>
       </button>
       <div class="login-footer-note">
         <span style="color:var(--green);">🔒</span> 100% Secure. We never post without your permission.
@@ -230,7 +263,7 @@
         <button class="copy-btn" onclick="copyApiKey()" data-i18n="copy_btn">📋 Copy</button>
       </div>
       <p class="api-note" data-i18n="api_note">Send <strong>/api YOUR_KEY</strong> to the bot to activate.</p>
-      <button onclick="logoutUser()" style="margin-top:15px;background:rgba(255,59,59,0.85);color:#fff;border:none;padding:10px 22px;border-radius:8px;cursor:pointer;font-weight:700;font-size:0.9rem;">🚪 Logout</button>
+      <a href="https://www.mayajaal.online" class="btn btn-green" style="margin-top:20px;display:inline-block;">🚀 Go to Dashboard</a>
     </div>
   </div>
 </section>
@@ -310,6 +343,16 @@
 </footer>
 
 <a href="/download.html" class="float-cta" data-i18n="float_btn">📥 Download App</a>
+
+<!-- SUCCESS OVERLAY -->
+<div class="success-overlay" id="successOverlay">
+  <div class="success-card">
+    <div class="success-icon">✅</div>
+    <h3>Login Successful!</h3>
+    <p>Redirecting to your dashboard...</p>
+    <div class="loader"></div>
+  </div>
+</div>
 
 <script>
 const translations = {
@@ -630,7 +673,7 @@ const translations = {
   }
 };
 
-// Generate API Key (replace with your real logic)
+// Generate API Key
 const apiKey = "MATRIX-" + Math.random().toString(36).substring(2, 18).toUpperCase();
 
 function copyApiKey() {
@@ -685,63 +728,127 @@ if (savedLang) {
 }
 </script>
 
-<!-- ===== FIREBASE GOOGLE LOGIN LOGIC ===== -->
+<!-- ===== FIREBASE GOOGLE LOGIN LOGIC (WORKING + REDIRECT) ===== -->
 <script type="module">
   import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
   import { getAuth, signInWithPopup, GoogleAuthProvider, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
+  import { getDatabase, ref, set, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js";
 
-  // ⚠️ APNA ASLI FIREBASE CONFIG YAHAN DAALO ⚠️
   const firebaseConfig = {
-    apiKey: "AIzaSyDI5hgBbaUeTpXcPIlAnq5yDjEnfY-y1M",
+    apiKey: "AIzaSyDI5hgBbaUeTpXcPIlAnq5yDjIenfY-ylM",
     authDomain: "mayajaal-app.firebaseapp.com",
+    databaseURL: "https://mayajaal-app-default-rtdb.asia-southeast1.firebasedatabase.app",
     projectId: "mayajaal-app",
     storageBucket: "mayajaal-app.firebasestorage.app",
     messagingSenderId: "96139047750",
-    appId: "1:96139047750:web:85053f7e8f8b9c9d8e7f6a"  // <-- Apna pura appId yahan daalo
+    appId: "1:96139047750:web:850537e9c436dd7d012b47"
   };
 
   const app = initializeApp(firebaseConfig);
   const auth = getAuth(app);
+  const db = getDatabase(app);
   const provider = new GoogleAuthProvider();
+  provider.setCustomParameters({ prompt: 'select_account' });
 
   const loginSection = document.getElementById('login-section');
   const loggedInSection = document.getElementById('api-section-logged-in');
   const loginBtn = document.getElementById('google-login-btn');
+  const loginBtnText = document.getElementById('google-btn-text');
   const userGreeting = document.getElementById('user-greeting');
   const apiKeyDisplay = document.getElementById('apiKeyDisplay');
+  const successOverlay = document.getElementById('successOverlay');
 
-  // Login state change handler
+  function resetLoginBtn(){
+    if (loginBtn) loginBtn.disabled = false;
+    if (loginBtnText) loginBtnText.textContent = 'Sign in with Google';
+  }
+
+  function saveUserAndRedirect(user){
+    // Save user info to localStorage (so main page can read it)
+    const userData = {
+      uid: user.uid,
+      name: user.displayName || user.email,
+      email: user.email,
+      photo: user.photoURL || '',
+      loginTime: Date.now()
+    };
+    localStorage.setItem('mayajaal_user', JSON.stringify(userData));
+    localStorage.setItem('mayajaal_uid', user.uid);
+    localStorage.setItem('mayajaal_apiKey', apiKey);
+
+    // Save to Firebase DB
+    try {
+      set(ref(db, 'users/' + user.uid), {
+        uid: user.uid,
+        name: user.displayName || '',
+        email: user.email || '',
+        photo: user.photoURL || '',
+        apiKey: apiKey,
+        lastLogin: serverTimestamp(),
+        loginCount: Date.now()
+      }).catch(err => console.log('DB save error:', err));
+    } catch(e){ console.log('DB error:', e); }
+
+    // Show success overlay
+    successOverlay.classList.add('on');
+
+    // Redirect to main page after 1.5 seconds
+    setTimeout(() => {
+      window.location.href = 'https://www.mayajaal.online';
+    }, 1500);
+  }
+
+  // Login state listener
   onAuthStateChanged(auth, (user) => {
     if (user) {
-      // User logged in
+      // Logged in
       loginSection.classList.add('hidden');
       loggedInSection.classList.remove('hidden');
       userGreeting.textContent = `👋 Welcome, ${user.displayName || user.email}!`;
       apiKeyDisplay.textContent = apiKey;
+
+      // If just logged in (not from cached), redirect
+      const justLoggedIn = sessionStorage.getItem('mj_just_logged_in');
+      if (justLoggedIn) {
+        sessionStorage.removeItem('mj_just_logged_in');
+        saveUserAndRedirect(user);
+      }
     } else {
-      // User logged out
+      // Logged out
       loginSection.classList.remove('hidden');
       loggedInSection.classList.add('hidden');
     }
   });
 
-  // Google login button
+  // Login button
   if (loginBtn) {
     loginBtn.addEventListener('click', () => {
+      loginBtn.disabled = true;
+      loginBtnText.textContent = 'Connecting...';
+
       signInWithPopup(auth, provider)
         .then((result) => {
-          console.log("Login successful:", result.user.displayName);
+          console.log("✅ Login successful:", result.user.displayName);
+          sessionStorage.setItem('mj_just_logged_in', '1');
+          // onAuthStateChanged will handle the rest
         })
         .catch((error) => {
-          console.error("Login error:", error);
+          console.error("❌ Login error:", error);
+          resetLoginBtn();
+          if (error.code === 'auth/popup-closed-by-user' || error.code === 'auth/cancelled-popup-request') {
+            return;
+          }
           alert("Login failed: " + error.message);
         });
     });
   }
 
-  // Logout function (global)
+  // Logout function (global, agar kabhi zaroorat pade)
   window.logoutUser = function() {
     signOut(auth).then(() => {
+      localStorage.removeItem('mayajaal_user');
+      localStorage.removeItem('mayajaal_uid');
+      localStorage.removeItem('mayajaal_apiKey');
       console.log("Logged out");
     }).catch((error) => {
       alert("Logout failed: " + error.message);
