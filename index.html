@@ -1,1 +1,1305 @@
 
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#020705">
+<title>MayaJaal â€” The Digital Network</title>
+<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-database-compat.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<style>
+*{box-sizing:border-box;margin:0;padding:0;font-family:'Courier New','SF Mono',Consolas,monospace}
+html,body{background:#020705;color:#effff5;min-height:100vh;overflow-x:hidden;-webkit-font-smoothing:antialiased;-webkit-tap-highlight-color:transparent}
+button{font-family:inherit;cursor:pointer;border:0;background:none;color:inherit}
+a{color:inherit;text-decoration:none}
+#matrix{position:fixed;inset:0;width:100%;height:100%;z-index:0;opacity:.5;pointer-events:none}
+.vig{position:fixed;inset:0;z-index:1;pointer-events:none;background:
+  radial-gradient(ellipse at 50% 25%,transparent 0%,rgba(0,20,10,.5) 55%,#000 100%),
+  linear-gradient(180deg,rgba(0,255,120,.04) 0%,transparent 30%,transparent 70%,rgba(0,255,120,.03) 100%)}
+
+.loading-screen{position:fixed;inset:0;z-index:500;display:flex;align-items:center;justify-content:center;background:radial-gradient(ellipse at center,#031a0e 0%,#020705 70%);transition:opacity .55s ease,visibility .55s}
+.loading-screen.hide{opacity:0;visibility:hidden;pointer-events:none}
+.loading-card{text-align:center;padding:20px;position:relative}
+.loading-eye{width:120px;height:120px;margin:0 auto 22px;display:block;filter:drop-shadow(0 0 30px rgba(0,255,120,.6));animation:pulseGlow 2.2s ease-in-out infinite}
+@keyframes pulseGlow{0%,100%{filter:drop-shadow(0 0 25px rgba(0,255,120,.5));transform:scale(1)}50%{filter:drop-shadow(0 0 55px rgba(0,255,120,.95));transform:scale(1.05)}}
+.loading-brand{font-size:2.6rem;font-weight:900;letter-spacing:-1.5px;color:#00ff78;text-shadow:0 0 25px rgba(0,255,120,.7);margin-bottom:8px}
+.loading-brand span{color:#d7ffe7;font-weight:400}
+.loading-tagline{color:#6f9981;font-size:.75rem;letter-spacing:.35em;text-transform:uppercase;margin-bottom:30px}
+.loading-bar-wrap{width:220px;height:4px;background:rgba(0,255,120,.12);border-radius:99px;overflow:hidden;margin:0 auto 18px;position:relative}
+.loading-bar{height:100%;width:40%;background:linear-gradient(90deg,transparent,#00ff78,#00c963,transparent);border-radius:99px;position:absolute;top:0;left:0;animation:loadSlide 1.6s ease-in-out infinite}
+@keyframes loadSlide{0%{left:-45%}100%{left:100%}}
+.loading-status{color:#9bffbd;font-size:.78rem;letter-spacing:.1em;min-height:1.2em;display:flex;align-items:center;justify-content:center;gap:8px}
+.loading-status .ldot{width:6px;height:6px;border-radius:50%;background:#00ff78;box-shadow:0 0 8px #00ff78;animation:pulseDot 1.2s infinite}
+.loading-grid-ring{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:180px;height:180px;border:1px dashed rgba(0,255,120,.25);border-radius:50%;animation:spinRing 12s linear infinite;pointer-events:none}
+.loading-grid-ring::before{content:"";position:absolute;top:-3px;left:50%;width:6px;height:6px;background:#00ff78;border-radius:50%;box-shadow:0 0 12px #00ff78;transform:translateX(-50%)}
+.loading-grid-ring.inner{width:240px;height:240px;border-color:rgba(0,255,120,.12);animation-duration:18s;animation-direction:reverse}
+@keyframes spinRing{from{transform:translate(-50%,-50%) rotate(0)}to{transform:translate(-50%,-50%) rotate(360deg)}}
+
+.snk{position:relative;display:inline-block;overflow:hidden;isolation:isolate;max-width:100%;padding:2px 6px;border-radius:6px}
+.snk.blk{display:block;width:100%}
+.snk::after{content:"";position:absolute;top:0;left:-90px;width:90px;height:100%;
+  background:radial-gradient(ellipse at center,rgba(255,255,255,.95) 0%,rgba(200,255,220,.75) 30%,rgba(0,255,120,.35) 60%,transparent 80%);
+  filter:blur(6px);mix-blend-mode:screen;pointer-events:none;z-index:5;
+  animation:snakeSweep 4.2s ease-in-out infinite}
+@keyframes snakeSweep{0%{left:-90px;opacity:0}10%{opacity:1}48%{left:100%;opacity:1}55%{left:100%;opacity:0}100%{left:100%;opacity:0}}
+.snk.d1::after{animation-delay:.6s}
+.snk.d2::after{animation-delay:1.2s}
+.snk.d3::after{animation-delay:1.8s}
+.snk.d4::after{animation-delay:2.4s}
+.snk.d5::after{animation-delay:3s}
+
+.brand-wrap{position:relative;display:inline-block;padding:6px 12px;overflow:hidden;border-radius:10px}
+.brand{position:relative;font-weight:900;font-size:clamp(1.8rem,5vw,2.4rem);letter-spacing:-1px;color:#00ff78;z-index:2;text-shadow:0 0 15px rgba(0,255,120,.55)}
+.brand span{color:#d7ffe7;font-weight:400}
+.brand-wrap .snake{position:absolute;top:0;left:-140px;width:140px;height:100%;
+  background:radial-gradient(ellipse at center,rgba(255,255,255,.95) 0%,rgba(200,255,220,.7) 30%,rgba(0,255,120,.3) 55%,transparent 75%);
+  filter:blur(7px);mix-blend-mode:screen;pointer-events:none;z-index:3;
+  animation:snakeGo 3.5s ease-in-out infinite}
+@keyframes snakeGo{0%{left:-140px;opacity:0}5%{opacity:1}45%{left:100%;opacity:1}50%{left:100%;opacity:0}55%{opacity:0}55.1%{left:100%;opacity:1}95%{left:-140px;opacity:1}100%{left:-140px;opacity:0}}
+
+.mtx{color:#00ff78;text-shadow:0 0 8px rgba(0,255,120,.55),0 0 2px rgba(0,255,120,.9);letter-spacing:.05em}
+
+.login-screen{position:relative;z-index:2;min-height:100vh;display:flex;align-items:center;justify-content:center;padding:24px 16px}
+.login-card{width:100%;max-width:440px;background:linear-gradient(135deg,rgba(5,28,17,.97),rgba(2,10,7,.97));border:1px solid rgba(0,255,120,.35);border-radius:22px;padding:40px 28px;text-align:center;backdrop-filter:blur(14px);box-shadow:0 0 70px rgba(0,255,120,.2);animation:fadeUp .8s ease-out;position:relative;overflow:hidden}
+.login-card::before{content:"";position:absolute;top:0;left:0;right:0;height:1px;background:linear-gradient(90deg,transparent,#00ff78,transparent);opacity:.8}
+@keyframes fadeUp{from{opacity:0;transform:translateY(24px)}to{opacity:1;transform:translateY(0)}}
+.login-eye{width:100px;height:100px;margin:0 auto 14px;display:block;filter:drop-shadow(0 0 30px rgba(0,255,120,.6))}
+.login-card h1{font-size:2.4rem;font-weight:900;letter-spacing:-1px;color:#00ff78;margin-bottom:6px;text-shadow:0 0 22px rgba(0,255,120,.65)}
+.login-card h1 span{color:#d7ffe7;font-weight:400}
+.tagline{color:#91b8a4;font-size:.85rem;margin-bottom:26px;line-height:1.5;padding:0 6px}
+.google-btn{display:flex;align-items:center;justify-content:center;gap:12px;width:100%;background:#fff;color:#1a1a1a;padding:15px;border-radius:12px;font-size:.95rem;font-weight:700;transition:.2s}
+.google-btn:hover:not(:disabled){transform:translateY(-2px);box-shadow:0 10px 30px rgba(255,255,255,.2)}
+.google-btn:disabled{opacity:.7;cursor:wait}
+.google-btn svg{width:20px;height:20px;flex-shrink:0}
+.err-msg{margin-top:14px;padding:11px 14px;border-radius:10px;background:#1a0e0e;border:1px solid #ff6b6b;color:#ffb3b3;font-size:.78rem;display:none;text-align:left;line-height:1.5}
+.err-msg.on{display:block}
+.err-msg button{background:#00ff78 !important;color:#001b0c !important;padding:9px 16px;border-radius:8px;font-weight:800;margin-top:8px;border:0;cursor:pointer;font-size:.78rem}
+.features{margin-top:24px;padding-top:20px;border-top:1px dashed rgba(0,255,120,.25);display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px}
+.feat .fi{font-size:1.3rem;margin-bottom:4px}
+.feat .ft{font-size:.62rem;color:#6f9981;text-transform:uppercase;letter-spacing:.08em}
+.login-foot{margin-top:18px;font-size:.72rem;color:#6f9981;line-height:1.6}
+
+.menu-btn{position:fixed;top:14px;left:14px;z-index:100;width:44px;height:44px;border-radius:12px;background:#04180e;border:1px solid rgba(0,255,120,.35);display:flex;flex-direction:column;justify-content:center;align-items:center;gap:5px;padding:10px;transition:.2s}
+.menu-btn:hover{border-color:#00ff78}
+.menu-btn span{display:block;width:22px;height:2px;background:#00ff78;border-radius:2px;transition:.3s}
+.menu-btn.open span:nth-child(1){transform:translateY(7px) rotate(45deg)}
+.menu-btn.open span:nth-child(2){opacity:0}
+.menu-btn.open span:nth-child(3){transform:translateY(-7px) rotate(-45deg)}
+.side-menu{position:fixed;top:0;left:-320px;width:300px;height:100vh;background:#03110a;border-right:1px solid rgba(0,255,120,.35);z-index:99;transition:left .3s;padding:70px 16px 20px;overflow-y:auto}
+.side-menu.open{left:0}
+.menu-overlay{position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:98;opacity:0;pointer-events:none;transition:.3s}
+.menu-overlay.open{opacity:1;pointer-events:auto}
+.menu-item{display:flex;align-items:center;gap:12px;padding:13px 12px;color:#effff5;border-radius:10px;font-size:.88rem;width:100%;text-align:left;transition:.2s;position:relative}
+.menu-item:hover{background:#041a0e;color:#00ff78}
+.menu-item .ico{color:#00ff78;font-size:1.1rem;width:22px;text-align:center}
+.badge{margin-left:auto;background:#ff3d3d;color:#fff;font-size:.65rem;font-weight:800;padding:3px 7px;border-radius:99px;min-width:20px;text-align:center}
+.badge.green{background:#00ff78;color:#001b0c}
+.menu-section{margin-top:20px;padding-top:20px;border-top:1px solid rgba(0,255,120,.2)}
+.menu-section h4{font-size:.68rem;color:#6f9981;text-transform:uppercase;letter-spacing:.15em;margin-bottom:8px;padding-left:12px}
+.menu-user{display:flex;align-items:center;gap:10px;padding:12px;background:#04180e;border-radius:12px;margin-bottom:16px;border:1px solid rgba(0,255,120,.2)}
+.menu-user img{width:40px;height:40px;border-radius:50%;border:2px solid #00ff78;object-fit:cover;background:#000}
+.menu-user .mu-name{font-size:.78rem;overflow:hidden;flex:1;min-width:0}
+.menu-user .mu-name b{display:block;color:#00ff78;font-size:.85rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.menu-user .mu-name span{color:#91b8a4;font-size:.7rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;display:block}
+
+.app{display:none;position:relative;z-index:2}
+.app.on{display:block}
+.wrap{width:min(1180px,calc(100% - 24px));margin:auto;padding:20px 0}
+.topbar{display:flex;align-items:center;justify-content:center;padding:14px 0;border-bottom:1px solid rgba(0,255,120,.2);margin-bottom:20px;position:relative;min-height:60px}
+.top-right{position:absolute;right:0;top:50%;transform:translateY(-50%);display:flex;align-items:center;gap:8px}
+
+.notif-btn{position:relative;width:40px;height:40px;border-radius:50%;background:#04180e;border:1px solid rgba(0,255,120,.35);color:#00ff78;font-size:1.1rem;display:flex;align-items:center;justify-content:center;transition:.2s;flex-shrink:0}
+.notif-btn:hover{border-color:#00ff78;transform:scale(1.08);box-shadow:0 0 15px rgba(0,255,120,.4)}
+.notif-btn .notif-dot{position:absolute;top:-4px;right:-4px;min-width:18px;height:18px;padding:0 4px;border-radius:99px;background:#ff3d3d;color:#fff;font-size:.62rem;font-weight:900;display:flex;align-items:center;justify-content:center;box-shadow:0 0 10px rgba(255,61,61,.8);border:2px solid #03110a;animation:bellPulse 1.6s ease-in-out infinite}
+@keyframes bellPulse{0%,100%{transform:scale(1)}50%{transform:scale(1.15)}}
+
+.user-chip{display:flex;align-items:center;gap:8px;background:#04180e;border:1px solid rgba(0,255,120,.25);border-radius:99px;padding:4px 12px 4px 4px}
+.user-chip img{width:30px;height:30px;border-radius:50%;border:2px solid #00ff78;object-fit:cover;background:#000}
+.user-chip .uc-name{font-size:.78rem;color:#00ff78;font-weight:700;max-width:100px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+
+.hero{text-align:center;padding:26px 16px 20px;position:relative;border-radius:20px;background:linear-gradient(135deg,rgba(5,28,17,.75),rgba(2,10,7,.75));border:1px solid rgba(0,255,120,.25);margin-bottom:22px;overflow:hidden}
+.hero::before{content:"";position:absolute;top:0;left:0;right:0;height:1px;background:linear-gradient(90deg,transparent,#00ff78,transparent);opacity:.7}
+.eyebrow{display:inline-block;color:#00ff78;letter-spacing:.25em;font-size:clamp(.6rem,2.6vw,.75rem);font-weight:800;margin:0 auto 10px;text-shadow:0 0 10px rgba(0,255,120,.6);max-width:100%;word-break:break-word;overflow-wrap:anywhere}
+.hero h1{font-size:clamp(1.4rem,5.5vw,2.6rem);margin:8px 0;letter-spacing:-1px;font-weight:900;line-height:1.3;word-break:break-word}
+.hero h1 em{font-style:normal;color:#00ff78;text-shadow:0 0 18px rgba(0,255,120,.6)}
+.sub{display:inline-block;color:#a8c9b6;max-width:560px;margin:10px auto 0;line-height:1.6;font-size:clamp(.78rem,2.8vw,.9rem);overflow-wrap:anywhere}
+.eye-box{width:min(700px,100%);margin:18px auto 6px;position:relative;filter:drop-shadow(0 0 28px rgba(0,255,120,.35))}
+.eye-box svg{width:100%;height:auto;display:block}
+.eyelid{transform-box:fill-box;transition:transform .09s ease-in-out}
+.eyelid.top{transform-origin:50% 100%;transform:scaleY(0)}
+.eyelid.bot{transform-origin:50% 0%;transform:scaleY(0)}
+.blink .eyelid.top{transform:scaleY(1)}
+.blink .eyelid.bot{transform:scaleY(1)}
+.status{display:inline-flex;gap:8px;align-items:center;color:#9bffbd;border:1px solid rgba(0,255,120,.3);background:#04170d;padding:7px 14px;border-radius:99px;font-size:.72rem;margin-top:6px;letter-spacing:.05em}
+.dot{width:7px;height:7px;border-radius:50%;background:#00ff78;box-shadow:0 0 10px #00ff78;display:inline-block;animation:pulseDot 1.6s infinite}
+@keyframes pulseDot{0%,100%{opacity:1}50%{opacity:.35}}
+
+.ad-slot{margin:18px 0;min-height:90px;border:1px dashed rgba(0,255,120,.2);border-radius:14px;background:linear-gradient(135deg,rgba(5,28,17,.4),rgba(2,10,7,.4));display:flex;align-items:center;justify-content:center;position:relative;overflow:hidden;padding:14px}
+.ad-slot.tall{min-height:250px}
+.ad-slot::before{content:"";position:absolute;top:0;left:0;right:0;height:1px;background:linear-gradient(90deg,transparent,rgba(0,255,120,.3),transparent);opacity:.5}
+.ad-slot .ad-label{font-size:.62rem;color:#5a7d6a;letter-spacing:.35em;text-transform:uppercase;text-align:center;font-weight:700}
+
+.api-card{background:linear-gradient(135deg,rgba(8,42,23,.98) 0%,rgba(3,18,10,.98) 50%,rgba(6,32,18,.98) 100%);border:2px solid rgba(0,255,120,.55);border-radius:22px;padding:26px 24px 24px;position:relative;overflow:hidden;box-shadow:0 0 50px rgba(0,255,120,.18),inset 0 0 80px rgba(0,255,120,.04);animation:apiPulse 3.5s ease-in-out infinite}
+@keyframes apiPulse{0%,100%{box-shadow:0 0 50px rgba(0,255,120,.18),inset 0 0 80px rgba(0,255,120,.04)}50%{box-shadow:0 0 70px rgba(0,255,120,.35),inset 0 0 100px rgba(0,255,120,.07)}}
+.api-card::before{content:"";position:absolute;top:0;left:0;right:0;height:2px;background:linear-gradient(90deg,transparent,#00ff78,#00c963,#00ff78,transparent);opacity:.9;animation:topLine 3s ease-in-out infinite}
+@keyframes topLine{0%,100%{opacity:.5}50%{opacity:1}}
+.api-card::after{content:"";position:absolute;bottom:-30px;right:-30px;width:180px;height:180px;border-radius:50%;background:radial-gradient(circle,rgba(0,255,120,.15) 0%,transparent 70%);pointer-events:none}
+.api-head{display:flex;align-items:center;gap:10px;margin-bottom:10px;flex-wrap:wrap}
+.api-step{background:linear-gradient(135deg,#00ff78,#00c963);color:#001b0c;padding:5px 13px;border-radius:99px;font-size:.65rem;font-weight:900;letter-spacing:.12em;box-shadow:0 0 20px rgba(0,255,120,.5);animation:stepGlow 2s ease-in-out infinite}
+@keyframes stepGlow{0%,100%{box-shadow:0 0 20px rgba(0,255,120,.5)}50%{box-shadow:0 0 35px rgba(0,255,120,.9)}}
+.api-card h2{font-size:.9rem;color:#00ff78;letter-spacing:.18em;text-transform:uppercase;margin:0;text-shadow:0 0 10px rgba(0,255,120,.6);font-weight:800}
+.api-desc{color:#a8c9b6;font-size:.82rem;margin-bottom:16px;line-height:1.6;padding-left:2px}
+.api-row{display:flex;gap:10px;align-items:center;background:linear-gradient(135deg,#010805,#020a06);border:1.5px solid rgba(0,255,120,.45);border-radius:14px;padding:18px 18px;flex-wrap:wrap;box-shadow:inset 0 0 30px rgba(0,255,120,.08);position:relative;overflow:hidden}
+.api-row::before{content:"";position:absolute;top:0;left:-100%;width:100%;height:100%;background:linear-gradient(90deg,transparent,rgba(0,255,120,.06),transparent);animation:keyShine 4s ease-in-out infinite}
+@keyframes keyShine{0%{left:-100%}100%{left:200%}}
+.key-text{flex:1;color:#00ff78;font-size:1rem;word-break:break-all;letter-spacing:2.2px;font-weight:bold;min-width:200px;text-shadow:0 0 12px rgba(0,255,120,.7),0 0 3px rgba(0,255,120,.9);position:relative;z-index:2;font-family:'Courier New',monospace;cursor:default}
+.key-text.retry{cursor:pointer;color:#ffb400;text-shadow:0 0 10px rgba(255,180,0,.6);font-size:.85rem;letter-spacing:.5px}
+.key-text.loading{color:#9bffbd;font-size:.85rem;letter-spacing:.15em;opacity:.9}
+.copy{background:linear-gradient(135deg,#00ff78,#00d96b);color:#001b0c;padding:12px 22px;border-radius:10px;font-weight:900;font-size:.8rem;letter-spacing:.08em;transition:.2s;white-space:nowrap;box-shadow:0 0 25px rgba(0,255,120,.45),0 4px 12px rgba(0,0,0,.3);position:relative;z-index:2}
+.copy:hover:not(:disabled){background:linear-gradient(135deg,#00e86b,#00c05a);transform:translateY(-2px);box-shadow:0 0 35px rgba(0,255,120,.7),0 6px 16px rgba(0,0,0,.4)}
+.copy.copied{background:#fff;color:#00c963}
+.copy:disabled{opacity:.5;cursor:not-allowed}
+.bot-hint{margin-top:14px;padding:14px 16px;background:linear-gradient(135deg,rgba(0,255,120,.06),rgba(0,255,120,.02));border-radius:12px;border-left:3px solid #00ff78;font-size:.8rem;color:#a8c9b6;line-height:1.7;display:flex;align-items:center;gap:10px;flex-wrap:wrap;justify-content:center;text-align:center}
+.hint-label{color:#9bffbd;font-weight:700;letter-spacing:.05em;font-size:.78rem}
+.bot-hint code{background:rgba(0,255,120,.15);padding:6px 12px;border-radius:6px;color:#7fffb8;word-break:break-all;font-size:.82rem;font-weight:700;border:1px solid rgba(0,255,120,.3);text-shadow:0 0 6px rgba(0,255,120,.5)}
+.activate-btn{display:block;background:linear-gradient(135deg,#00ff78,#00d96b);color:#001b0c;padding:15px 20px;border-radius:12px;font-weight:900;font-size:.9rem;text-align:center;margin-top:16px;transition:.2s;box-shadow:0 0 30px rgba(0,255,120,.4),0 6px 18px rgba(0,0,0,.3);letter-spacing:.04em}
+.activate-btn:hover{background:linear-gradient(135deg,#00e86b,#00c05a);transform:translateY(-2px);box-shadow:0 0 45px rgba(0,255,120,.7),0 8px 22px rgba(0,0,0,.4)}
+
+.bonus-card{background:linear-gradient(135deg,rgba(5,28,17,.95),rgba(2,10,7,.95));border:1px solid rgba(255,180,0,.35);border-radius:18px;padding:20px;position:relative;overflow:hidden}
+.bonus-card::before{content:"";position:absolute;top:0;left:0;right:0;height:1px;background:linear-gradient(90deg,transparent,#ffb400,transparent);opacity:.7}
+.bonus-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;flex-wrap:wrap;gap:8px}
+.bonus-head h2{font-size:.78rem;color:#ffb400;letter-spacing:.15em;text-transform:uppercase;text-shadow:0 0 8px rgba(255,180,0,.5)}
+.bonus-tier{background:rgba(255,180,0,.15);border:1px solid rgba(255,180,0,.4);color:#ffd76b;padding:5px 12px;border-radius:99px;font-size:.72rem;font-weight:800}
+.bonus-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:14px}
+.bonus-stat{background:#020a06;border:1px solid rgba(255,180,0,.25);border-radius:12px;padding:12px;text-align:center}
+.bonus-stat h5{font-size:.62rem;color:#8a7a4a;text-transform:uppercase;letter-spacing:.08em;margin-bottom:5px;font-weight:normal}
+.bonus-stat .bv{font-size:1.2rem;font-weight:bold;color:#ffd76b;text-shadow:0 0 10px rgba(255,180,0,.5)}
+.progress-wrap{background:#020a06;border:1px solid rgba(255,180,0,.25);border-radius:99px;height:12px;overflow:hidden;margin-top:6px}
+.progress-bar{height:100%;background:linear-gradient(90deg,#00ff78,#ffb400);border-radius:99px;transition:width .6s ease}
+.progress-label{display:flex;justify-content:space-between;font-size:.68rem;color:#8a7a4a;margin-top:6px}
+
+.dash-title{display:flex;align-items:center;justify-content:space-between;margin:26px 0 14px;flex-wrap:wrap;gap:10px}
+.dash-title h2{font-size:1.05rem;letter-spacing:.05em;display:flex;align-items:center;gap:8px}
+.dash-title h2 span{color:#00ff78}
+.live{font-size:.7rem;color:#9bffbd;border:1px solid rgba(0,255,120,.3);padding:5px 12px;border-radius:99px;display:inline-flex;align-items:center;gap:6px}
+.grid{display:grid;grid-template-columns:repeat(2,1fr);gap:11px;margin-bottom:16px}
+.stat{background:#04180e;border:1px solid rgba(0,255,120,.25);border-radius:12px;padding:15px;text-align:center;transition:.2s;position:relative;overflow:hidden}
+.stat:hover{border-color:rgba(0,255,120,.55);transform:translateY(-2px)}
+.stat h4{margin:0 0 7px;color:#91b8a4;font-size:.62rem;font-weight:normal;text-transform:uppercase;letter-spacing:.06em}
+.stat .v{font-size:1.3rem;font-weight:bold;color:#00ff78;word-break:break-word;text-shadow:0 0 10px rgba(0,255,120,.5)}
+
+.chart-grid{display:grid;grid-template-columns:1fr;gap:16px;margin-bottom:16px}
+.chart-box{background:#04180e;border:1px solid rgba(0,255,120,.25);border-radius:14px;padding:18px;height:320px;position:relative;overflow:hidden}
+.chart-box h4{margin:0 0 14px;font-size:.85rem;color:#effff5;font-weight:normal;letter-spacing:.05em;display:flex;align-items:center;gap:6px}
+.chart-box canvas{width:100%!important;height:calc(100% - 40px)!important}
+
+.bots-section{padding:20px;border:1px solid rgba(0,255,120,.25);border-radius:18px;background:linear-gradient(135deg,rgba(5,28,17,.9),rgba(2,10,7,.9));position:relative;overflow:hidden}
+.bots-section h3{color:#00ff78;font-size:.78rem;letter-spacing:.15em;text-transform:uppercase;margin-bottom:14px}
+.bot-links{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.bot-link{display:flex;align-items:center;gap:14px;padding:15px;border:1px solid rgba(0,255,120,.25);border-radius:12px;background:#04180e;transition:.2s}
+.bot-link:hover{border-color:#00ff78;background:#052a15;transform:translateY(-2px)}
+.bot-link .b-ico{font-size:1.5rem;color:#00ff78;flex-shrink:0}
+.bot-link .b-info h4{font-size:.9rem;margin-bottom:3px;color:#effff5}
+.bot-link .b-info p{font-size:.7rem;color:#91b8a4}
+.footer{text-align:center;padding:34px 0 20px;color:#6f9981;font-size:.72rem;border-top:1px dashed rgba(0,255,120,.15);margin-top:30px}
+
+.modal-bg{position:fixed;inset:0;background:rgba(0,0,0,.85);backdrop-filter:blur(6px);z-index:200;display:none;align-items:center;justify-content:center;padding:16px}
+.modal-bg.on{display:flex}
+.modal{width:min(640px,100%);max-height:88vh;overflow-y:auto;border:1px solid #00c963;background:#03110a;border-radius:18px;padding:22px}
+.modal-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;padding-bottom:12px;border-bottom:1px solid rgba(0,255,120,.2);gap:10px;flex-wrap:wrap}
+.modal-head h2{font-size:1.1rem;color:#00ff78;text-shadow:0 0 10px rgba(0,255,120,.5);flex:1;min-width:0}
+.close-x{color:#00ff78;font-size:1.7rem;line-height:1;padding:0 6px}
+.modal-body{color:#b6d5c2;line-height:1.65;font-size:.86rem}
+.modal-body p{margin-bottom:10px}
+.modal-body a{color:#00ff78;text-decoration:underline}
+.form-row{margin:14px 0}
+.form-row label{display:block;font-size:.82rem;color:#dfffea;margin-bottom:6px}
+.form-row select,.form-row input{width:100%;background:#020a06;color:#fff;border:1px solid rgba(0,255,120,.3);border-radius:10px;padding:11px;font-size:.88rem}
+.form-row select:focus,.form-row input:focus{outline:none;border-color:#00ff78}
+.btn-save{background:#00ff78;color:#001b0c;padding:11px 20px;border-radius:10px;font-weight:800;font-size:.85rem;transition:.2s}
+.btn-save:hover{background:#00e86b}
+
+.earn-table{width:100%;border-collapse:collapse;margin:12px 0;font-size:.78rem}
+.earn-table th,.earn-table td{padding:8px 6px;text-align:left;border-bottom:1px solid rgba(0,255,120,.15)}
+.earn-table th{color:#00ff78;text-transform:uppercase;font-size:.68rem;letter-spacing:.08em}
+.earn-table td{color:#c6e8d4}
+.earn-table tr.hl{background:rgba(0,255,120,.08)}
+.earn-box{background:#020a06;border:1px dashed rgba(0,255,120,.35);border-radius:10px;padding:12px;margin:12px 0;color:#7fffb8;font-size:.8rem;line-height:1.7}
+.notif-item{padding:12px;border-radius:10px;background:#04180e;border-left:3px solid #00ff78;margin-bottom:10px;font-size:.82rem;color:#c6e8d4}
+.notif-item .nt{font-size:.66rem;color:#6f9981;margin-top:4px}
+.notif-empty{text-align:center;color:#6f9981;padding:20px;font-size:.8rem}
+
+.info-lang-switch{display:flex;gap:8px;margin-bottom:16px;background:#020a06;padding:5px;border-radius:10px;border:1px solid rgba(0,255,120,.2)}
+.info-lang-switch button{flex:1;padding:9px;border-radius:7px;font-size:.78rem;font-weight:800;color:#91b8a4;transition:.2s;letter-spacing:.06em}
+.info-lang-switch button.active{background:linear-gradient(135deg,#00ff78,#00d96b);color:#001b0c;box-shadow:0 0 15px rgba(0,255,120,.4)}
+.info-block{margin-bottom:16px;padding:14px 16px;background:linear-gradient(135deg,rgba(5,28,17,.7),rgba(2,10,7,.7));border-radius:12px;border-left:3px solid #00ff78;position:relative;overflow:hidden}
+.info-block.bonus{border-left-color:#ffb400}
+.info-block.payout{border-left-color:#00c963}
+.info-block.warn{border-left-color:#ff6b6b}
+.info-block h4{color:#00ff78;font-size:.82rem;margin-bottom:8px;text-transform:uppercase;letter-spacing:.08em;display:flex;align-items:center;gap:8px}
+.info-block.bonus h4{color:#ffb400}
+.info-block.warn h4{color:#ff6b6b}
+.info-block p,.info-block li{color:#c6e8d4;font-size:.82rem;line-height:1.7}
+.info-block ol,.info-block ul{margin:8px 0 8px 18px}
+.info-block li{margin-bottom:5px}
+.info-block code{background:rgba(0,255,120,.15);padding:3px 8px;border-radius:5px;color:#7fffb8;font-size:.78rem;border:1px solid rgba(0,255,120,.25)}
+.info-tip{background:rgba(0,255,120,.06);border:1px dashed rgba(0,255,120,.35);border-radius:10px;padding:12px;margin:12px 0;color:#9bffbd;font-size:.8rem;line-height:1.6}
+.info-tip b{color:#00ff78}
+
+@media(min-width:600px){
+  .grid{grid-template-columns:repeat(3,1fr)}
+  .login-card{padding:48px 40px}
+  .login-card h1{font-size:2.6rem}
+  .loading-brand{font-size:3rem}
+}
+@media(min-width:900px){
+  .grid{grid-template-columns:repeat(6,1fr)}
+  .chart-grid{grid-template-columns:1fr 1fr 1fr}
+  .chart-box{height:340px}
+  .api-card{padding:32px 30px 28px}
+}
+@media(max-width:520px){
+  .login-card{padding:32px 22px}.login-card h1{font-size:2rem}.brand{font-size:1.5rem}
+  .user-chip .uc-name{display:none}.user-chip{padding:3px}
+  .api-card{padding:20px 16px 18px}.key-text{font-size:.82rem;letter-spacing:1.5px}
+  .bot-links{grid-template-columns:1fr}.chart-box{height:260px;padding:14px}
+  .bonus-grid{grid-template-columns:1fr}
+  .hero{padding:22px 12px}
+  .api-card h2{font-size:.78rem;letter-spacing:.12em}
+  .copy{padding:11px 18px;font-size:.75rem}
+  .loading-brand{font-size:2.2rem}
+  .loading-eye{width:100px;height:100px}
+  .notif-btn{width:36px;height:36px;font-size:1rem}
+  .ad-slot{min-height:80px}
+  .ad-slot.tall{min-height:200px}
+}
+</style>
+</head>
+<body>
+<script>
+/* FAILSAFE_LOADING_FIX */
+setTimeout(function(){
+  var ls = document.getElementById('loadingScreen');
+  if (ls && !ls.classList.contains('hide')) {
+    ls.classList.add('hide');
+    console.log('Failsafe: loading screen hidden');
+  }
+}, 3000);
+</script>
+
+<canvas id="matrix"></canvas>
+<div class="vig"></div>
+
+<div class="loading-screen" id="loadingScreen">
+  <div class="loading-card">
+    <div class="loading-grid-ring"></div>
+    <div class="loading-grid-ring inner"></div>
+    <svg class="loading-eye" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+      <defs>
+        <radialGradient id="ldIris" cx="50%" cy="45%" r="60%">
+          <stop offset="0%" stop-color="#0a3d24"/><stop offset="40%" stop-color="#0a7a42"/>
+          <stop offset="75%" stop-color="#00ff78"/><stop offset="100%" stop-color="#041a0e"/>
+        </radialGradient>
+        <clipPath id="ldClip"><path d="M8 50 Q25 15 50 18 Q75 15 92 50 Q75 85 50 82 Q25 85 8 50 Z"/></clipPath>
+      </defs>
+      <path d="M8 50 Q25 15 50 18 Q75 15 92 50 Q75 85 50 82 Q25 85 8 50 Z" fill="#f0f7f2" stroke="#0a1f12" stroke-width="1.5"/>
+      <g clip-path="url(#ldClip)">
+        <ellipse cx="50" cy="50" rx="16" ry="18" fill="url(#ldIris)"/>
+        <ellipse cx="50" cy="50" rx="7" ry="8" fill="#000"/>
+        <circle cx="45" cy="43" r="3" fill="#fff" opacity=".95"/>
+        <circle cx="56" cy="55" r="1.5" fill="#fff" opacity=".7"/>
+      </g>
+      <path d="M8 50 Q25 15 50 18 Q75 15 92 50" fill="none" stroke="#00ff78" stroke-width="2" stroke-linecap="round"/>
+      <path d="M8 50 Q25 85 50 82 Q75 85 92 50" fill="none" stroke="#00c963" stroke-width="1.5"/>
+    </svg>
+    <div class="loading-brand">maya<span>Jaal</span></div>
+    <div class="loading-tagline">The Digital Network</div>
+    <div class="loading-bar-wrap"><div class="loading-bar"></div></div>
+    <div class="loading-status" id="loadingStatus"><span class="ldot"></span><span id="loadingText">INITIALIZING MATRIX</span></div>
+  </div>
+</div>
+
+<div class="login-screen" id="loginScreen" style="display:none">
+  <div class="login-card">
+    <svg class="login-eye" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+      <defs>
+        <radialGradient id="lgIris" cx="50%" cy="45%" r="60%">
+          <stop offset="0%" stop-color="#0a3d24"/><stop offset="40%" stop-color="#0a7a42"/>
+          <stop offset="75%" stop-color="#00ff78"/><stop offset="100%" stop-color="#041a0e"/>
+        </radialGradient>
+        <clipPath id="lgClip"><path d="M8 50 Q25 15 50 18 Q75 15 92 50 Q75 85 50 82 Q25 85 8 50 Z"/></clipPath>
+      </defs>
+      <path d="M8 50 Q25 15 50 18 Q75 15 92 50 Q75 85 50 82 Q25 85 8 50 Z" fill="#f0f7f2" stroke="#0a1f12" stroke-width="1.5"/>
+      <g clip-path="url(#lgClip)">
+        <ellipse cx="50" cy="50" rx="16" ry="18" fill="url(#lgIris)"/>
+        <ellipse cx="50" cy="50" rx="7" ry="8" fill="#000"/>
+        <circle cx="45" cy="43" r="3" fill="#fff" opacity=".95"/>
+        <circle cx="56" cy="55" r="1.5" fill="#fff" opacity=".7"/>
+      </g>
+      <path d="M8 50 Q25 15 50 18 Q75 15 92 50" fill="none" stroke="#00ff78" stroke-width="2" stroke-linecap="round"/>
+      <path d="M8 50 Q25 85 50 82 Q75 85 92 50" fill="none" stroke="#00c963" stroke-width="1.5"/>
+    </svg>
+    <h1>maya<span>Jaal</span></h1>
+    <p class="tagline">Your unique API key & earnings dashboard</p>
+    
+    <div class="err-msg" id="errMsg"></div>
+    <div class="features">
+      <div class="feat"><div class="fi">ðŸ”‘</div><div class="ft">API Key</div></div>
+      <div class="feat"><div class="fi">ðŸ“Š</div><div class="ft">Live Stats</div></div>
+      <div class="feat"><div class="fi">âš¡</div><div class="ft">Bot Sync</div></div>
+    </div>
+    <p class="login-foot">Your data is linked to your Gmail. Come back anytime â€” same API & data.</p>
+  </div>
+</div>
+
+<button class="menu-btn" id="menuBtn" style="display:none"><span></span><span></span><span></span></button>
+<div class="side-menu" id="sideMenu">
+  <div class="menu-user">
+    <img id="mPic" src="" alt="">
+    <div class="mu-name"><b id="mName">User</b><span id="mEmail">email</span></div>
+  </div>
+  <button class="menu-item" data-act="settings"><span class="ico">âš™</span> Settings</button>
+  <button class="menu-item" data-act="info"><span class="ico">â„¹</span> Information</button>
+  <button class="menu-item" data-act="bonus"><span class="ico">ðŸŽ</span> Bonus<span class="badge green" id="bonusBadge">NEW</span></button>
+  <button class="menu-item" data-act="earnings"><span class="ico">ðŸ’°</span> Earnings Model</button>
+  <button class="menu-item" data-act="support"><span class="ico">â˜</span> Help & Support</button>
+  <button class="menu-item" data-act="privacy"><span class="ico">â¬¡</span> Privacy Policy</button>
+  <button class="menu-item" data-act="terms"><span class="ico">â–¤</span> Terms & Conditions</button>
+  <div class="menu-section">
+    <h4>Join Us</h4>
+    <a class="menu-item" href="https://www.instagram.com/maya_jaal_official" target="_blank"><span class="ico">â—Ž</span> Instagram</a>
+    <a class="menu-item" href="https://t.me/Mayajaalfilebot" target="_blank"><span class="ico">âž¤</span> Telegram Channel</a>
+    <a class="menu-item" href="https://youtube.com/@mayajaal" target="_blank"><span class="ico">â–·</span> YouTube</a>
+  </div>
+  <div class="menu-section">
+    <button class="menu-item" id="logoutMenuBtn" style="color:#ff6b6b"><span class="ico" style="color:#ff6b6b">âŽ‹</span> Logout</button>
+  </div>
+</div>
+<div class="menu-overlay" id="menuOverlay"></div>
+
+<div class="app" id="appScreen">
+<div class="wrap">
+  <div class="topbar">
+    <div class="brand-wrap"><div class="snake"></div><div class="brand">maya<span>Jaal</span></div></div>
+    <div class="top-right">
+      <button class="notif-btn" id="notifBtn" title="Notifications" type="button">
+        ðŸ””
+        <span class="notif-dot" id="notifDot" style="display:none">0</span>
+      </button>
+      <div class="user-chip"><img id="uPic" src=""><span class="uc-name" id="uName">User</span></div>
+    </div>
+  </div>
+
+  <div class="hero">
+    <span class="eyebrow snk d1" id="i18nEyebrow">VIDEOS Â· LINKS Â· BEYOND</span>
+    <h1><span class="snk d2"><em id="i18nWelcome">ENTER THE</em> MAYAJAAL</span></h1>
+    <p class="sub snk d3" id="i18nTagline">Your digital universe. One portal for your files, links, tools and community.</p>
+
+    <div class="eye-box" id="eyeBox">
+      <svg viewBox="0 0 800 340" xmlns="http://www.w3.org/2000/svg">
+        <defs>
+          <radialGradient id="sclera" cx="50%" cy="50%" r="70%">
+            <stop offset="0%" stop-color="#ffffff"/><stop offset="50%" stop-color="#f0f7f2"/>
+            <stop offset="80%" stop-color="#cadad0"/><stop offset="100%" stop-color="#7d9486"/>
+          </radialGradient>
+          <radialGradient id="iris" cx="50%" cy="45%" r="60%">
+            <stop offset="0%" stop-color="#0a3d24"/><stop offset="35%" stop-color="#0a7a42"/>
+            <stop offset="65%" stop-color="#00c963"/><stop offset="88%" stop-color="#00ff78"/>
+            <stop offset="100%" stop-color="#041a0e"/>
+          </radialGradient>
+          <radialGradient id="pupil" cx="50%" cy="45%" r="60%">
+            <stop offset="0%" stop-color="#000"/><stop offset="80%" stop-color="#020503"/><stop offset="100%" stop-color="#0a1f12"/>
+          </radialGradient>
+          <radialGradient id="shadow" cx="50%" cy="0%" r="100%">
+            <stop offset="0%" stop-color="#000" stop-opacity=".55"/>
+            <stop offset="60%" stop-color="#000" stop-opacity=".15"/>
+            <stop offset="100%" stop-color="#000" stop-opacity="0"/>
+          </radialGradient>
+          <clipPath id="eyeClip"><path d="M30 170 Q200 -10 400 20 Q600 -10 770 170 Q600 330 400 320 Q200 330 30 170 Z"/></clipPath>
+        </defs>
+        <path d="M30 170 Q200 -10 400 20 Q600 -10 770 170 Q600 330 400 320 Q200 330 30 170 Z" fill="url(#sclera)"/>
+        <g clip-path="url(#eyeClip)">
+          <rect x="0" y="0" width="800" height="130" fill="url(#shadow)"/>
+          <path d="M60 180 Q90 160 120 175" stroke="#c98a8a" stroke-width="1" fill="none" opacity=".4"/>
+          <path d="M680 180 Q710 165 740 175" stroke="#c98a8a" stroke-width="1" fill="none" opacity=".4"/>
+          <ellipse cx="400" cy="170" rx="128" ry="138" fill="url(#iris)"/>
+          <g id="fibers"></g>
+          <ellipse cx="400" cy="170" rx="58" ry="62" fill="url(#pupil)"/>
+          <ellipse cx="348" cy="110" rx="30" ry="27" fill="#fff" opacity=".95"/>
+          <ellipse cx="338" cy="102" rx="12" ry="10" fill="#fff"/>
+          <circle cx="460" cy="222" r="12" fill="#c6ffdc" opacity=".7"/>
+          <circle cx="325" cy="140" r="6" fill="#fff" opacity=".85"/>
+          <circle cx="430" cy="115" r="5" fill="#fff" opacity=".55"/>
+          <path class="eyelid top" d="M30 170 Q200 -10 400 20 Q600 -10 770 170 L770 -30 L30 -30 Z" fill="#030803"/>
+          <path class="eyelid bot" d="M30 170 Q200 330 400 320 Q600 330 770 170 L770 370 L30 370 Z" fill="#030803"/>
+        </g>
+        <path d="M30 170 Q200 -10 400 20 Q600 -10 770 170" fill="none" stroke="#0a1f12" stroke-width="4" stroke-linecap="round"/>
+        <path d="M30 170 Q200 330 400 320 Q600 330 770 170" fill="none" stroke="#0a1f12" stroke-width="3" stroke-linecap="round"/>
+        <g stroke="#050a07" stroke-width="3" stroke-linecap="round" fill="none">
+          <path d="M90 55 Q82 20 78 5"/><path d="M170 25 Q165 -8 160 -22"/>
+          <path d="M250 12 Q247 -18 244 -35"/><path d="M330 5 Q328 -25 325 -42"/>
+          <path d="M410 8 Q408 -22 405 -40"/><path d="M490 18 Q488 -12 485 -28"/>
+          <path d="M570 38 Q568 8 565 -5"/><path d="M650 68 Q648 40 645 25"/>
+          <path d="M720 105 Q718 80 715 65"/>
+        </g>
+      </svg>
+    </div>
+    <div class="status"><span class="dot"></span> MATRIX EYE SYSTEM Â· <span id="i18nOnline">ONLINE</span></div>
+  </div>
+
+  <div class="ad-slot" data-ad="top"><span class="ad-label">ADVERTISEMENT</span></div>
+
+  <div class="api-card">
+    <div class="api-head">
+      <span class="api-step">STEP 1</span>
+      <h2 class="snk d1" id="i18nApiTitle">ðŸ”‘ YOUR API KEY</h2>
+    </div>
+    <p class="api-desc" id="i18nApiDesc">Yeh key aapke Gmail se linked hai. Har account ki alag hoti hai aur hamesha same rehti hai.</p>
+    <div class="api-row">
+      <div class="key-text loading" id="apiKeyEl">LOADING KEY...</div>
+      <button class="copy" id="copyBtn" disabled>ðŸ“‹ COPY</button>
+    </div>
+    <div class="bot-hint">
+      <span class="hint-label">âš¡ Bot me bhejein:</span>
+      <code id="cmdEl">/api YOUR_KEY</code>
+    </div>
+    <a href="https://t.me/Mayajaalfilebot" id="botBtn" target="_blank" class="activate-btn">âš¡ <span id="i18nActivate">Activate in Telegram Bot</span></a>
+  </div>
+
+  <div class="ad-slot" data-ad="mid1"><span class="ad-label">ADVERTISEMENT</span></div>
+
+  <div class="bonus-card">
+    <div class="bonus-head">
+      <h2 class="snk d1">ðŸŽ BONUS MULTIPLIER</h2>
+      <span class="bonus-tier" id="bonusTier">TIER 1</span>
+    </div>
+    <div class="bonus-grid">
+      <div class="bonus-stat"><h5>Current Rate</h5><div class="bv" id="bonusRate">$1.00<span style="font-size:.65rem;color:#8a7a4a">/1K</span></div></div>
+      <div class="bonus-stat"><h5>Next Boost In</h5><div class="bv" id="bonusNext">1000<span style="font-size:.65rem;color:#8a7a4a"> views</span></div></div>
+    </div>
+    <div class="progress-wrap"><div class="progress-bar" id="bonusProgress" style="width:0%"></div></div>
+    <div class="progress-label"><span id="bonusFrom">0</span><span id="bonusTo">1000</span></div>
+    <p style="font-size:.72rem;color:#8a7a4a;margin-top:10px;line-height:1.5">Har 2,000 views ke baad rate Ã—1.5 ho jata hai. <a href="#" data-act="earnings" style="color:#ffd76b;text-decoration:underline">Poora model dekhein â†’</a></p>
+  </div>
+
+  <div class="ad-slot" data-ad="mid2"><span class="ad-label">ADVERTISEMENT</span></div>
+
+  <div class="dash-title">
+    <h2><span>â–£</span> <span id="i18nDashTitle" class="snk mtx d2">EARNINGS DASHBOARD</span></h2>
+    <span class="live"><span class="dot"></span> <span id="liveTxt">Live</span></span>
+  </div>
+  <div class="grid">
+    <div class="stat"><h4 id="i18nTotalLinks">Total Links</h4><div class="v" id="sLinks">0</div></div>
+    <div class="stat"><h4 id="i18nTotalViews">Total Views</h4><div class="v" id="sViews">0</div></div>
+    <div class="stat"><h4 id="i18nTodayViews">Today Views</h4><div class="v" id="sTodayViews">0</div></div>
+    <div class="stat"><h4 id="i18nConv">Conversions</h4><div class="v" id="sConv">0</div></div>
+    <div class="stat"><h4 id="i18nTotalInc">Total Income</h4><div class="v" id="sInc">$0</div></div>
+    <div class="stat"><h4 id="i18nTodayInc">Today Income</h4><div class="v" id="sTodayInc">$0</div></div>
+  </div>
+
+  <div class="ad-slot tall" data-ad="mid3"><span class="ad-label">ADVERTISEMENT SPACE</span></div>
+
+  <div class="chart-grid">
+    <div class="chart-box">
+      <h4>ðŸ“ˆ <span class="snk d1" id="i18nChartTitle">Views (Last 7 Days)</span></h4>
+      <canvas id="chartViews"></canvas>
+    </div>
+    <div class="chart-box">
+      <h4>ðŸ”— <span class="snk d2">Links Created (Last 7 Days)</span></h4>
+      <canvas id="chartLinks"></canvas>
+    </div>
+    <div class="chart-box">
+      <h4>ðŸ’° <span class="snk d3">Earnings in USD (Last 7 Days)</span></h4>
+      <canvas id="chartEarnings"></canvas>
+    </div>
+  </div>
+
+  <div class="ad-slot" data-ad="mid4"><span class="ad-label">ADVERTISEMENT</span></div>
+
+  <div class="bots-section">
+    <h3 class="snk blk d1">â–· <span id="i18nBotsTitle">OFFICIAL BOTS</span></h3>
+    <div class="bot-links">
+      <a class="bot-link" href="https://t.me/Mayajaalfilebot" target="_blank">
+        <span class="b-ico">âž¤</span>
+        <div class="b-info"><h4>MayaJaal File Bot</h4><p>Upload & file links</p></div>
+      </a>
+      <a class="bot-link" href="https://t.me/MayaJaalBulkConverterbot" target="_blank">
+        <span class="b-ico">â‡„</span>
+        <div class="b-info"><h4>Bulk Converter Bot</h4><p>Convert multiple links</p></div>
+      </a>
+    </div>
+  </div>
+
+  <div class="ad-slot" data-ad="bottom"><span class="ad-label">ADVERTISEMENT</span></div>
+
+  <div class="footer">Â© <span id="year"></span> MayaJaal Â· Built for mobile and desktop</div>
+</div>
+</div>
+
+<div class="modal-bg" id="modalBg">
+  <div class="modal">
+    <div class="modal-head"><h2 id="mTitle">MayaJaal</h2><button class="close-x" id="mClose">Ã—</button></div>
+    <div class="modal-body" id="mBody"></div>
+  </div>
+</div>
+
+<script>
+/* FIREBASE */
+var firebaseConfig = {
+  apiKey: "AIzaSyDI5hgBbaUeTpXcPIlAnq5yDjIenfY-ylM",
+  authDomain: "www.mayajaal.online",
+  databaseURL: "https://mayajaal-app-default-rtdb.asia-southeast1.firebasedatabase.app",
+  projectId: "mayajaal-app",
+  storageBucket: "mayajaal-app.firebasestorage.app",
+  messagingSenderId: "96139047750",
+  appId: "1:96139047750:web:850537e9c436dd7d012b47"
+};
+firebase.initializeApp(firebaseConfig);
+var auth = firebase.auth();
+var db = firebase.database();
+
+var provider = new firebase.auth.GoogleAuthProvider();
+provider.setCustomParameters({ prompt: 'select_account' });
+
+var currentUser = null, currentKey = '', dashRef = null, notifRef = null;
+var viewsChart = null, linksChart = null, earningsChart = null;
+var $ = function(id){ return document.getElementById(id); };
+$('year').textContent = new Date().getFullYear();
+
+/* LOADING */
+var loadingHidden = false;
+var loadStartTime = Date.now();
+var MIN_LOADING_MS = 1100;
+var loadingMessages = ['INITIALIZING MATRIX','CONNECTING TO NETWORK','VERIFYING IDENTITY','LOADING DASHBOARD'];
+var loadingMsgIdx = 0;
+var loadingMsgTimer = null;
+
+function startLoadingMessages(){
+  var txtEl = $('loadingText');
+  if (!txtEl) return;
+  loadingMsgTimer = setInterval(function(){
+    if (loadingHidden){ clearInterval(loadingMsgTimer); return; }
+    loadingMsgIdx = (loadingMsgIdx + 1) % loadingMessages.length;
+    txtEl.textContent = loadingMessages[loadingMsgIdx];
+  }, 550);
+}
+function hideLoading(){
+  if (loadingHidden) return;
+  var elapsed = Date.now() - loadStartTime;
+  var wait = Math.max(0, MIN_LOADING_MS - elapsed);
+  setTimeout(function(){
+    if (loadingHidden) return;
+    loadingHidden = true;
+    if (loadingMsgTimer) clearInterval(loadingMsgTimer);
+    var ls = $('loadingScreen');
+    if (ls){
+      ls.classList.add('hide');
+      setTimeout(function(){ ls.style.display = 'none'; }, 600);
+    }
+  }, wait);
+}
+startLoadingMessages();
+setTimeout(function(){ if (!loadingHidden) hideLoading(); }, 7000);
+
+/* MATRIX */
+var canvas = $('matrix'), ctx = canvas.getContext('2d');
+var drops = [], fontSize = 14, cols = 0;
+function resizeCanvas(){
+  var dpr = Math.min(devicePixelRatio || 1, 2);
+  canvas.width = innerWidth * dpr; canvas.height = innerHeight * dpr;
+  canvas.style.width = innerWidth + 'px'; canvas.style.height = innerHeight + 'px';
+  ctx.setTransform(dpr,0,0,dpr,0,0);
+  cols = Math.ceil(innerWidth / fontSize); drops = [];
+  for (var i=0;i<cols;i++) drops.push(Math.random()*-80);
+}
+function drawMatrix(){
+  ctx.fillStyle = 'rgba(0,5,3,.1)';
+  ctx.fillRect(0,0,innerWidth,innerHeight);
+  ctx.font = fontSize + 'px monospace';
+  var ch = 'ã‚¢0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+  for (var i=0;i<drops.length;i++){
+    var c = ch[Math.floor(Math.random()*ch.length)];
+    ctx.fillStyle = Math.random() > .93 ? '#c6ffdc' : '#00c963';
+    ctx.fillText(c, i*fontSize, drops[i]*fontSize);
+    if (drops[i]*fontSize > innerHeight && Math.random() > .975) drops[i] = 0;
+    drops[i] += .5;
+  }
+  requestAnimationFrame(drawMatrix);
+}
+resizeCanvas(); drawMatrix();
+addEventListener('resize', resizeCanvas);
+
+/* EYE FIBERS */
+var fibers = $('fibers');
+if (fibers){
+  for (var i = 0; i < 90; i++){
+    var a = (i * Math.PI * 2 / 90) + Math.random() * .1;
+    var r1 = 55 + Math.random() * 10, r2 = 105 + Math.random() * 20;
+    var x1 = 400 + Math.cos(a) * r1, y1 = 170 + Math.sin(a) * r1;
+    var x2 = 400 + Math.cos(a) * r2, y2 = 170 + Math.sin(a) * r2;
+    var l = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+    l.setAttribute('x1', x1); l.setAttribute('y1', y1);
+    l.setAttribute('x2', x2); l.setAttribute('y2', y2);
+    l.setAttribute('stroke', '#031c0e');
+    l.setAttribute('stroke-width', (Math.random()*1.4 + .3).toFixed(2));
+    l.setAttribute('opacity', (Math.random()*.5 + .3).toFixed(2));
+    fibers.appendChild(l);
+  }
+}
+
+/* BLINK */
+var eyeBox = $('eyeBox');
+function doBlink(){ if (!eyeBox) return; eyeBox.classList.add('blink'); setTimeout(function(){ eyeBox.classList.remove('blink'); }, 150); }
+function scheduleBlink(){ setTimeout(function(){ doBlink(); setTimeout(doBlink, 280); scheduleBlink(); }, 2500 + Math.random()*3000); }
+scheduleBlink();
+
+/* LOGIN */
+var googleBtn = $('googleBtn');
+var loginTimeout = null;
+
+function resetLoginBtn(){
+  if (!googleBtn) return;
+  googleBtn.disabled = false;
+  var t = $('googleBtnText');
+  if (t) t.textContent = '';
+  if (loginTimeout){ clearTimeout(loginTimeout); loginTimeout = null; }
+}
+function isInAppBrowser(){
+  var ua = navigator.userAgent || '';
+  return /FBAN|FBAV|FB_IAB|Instagram|Line\/|WhatsApp|Twitter|LinkedInApp|Snapchat|Pinterest|MicroMessenger|; wv\)/i.test(ua);
+}
+window.copyCurrentUrl = function(){
+  var url = location.href;
+  var done = function(){
+    var em = $('errMsg');
+    em.innerHTML = 'âœ… Link copied! Ab Chrome ya Safari kholo aur paste karo.';
+    em.classList.add('on');
+  };
+  if (navigator.clipboard){
+    navigator.clipboard.writeText(url).then(done).catch(function(){
+      var ta = document.createElement('textarea'); ta.value = url;
+      document.body.appendChild(ta); ta.select(); document.execCommand('copy');
+      document.body.removeChild(ta); done();
+    });
+  } else {
+    var ta = document.createElement('textarea'); ta.value = url;
+    document.body.appendChild(ta); ta.select(); document.execCommand('copy');
+    document.body.removeChild(ta); done();
+  }
+};
+
+googleBtn.onclick = function(){
+  $('errMsg').classList.remove('on');
+  if (isInAppBrowser()){
+    var em = $('errMsg');
+    em.innerHTML = 'âš ï¸ <b>In-app browser detected!</b><br><br>' +
+      'Instagram/Facebook/WhatsApp ke andar Google login kaam nahi karta. Kripya <b>Chrome</b> ya <b>Safari</b> me kholo.<br><br>' +
+      '<button onclick="copyCurrentUrl()">ðŸ“‹ COPY LINK</button>';
+    em.classList.add('on');
+    return;
+  }
+  googleBtn.disabled = true;
+  $('googleBtnText').textContent = '';
+  if (loginTimeout) clearTimeout(loginTimeout);
+  loginTimeout = setTimeout(resetLoginBtn, 90000);
+
+  auth.setPersistence(firebase.auth.Auth.Persistence.LOCAL)
+    .catch(function(){})
+    .then(function(){ return auth.signInWithPopup(provider); })
+    .then(function(result){ resetLoginBtn(); console.log('âœ… Login:', result.user.email); })
+    .catch(function(err){
+      console.log('Login error:', err && err.code);
+      if (err.code === 'auth/popup-closed-by-user' || err.code === 'auth/cancelled-popup-request'){
+        resetLoginBtn(); return;
+      }
+      if (err.code === 'auth/popup-blocked' || err.code === 'auth/operation-not-supported-in-this-environment'){
+        $('googleBtnText').textContent = 'Redirecting...';
+        auth.signInWithRedirect(provider).catch(function(){
+          resetLoginBtn();
+          var em = $('errMsg');
+          em.innerHTML = 'âŒ Login fail. Kripya Chrome/Safari me site kholo.<br><br><button onclick="copyCurrentUrl()">ðŸ“‹ COPY LINK</button>';
+          em.classList.add('on');
+        });
+        return;
+      }
+      resetLoginBtn();
+      var em2 = $('errMsg');
+      em2.textContent = 'âŒ ' + (err.message || 'Login failed.');
+      em2.classList.add('on');
+    });
+};
+
+auth.getRedirectResult().then(function(r){ resetLoginBtn(); }).catch(function(){ resetLoginBtn(); });
+window.addEventListener('pageshow', resetLoginBtn);
+
+/* ============ AUTH STATE ============ */
+var _authResolved = false;
+var _userInitialized = false;
+var cachedUser = null;
+try { cachedUser = auth.currentUser; } catch(e){}
+
+if (cachedUser){
+  currentUser = cachedUser;
+  showAppForUser(cachedUser);
+}
+
+auth.onAuthStateChanged(function(user){
+  if (user){
+    if (!currentUser || currentUser.uid !== user.uid){
+      currentUser = user;
+      showAppForUser(user);
+    }
+  } else {
+    currentUser = null;
+    showLoginScreen();
+  }
+  if (!_authResolved){
+    _authResolved = true;
+    hideLoading();
+  }
+});
+
+function showAppForUser(user){
+  $('loginScreen').style.display = 'none';
+  $('appScreen').classList.add('on');
+  $('menuBtn').style.display = 'flex';
+  $('uPic').src = user.photoURL || '';
+  $('uName').textContent = user.displayName || 'User';
+  $('mPic').src = user.photoURL || '';
+  $('mName').textContent = user.displayName || 'User';
+  $('mEmail').textContent = user.email || '';
+
+  if (!_userInitialized){
+    _userInitialized = true;
+    ensureUserRecord();
+    setTimeout(function(){ generateOrLoadKey(); }, 300);
+    startDashboardListener();
+    startNotificationListener();
+  }
+  window.scrollTo(0,0);
+}
+function showLoginScreen(){
+  $('loginScreen').style.display = 'flex';
+  $('appScreen').classList.remove('on');
+  $('menuBtn').style.display = 'none';
+  _userInitialized = false;
+  if (dashRef){ dashRef.off(); dashRef = null; }
+  if (notifRef){ notifRef.off(); notifRef = null; }
+}
+
+function ensureUserRecord(){
+  if (!currentUser) return;
+  var ref = db.ref('users/' + currentUser.uid);
+  ref.once('value', function(snap){
+    var d = snap.val() || {};
+    var updates = { email: currentUser.email, name: currentUser.displayName, lastSeen: Date.now() };
+    if (!d.createdAt) updates.createdAt = Date.now();
+    if (!d.dashboard){
+      updates.dashboard = { totalLinks:0, totalViews:0, todayViews:0, todayConversions:0, totalIncome:0, todayIncome:0, viewsByDay:{}, linksByDay:{} };
+    } else {
+      if (!d.dashboard.viewsByDay) updates['dashboard/viewsByDay'] = {};
+      if (!d.dashboard.linksByDay) updates['dashboard/linksByDay'] = {};
+    }
+    ref.update(updates);
+  }, function(err){ console.log('ensureUserRecord error:', err); });
+}
+
+/* ============ API KEY (PROMISE + LOCALSTORAGE FALLBACK) ============ */
+var apiRetries = 0;
+var MAX_API_RETRIES = 5;
+
+function generateKey(){
+  var chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+  var out = '';
+  try {
+    var arr = new Uint32Array(24);
+    crypto.getRandomValues(arr);
+    for (var i=0;i<24;i++) out += chars[arr[i] % chars.length];
+  } catch(e){
+    for (var i=0;i<24;i++) out += chars[Math.floor(Math.random()*chars.length)];
+  }
+  return out;
+}
+
+function lsGet(uid){
+  try { return localStorage.getItem('mj_key_' + uid); } catch(e){ return null; }
+}
+function lsSet(uid, key){
+  try { localStorage.setItem('mj_key_' + uid, key); } catch(e){}
+}
+
+function setKeyLoading(){
+  var el = $('apiKeyEl');
+  if (!el) return;
+  el.classList.add('loading');
+  el.classList.remove('retry');
+  el.onclick = null;
+  el.textContent = 'LOADING KEY...';
+  var cb = $('copyBtn');
+  if (cb) cb.disabled = true;
+}
+function setKeyReady(key, source){
+  var el = $('apiKeyEl');
+  if (!el) return;
+  el.classList.remove('loading');
+  el.classList.remove('retry');
+  el.onclick = null;
+  el.textContent = key;
+  var cb = $('copyBtn');
+  if (cb) cb.disabled = false;
+  $('cmdEl').textContent = '/api ' + key;
+  $('botBtn').href = 'https://t.me/Mayajaalfilebot?start=api_' + key;
+  console.log('âœ… Key ready (' + source + '):', key);
+}
+function setKeyError(msg){
+  var el = $('apiKeyEl');
+  if (!el) return;
+  el.classList.remove('loading');
+  el.classList.add('retry');
+  el.textContent = 'âš ï¸ TAP TO RETRY';
+  el.onclick = function(){
+    el.classList.remove('retry');
+    el.onclick = null;
+    apiRetries = 0;
+    generateOrLoadKey();
+  };
+  var cb = $('copyBtn');
+  if (cb) cb.disabled = true;
+  console.error('âŒ API key error:', msg);
+}
+
+function generateOrLoadKey(){
+  if (!currentUser){
+    console.warn('âš ï¸ No currentUser yet');
+    setKeyError('No user');
+    return;
+  }
+
+  var uid = currentUser.uid;
+  setKeyLoading();
+  console.log('ðŸ” Loading API key for:', uid);
+
+  /* STEP 1: Fresh ID token lo */
+  currentUser.getIdToken(true).then(function(){
+    console.log('ðŸ” Token refreshed');
+
+    var ref = db.ref('users/' + uid + '/apiKey');
+
+    return ref.once('value').then(function(snap){
+      var existing = snap.val();
+      console.log('ðŸ“¥ DB returned:', existing);
+
+      if (existing && typeof existing === 'string' && existing.length >= 8){
+        currentKey = existing;
+        lsSet(uid, existing);
+        setKeyReady(existing, 'DB');
+        apiRetries = 0;
+        return;
+      }
+
+      var cached = lsGet(uid);
+      if (cached && cached.length >= 8){
+        console.log('ðŸ’¾ Using localStorage cached key:', cached);
+        currentKey = cached;
+        setKeyReady(cached, 'cache');
+        ref.set(cached).then(function(){
+          console.log('âœ… Cached key synced to DB');
+        }).catch(function(err){
+          console.warn('âš ï¸ Could not sync cached key to DB:', err.message);
+        });
+        return;
+      }
+
+      var newKey = generateKey();
+      console.log('ðŸ†• Generating new key:', newKey);
+      currentKey = newKey;
+      lsSet(uid, newKey);
+      setKeyReady(newKey, 'generated');
+
+      ref.set(newKey).then(function(){
+        console.log('âœ… New key saved to DB');
+      }).catch(function(err){
+        console.warn('âš ï¸ DB save failed (key still works locally):', err.message);
+      });
+    });
+  }).catch(function(err){
+    console.error('âŒ Token refresh / DB read failed:', err && err.message);
+
+    var cached = lsGet(uid);
+    if (cached && cached.length >= 8){
+      console.log('ðŸ’¾ Falling back to localStorage key');
+      currentKey = cached;
+      setKeyReady(cached, 'cache-fallback');
+      return;
+    }
+
+    apiRetries++;
+    if (apiRetries < MAX_API_RETRIES){
+      setTimeout(generateOrLoadKey, 1500);
+    } else {
+      var newKey = generateKey();
+      console.log('ðŸ†˜ Generating offline-only key:', newKey);
+      currentKey = newKey;
+      lsSet(uid, newKey);
+      setKeyReady(newKey, 'offline');
+    }
+  });
+}
+
+$('copyBtn').onclick = function(){
+  if (!currentKey) return;
+  var cmd = '/api ' + currentKey;
+  var done = function(){
+    var b = $('copyBtn');
+    b.textContent = 'âœ… COPIED'; b.classList.add('copied');
+    if (navigator.vibrate) navigator.vibrate(50);
+    setTimeout(function(){ b.textContent = 'ðŸ“‹ COPY'; b.classList.remove('copied'); }, 2000);
+  };
+  var fallback = function(){
+    var ta = document.createElement('textarea'); ta.value = cmd;
+    ta.style.position='fixed'; ta.style.left='-9999px';
+    document.body.appendChild(ta); ta.select();
+    try { document.execCommand('copy'); } catch(e){}
+    document.body.removeChild(ta); done();
+  };
+  if (navigator.clipboard && window.isSecureContext){
+    navigator.clipboard.writeText(cmd).then(done).catch(fallback);
+  } else {
+    fallback();
+  }
+};
+
+/* EARNINGS */
+function calcEarnings(views){
+  views = Math.max(0, Number(views) || 0);
+  if (views <= 0) return 0;
+  if (views <= 1000) return round2((views/1000) * 1);
+  var income = 1;
+  var remaining = views - 1000;
+  var tier = 1;
+  while (remaining > 0){
+    var chunk = Math.min(remaining, 2000);
+    income += (chunk/1000) * Math.pow(1.5, tier);
+    remaining -= chunk;
+    tier++;
+    if (tier > 30) break;
+  }
+  return round2(income);
+}
+function getTierInfo(views){
+  views = Math.max(0, Number(views) || 0);
+  if (views < 1000) return { tier: 1, rate: 1.00, from: 0, to: 1000, next: 1000 - views };
+  var tier = 1, start = 1000;
+  while (views >= start + 2000){ tier++; start += 2000; if (tier > 30) break; }
+  return { tier: tier + 1, rate: round2(Math.pow(1.5, tier)), from: start, to: start + 2000, next: start + 2000 - views };
+}
+function round2(n){ return Math.round(n * 100) / 100; }
+
+function updateBonusCard(views){
+  var t = getTierInfo(views);
+  $('bonusTier').textContent = 'TIER ' + t.tier;
+  $('bonusRate').innerHTML = '$' + t.rate.toFixed(2) + '<span style="font-size:.65rem;color:#8a7a4a">/1K</span>';
+  $('bonusNext').innerHTML = t.next + '<span style="font-size:.65rem;color:#8a7a4a"> views</span>';
+  $('bonusFrom').textContent = views;
+  $('bonusTo').textContent = t.to;
+  var span = t.to - t.from;
+  var pct = span > 0 ? Math.min(100, ((views - t.from) / span) * 100) : 0;
+  $('bonusProgress').style.width = pct + '%';
+}
+
+/* DASHBOARD */
+function startDashboardListener(){
+  if (dashRef) dashRef.off();
+  dashRef = db.ref('users/' + currentUser.uid + '/dashboard');
+  dashRef.on('value', function(snap){
+    var d = snap.val() || {};
+    var views = d.totalViews || 0;
+    var liveIncome = calcEarnings(views);
+    var storedInc = d.totalIncome || 0;
+    var finalIncome = Math.max(liveIncome, storedInc);
+
+    $('sLinks').textContent = d.totalLinks || 0;
+    $('sViews').textContent = views;
+    $('sTodayViews').textContent = d.todayViews || 0;
+    $('sConv').textContent = d.todayConversions || 0;
+    $('sInc').textContent = '$' + finalIncome.toFixed(2);
+    $('sTodayInc').textContent = '$' + (d.todayIncome || 0).toFixed(2);
+
+    updateBonusCard(views);
+    updateCharts(d.viewsByDay || {}, d.linksByDay || {});
+    $('liveTxt').textContent = 'Live';
+  }, function(){ $('liveTxt').textContent = 'Error'; });
+}
+
+function last7Days(){
+  var days = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+  var labels = [], keys = [];
+  var today = new Date();
+  for (var k = 6; k >= 0; k--){
+    var dt = new Date(today);
+    dt.setDate(today.getDate() - k);
+    var key = dt.getFullYear() + '-' + String(dt.getMonth()+1).padStart(2,'0') + '-' + String(dt.getDate()).padStart(2,'0');
+    keys.push(key); labels.push(days[dt.getDay()]);
+  }
+  return { labels: labels, keys: keys };
+}
+function baseChart(canvasEl, label, color, bg, yTickCb){
+  return new Chart(canvasEl.getContext('2d'), {
+    type: 'line',
+    data: { labels: [], datasets: [{ label: label, data: [], borderColor: color, backgroundColor: bg, borderWidth: 3, tension: .35, fill: true, pointBackgroundColor: color, pointRadius: 6, pointHoverRadius: 8, pointBorderColor: '#001b0c', pointBorderWidth: 2 }] },
+    options: {
+      responsive: true, maintainAspectRatio: false, animation: { duration: 700 },
+      interaction: { intersect: false, mode: 'index' },
+      plugins: {
+        legend: { display: false },
+        tooltip: { backgroundColor: '#03110a', borderColor: color, borderWidth: 1, titleColor: color, bodyColor: '#effff5', padding: 12, displayColors: false, callbacks: yTickCb ? { label: function(c){ return yTickCb(c.parsed.y); } } : undefined }
+      },
+      scales: {
+        y: { beginAtZero: true, suggestedMax: 10, grid: { color: 'rgba(0,255,120,.08)' }, ticks: { color: '#91b8a4', font: { size: 11 }, callback: yTickCb ? function(v){ return yTickCb(v); } : function(v){ return v; } } },
+        x: { grid: { display: false }, ticks: { color: '#91b8a4', font: { size: 11 } } }
+      }
+    }
+  });
+}
+function updateCharts(vb, lb){
+  var t = last7Days();
+  var vData = t.keys.map(function(k){ return vb[k] || 0; });
+  var lData = t.keys.map(function(k){ return lb[k] || 0; });
+  var eData = t.keys.map(function(k){ return calcEarnings(vb[k] || 0); });
+  var vEl = $('chartViews'), lEl = $('chartLinks'), eEl = $('chartEarnings');
+  if (!vEl || !lEl || !eEl) return;
+  if (!viewsChart) viewsChart = baseChart(vEl, 'Views', '#00ff78', 'rgba(0,255,120,.15)');
+  if (!linksChart) linksChart = baseChart(lEl, 'Links', '#00c963', 'rgba(0,201,99,.15)');
+  if (!earningsChart) earningsChart = baseChart(eEl, 'Earnings', '#ffb400', 'rgba(255,180,0,.15)', function(v){ return '$' + Number(v).toFixed(2); });
+  viewsChart.data.labels = t.labels; viewsChart.data.datasets[0].data = vData; viewsChart.update();
+  linksChart.data.labels = t.labels; linksChart.data.datasets[0].data = lData; linksChart.update();
+  earningsChart.data.labels = t.labels; earningsChart.data.datasets[0].data = eData; earningsChart.update();
+}
+
+/* NOTIFICATIONS */
+function startNotificationListener(){
+  if (notifRef) notifRef.off();
+  notifRef = db.ref('users/' + currentUser.uid + '/notifications');
+  notifRef.on('value', function(snap){
+    var d = snap.val() || {};
+    var arr = Object.keys(d).map(function(k){ return d[k]; }).filter(Boolean);
+    var unread = arr.filter(function(n){ return !n.read; }).length;
+    var dot = $('notifDot');
+    if (dot){
+      if (unread > 0){ dot.textContent = unread > 9 ? '9+' : unread; dot.style.display = 'flex'; }
+      else dot.style.display = 'none';
+    }
+  });
+}
+function openNotifications(){
+  if (!currentUser){ openModal('ðŸ”” Notifications', '<p class="notif-empty">Login karo pehle.</p>'); return; }
+  db.ref('users/' + currentUser.uid + '/notifications').once('value', function(snap){
+    var d = snap.val() || {};
+    var arr = Object.keys(d).map(function(k){ var o = Object.assign({}, d[k]); o._id = k; return o; }).filter(Boolean);
+    arr.sort(function(x,y){ return (y.time||0) - (x.time||0); });
+    var html = '';
+    if (!arr.length) html = '<p class="notif-empty">ðŸ“­ Abhi koi notification nahi hai.</p>';
+    else html = arr.slice(0,30).map(function(n){
+      var dt = n.time ? new Date(n.time).toLocaleString() : '';
+      return '<div class="notif-item"><div>' + (n.text || 'Notification') + '</div><div class="nt">' + dt + '</div></div>';
+    }).join('');
+    openModal('ðŸ”” Notifications', html);
+    var updates = {};
+    Object.keys(d).forEach(function(k){ updates[k + '/read'] = true; });
+    if (Object.keys(updates).length) db.ref('users/' + currentUser.uid + '/notifications').update(updates);
+  });
+}
+$('notifBtn').addEventListener('click', openNotifications);
+
+/* MENU */
+var menuBtn = $('menuBtn'), sideMenu = $('sideMenu'), overlay = $('menuOverlay');
+function toggleMenu(open){
+  if (open === undefined) open = !sideMenu.classList.contains('open');
+  sideMenu.classList.toggle('open', open);
+  menuBtn.classList.toggle('open', open);
+  overlay.classList.toggle('open', open);
+}
+menuBtn.addEventListener('click', function(){ toggleMenu(); });
+overlay.addEventListener('click', function(){ toggleMenu(false); });
+
+function openModal(title, body){
+  $('mTitle').textContent = title;
+  $('mBody').innerHTML = body;
+  $('modalBg').classList.add('on');
+  toggleMenu(false);
+  var saveBtn = document.getElementById('saveSettingsBtn');
+  if (saveBtn){
+    saveBtn.onclick = function(){
+      var lang = document.getElementById('modalLang').value;
+      setLang(lang);
+      closeModal();
+    };
+  }
+}
+function closeModal(){ $('modalBg').classList.remove('on'); }
+$('mClose').onclick = closeModal;
+$('modalBg').onclick = function(e){ if (e.target.id === 'modalBg') closeModal(); };
+
+/* INFO CONTENT */
+var infoLang = 'en';
+try { infoLang = localStorage.getItem('mj_info_lang') || localStorage.getItem('mj_lang') || 'en'; } catch(e){}
+
+var infoContent = {
+  en: '' +
+    '<div class="info-lang-switch">' +
+      '<button data-info-lang="en" class="active">English</button>' +
+      '<button data-info-lang="hi">à¤¹à¤¿à¤¨à¥à¤¦à¥€</button>' +
+    '</div>' +
+    '<p style="color:#00ff78;font-weight:800;font-size:1rem;margin-bottom:12px">Welcome to MayaJaal ðŸ‘ï¸</p>' +
+    '<p style="color:#a8c9b6;font-size:.84rem;line-height:1.7;margin-bottom:16px">MayaJaal is a digital network where you upload files/videos, generate shareable links, and earn money from views.</p>' +
+    '<div class="info-block"><h4>ðŸ”‘ STEP 1 â€” Get Your API Key</h4><ol><li>Your unique API key is shown below.</li><li>Your <b>unique API key</b> appears in the green box above (marked STEP 1).</li><li>Each Gmail account gets a <b>different key</b> â€” locked to your email.</li><li>Tap <code>ðŸ“‹ COPY</code> to copy it as <code>/api YOUR_KEY</code>.</li></ol></div>' +
+    '<div class="info-block"><h4>âš¡ STEP 2 â€” Connect API to Telegram Bot</h4><ol><li>Open Telegram and search: <a href="https://t.me/Mayajaalfilebot" target="_blank">@Mayajaalfilebot</a></li><li>Press <b>START</b>.</li><li>Paste and send: <code>/api YOUR_KEY</code></li><li>You will see <b>"âœ… Connected successfully"</b>.</li><li>Now the bot is linked to your dashboard.</li></ol></div>' +
+    '<div class="info-block"><h4>ðŸ“¤ STEP 3 â€” Upload Files / Videos</h4><ol><li>In <b>@Mayajaalfilebot</b>, send any video / file.</li><li>The bot converts it and gives you a <b>shareable link</b>.</li><li>For bulk, use <a href="https://t.me/MayaJaalBulkConverterbot" target="_blank">@MayaJaalBulkConverterbot</a>.</li></ol></div>' +
+    '<div class="info-block"><h4>ðŸ”— STEP 4 â€” Share & Get Views</h4><ol><li>Share your link on <b>WhatsApp, Telegram, Instagram, YouTube, Facebook</b>.</li><li>Every time someone opens your link, a <b>view</b> is counted.</li><li>Views update <b>live</b> on this dashboard.</li></ol></div>' +
+    '<div class="info-block bonus"><h4>ðŸ’° STEP 5 â€” Earn Money</h4><ul><li><b>Base rate:</b> 1,000 views = <b>$1.00</b></li><li><b>Bonus:</b> Every next 2,000 views â†’ rate Ã— 1.5 (50% boost)</li><li><b>Example:</b> 5,000 views = <b>$8.50</b></li><li>Income shows <b>LIVE</b> on dashboard.</li></ul><div class="info-tip">ðŸš€ <b>Pro tip:</b> More views = higher rate.</div></div>' +
+    '<div class="info-block payout"><h4>ðŸ’µ STEP 6 â€” Withdraw Money</h4><ul><li><b>Minimum withdrawal:</b> $20 (â‚¹1,600 approx)</li><li>Once you reach $20, request withdrawal from the bot.</li><li><b>Payment methods:</b> Bank Transfer Â· UPI Â· Any Bank in India</li><li><b>Processing time:</b> 24 â€“ 48 hours</li><li>Money directly reaches your bank / UPI app.</li></ul></div>' +
+    '<div class="info-block warn"><h4>âš ï¸ Rules & Safety</h4><ul><li>Never share your API key.</li><li>Do not abuse, spam, or upload illegal content.</li><li>Follow copyright rules.</li></ul></div>' +
+    '<p style="color:#6f9981;font-size:.75rem;text-align:center;margin-top:14px">Need help? Use â˜ Help & Support.</p>',
+  hi: '' +
+    '<div class="info-lang-switch">' +
+      '<button data-info-lang="en">English</button>' +
+      '<button data-info-lang="hi" class="active">à¤¹à¤¿à¤¨à¥à¤¦à¥€</button>' +
+    '</div>' +
+    '<p style="color:#00ff78;font-weight:800;font-size:1rem;margin-bottom:12px">MayaJaal à¤®à¥‡à¤‚ à¤†à¤ªà¤•à¤¾ à¤¸à¥à¤µà¤¾à¤—à¤¤ à¤¹à¥ˆ ðŸ‘ï¸</p>' +
+    '<p style="color:#a8c9b6;font-size:.84rem;line-height:1.7;margin-bottom:16px">MayaJaal à¤à¤• à¤¡à¤¿à¤œà¤¿à¤Ÿà¤² à¤¨à¥‡à¤Ÿà¤µà¤°à¥à¤• à¤¹à¥ˆ à¤œà¤¹à¤¾à¤ à¤†à¤ª à¤«à¤¾à¤‡à¤²/à¤µà¥€à¤¡à¤¿à¤¯à¥‹ à¤…à¤ªà¤²à¥‹à¤¡ à¤•à¤°à¤¤à¥‡ à¤¹à¥ˆà¤‚, à¤¶à¥‡à¤¯à¤° à¤•à¤°à¤¨à¥‡ à¤¯à¥‹à¤—à¥à¤¯ à¤²à¤¿à¤‚à¤• à¤¬à¤¨à¤¾à¤¤à¥‡ à¤¹à¥ˆà¤‚, à¤”à¤° à¤µà¥à¤¯à¥‚à¤œà¤¼ à¤¸à¥‡ à¤ªà¥ˆà¤¸à¥‡ à¤•à¤®à¤¾à¤¤à¥‡ à¤¹à¥ˆà¤‚à¥¤</p>' +
+    '<div class="info-block"><h4>ðŸ”‘ à¤¸à¥à¤Ÿà¥‡à¤ª 1 â€” à¤…à¤ªà¤¨à¥€ API Key à¤²à¥‡à¤‚</h4><ol><li>à¤‡à¤¸ à¤¡à¥ˆà¤¶à¤¬à¥‹à¤°à¥à¤¡ à¤ªà¤° Google à¤¸à¥‡ à¤²à¥‰à¤—à¤¿à¤¨ à¤•à¤°à¥‡à¤‚à¥¤</li><li>à¤†à¤ªà¤•à¥€ <b>unique API key</b> à¤Šà¤ªà¤° à¤¹à¤°à¥‡ à¤¬à¥‰à¤•à¥à¤¸ à¤®à¥‡à¤‚ à¤¦à¤¿à¤–à¥‡à¤—à¥€ (STEP 1 à¤²à¤¿à¤–à¤¾ à¤¹à¥ˆ)à¥¤</li><li>à¤¹à¤° Gmail account à¤•à¥€ <b>à¤…à¤²à¤— key</b> à¤¹à¥‹à¤¤à¥€ à¤¹à¥ˆà¥¤</li><li><code>ðŸ“‹ COPY</code> à¤¦à¤¬à¤¾à¤•à¤° <code>/api YOUR_KEY</code> à¤•à¥‰à¤ªà¥€ à¤•à¤°à¥‡à¤‚à¥¤</li></ol></div>' +
+    '<div class="info-block"><h4>âš¡ à¤¸à¥à¤Ÿà¥‡à¤ª 2 â€” API à¤•à¥‹ Bot à¤¸à¥‡ à¤œà¥‹à¤¡à¤¼à¥‡à¤‚</h4><ol><li>Telegram à¤–à¥‹à¤²à¥‡à¤‚: <a href="https://t.me/Mayajaalfilebot" target="_blank">@Mayajaalfilebot</a></li><li><b>START</b> à¤¦à¤¬à¤¾à¤à¤à¥¤</li><li>à¤•à¥‰à¤ªà¥€ à¤•à¤¿à¤¯à¤¾ command à¤­à¥‡à¤œà¥‡à¤‚: <code>/api YOUR_KEY</code></li><li>à¤¦à¤¿à¤–à¥‡à¤—à¤¾ <b>"âœ… Connected successfully"</b>à¥¤</li><li>à¤…à¤¬ bot à¤†à¤ªà¤•à¥‡ dashboard à¤¸à¥‡ à¤œà¥à¤¡à¤¼ à¤—à¤¯à¤¾à¥¤</li></ol></div>' +
+    '<div class="info-block"><h4>ðŸ“¤ à¤¸à¥à¤Ÿà¥‡à¤ª 3 â€” à¤«à¤¾à¤‡à¤² / à¤µà¥€à¤¡à¤¿à¤¯à¥‹ à¤…à¤ªà¤²à¥‹à¤¡ à¤•à¤°à¥‡à¤‚</h4><ol><li><b>@Mayajaalfilebot</b> à¤®à¥‡à¤‚ à¤•à¥‹à¤ˆ à¤­à¥€ video / file à¤­à¥‡à¤œà¥‡à¤‚à¥¤</li><li>Bot convert à¤•à¤°à¤•à¥‡ à¤à¤• <b>shareable link</b> à¤¦à¥‡à¤—à¤¾à¥¤</li><li>à¤•à¤ˆ links à¤•à¥‡ à¤²à¤¿à¤ <a href="https://t.me/MayaJaalBulkConverterbot" target="_blank">@MayaJaalBulkConverterbot</a> à¤‡à¤¸à¥à¤¤à¥‡à¤®à¤¾à¤² à¤•à¤°à¥‡à¤‚à¥¤</li></ol></div>' +
+    '<div class="info-block"><h4>ðŸ”— à¤¸à¥à¤Ÿà¥‡à¤ª 4 â€” à¤¶à¥‡à¤¯à¤° à¤•à¤°à¥‡à¤‚ à¤”à¤° à¤µà¥à¤¯à¥‚à¤œà¤¼ à¤ªà¤¾à¤à¤</h4><ol><li>à¤…à¤ªà¤¨à¤¾ link <b>WhatsApp, Telegram, Instagram, YouTube, Facebook</b> à¤ªà¤° à¤¶à¥‡à¤¯à¤° à¤•à¤°à¥‡à¤‚à¥¤</li><li>à¤œà¤¬ à¤­à¥€ à¤•à¥‹à¤ˆ link à¤–à¥‹à¤²à¥‡à¤—à¤¾ â€” à¤à¤• <b>view</b> à¤—à¤¿à¤¨à¤¾ à¤œà¤¾à¤à¤—à¤¾à¥¤</li><li>Views dashboard à¤ªà¤° <b>live</b> à¤…à¤ªà¤¡à¥‡à¤Ÿ à¤¹à¥‹à¤¤à¥‡ à¤¹à¥ˆà¤‚à¥¤</li></ol></div>' +
+    '<div class="info-block bonus"><h4>ðŸ’° à¤¸à¥à¤Ÿà¥‡à¤ª 5 â€” à¤ªà¥ˆà¤¸à¥‡ à¤•à¤®à¤¾à¤à¤</h4><ul><li><b>Base rate:</b> 1,000 views = <b>$1.00</b></li><li><b>Bonus:</b> à¤¹à¤° à¤…à¤—à¤²à¥‡ 2,000 views à¤ªà¤° rate Ã— 1.5 (50% à¤¬à¤¢à¤¼à¥‹à¤¤à¤°à¥€)</li><li><b>à¤‰à¤¦à¤¾à¤¹à¤°à¤£:</b> 5,000 views = <b>$8.50</b></li><li>à¤•à¤®à¤¾à¤ˆ dashboard à¤ªà¤° <b>LIVE</b> à¤¦à¤¿à¤–à¤¤à¥€ à¤¹à¥ˆà¥¤</li></ul><div class="info-tip">ðŸš€ <b>à¤Ÿà¤¿à¤ª:</b> à¤œà¤¿à¤¤à¤¨à¥‡ à¤œà¤¼à¥à¤¯à¤¾à¤¦à¤¾ views, à¤‰à¤¤à¤¨à¤¾ à¤Šà¤à¤šà¤¾ rateà¥¤</div></div>' +
+    '<div class="info-block payout"><h4>ðŸ’µ à¤¸à¥à¤Ÿà¥‡à¤ª 6 â€” à¤ªà¥ˆà¤¸à¥‡ à¤¨à¤¿à¤•à¤¾à¤²à¥‡à¤‚</h4><ul><li><b>Minimum withdrawal:</b> $20 (à¤²à¤—à¤­à¤— â‚¹1,600)</li><li>$20 à¤ªà¥‚à¤°à¥‡ à¤¹à¥‹à¤¤à¥‡ à¤¹à¥€ bot à¤¸à¥‡ withdrawal request à¤­à¥‡à¤œà¥‡à¤‚à¥¤</li><li><b>Payment methods:</b> Bank Transfer Â· UPI Â· à¤•à¤¿à¤¸à¥€ à¤­à¥€ à¤­à¤¾à¤°à¤¤à¥€à¤¯ à¤¬à¥ˆà¤‚à¤•</li><li><b>à¤ªà¥à¤°à¥‹à¤¸à¥‡à¤¸à¤¿à¤‚à¤— à¤Ÿà¤¾à¤‡à¤®:</b> 24 â€“ 48 à¤˜à¤‚à¤Ÿà¥‡</li><li>à¤ªà¥ˆà¤¸à¥‡ à¤¸à¥€à¤§à¥‡ à¤†à¤ªà¤•à¥‡ à¤¬à¥ˆà¤‚à¤• / UPI app à¤®à¥‡à¤‚ à¤† à¤œà¤¾à¤¤à¥‡ à¤¹à¥ˆà¤‚à¥¤</li></ul></div>' +
+    '<div class="info-block warn"><h4>âš ï¸ à¤¨à¤¿à¤¯à¤® à¤”à¤° à¤¸à¥à¤°à¤•à¥à¤·à¤¾</h4><ul><li>à¤…à¤ªà¤¨à¥€ API key à¤•à¤¿à¤¸à¥€ à¤¸à¥‡ à¤¶à¥‡à¤¯à¤° à¤¨ à¤•à¤°à¥‡à¤‚à¥¤</li><li>à¤—à¤²à¤¤ à¤‡à¤¸à¥à¤¤à¥‡à¤®à¤¾à¤², spam, illegal content à¤¨ à¤•à¤°à¥‡à¤‚à¥¤</li><li>à¤…à¤ªà¤¨à¥‡ à¤¦à¥‡à¤¶ à¤•à¥‡ copyright à¤¨à¤¿à¤¯à¤®à¥‹à¤‚ à¤•à¤¾ à¤ªà¤¾à¤²à¤¨ à¤•à¤°à¥‡à¤‚à¥¤</li></ul></div>' +
+    '<p style="color:#6f9981;font-size:.75rem;text-align:center;margin-top:14px">à¤®à¤¦à¤¦ à¤šà¤¾à¤¹à¤¿à¤? Menu à¤¸à¥‡ â˜ Help & Support à¤–à¥‹à¤²à¥‡à¤‚à¥¤</p>'
+};
+
+function switchInfoLang(lang){
+  infoLang = lang;
+  try { localStorage.setItem('mj_info_lang', lang); } catch(e){}
+  $('mBody').innerHTML = infoContent[lang] || infoContent.en;
+  bindInfoLangButtons();
+}
+function bindInfoLangButtons(){
+  var btns = $('mBody').querySelectorAll('[data-info-lang]');
+  for (var i=0;i<btns.length;i++){
+    btns[i].onclick = function(){ switchInfoLang(this.getAttribute('data-info-lang')); };
+  }
+}
+
+function earningsModalHTML(){
+  return '' +
+    '<p style="color:#00ff78;font-weight:800;font-size:.95rem;margin-bottom:12px">ðŸ’° MAYAJAAL EARNINGS MODEL</p>' +
+    '<div class="earn-box"><b style="color:#00ff78">ðŸ“Œ BASE:</b> Pehle <b>1,000 views = $1.00</b><br><b style="color:#ffd76b">ðŸ“Œ BONUS:</b> Har extra <b>2,000 views</b> ke baad rate <b>Ã— 1.5</b> (50% boost).</div>' +
+    '<p style="font-size:.82rem;color:#b6d5c2;margin-bottom:8px"><b>Tier Table (Tumhara current tier highlight):</b></p>' +
+    '<table class="earn-table" id="earnTable">' +
+      '<thead><tr><th>Views</th><th>Rate / 1K</th><th>Total Income</th></tr></thead>' +
+      '<tbody>' +
+        '<tr data-range="0-1000"><td>0 â€“ 1,000</td><td>$1.00</td><td>$1.00</td></tr>' +
+        '<tr data-range="1000-3000"><td>1K â€“ 3K</td><td>$1.50</td><td>$4.00</td></tr>' +
+        '<tr data-range="3000-5000"><td>3K â€“ 5K</td><td>$2.25</td><td>$8.50</td></tr>' +
+        '<tr data-range="5000-7000"><td>5K â€“ 7K</td><td>$3.38</td><td>$15.25</td></tr>' +
+        '<tr data-range="7000-9000"><td>7K â€“ 9K</td><td>$5.06</td><td>$25.38</td></tr>' +
+        '<tr data-range="9000-11000"><td>9K â€“ 11K</td><td>$7.59</td><td>$40.56</td></tr>' +
+      '</tbody>' +
+    '</table>' +
+    '<div class="earn-box"><b style="color:#ffd76b">ðŸ§® Example (5,000 views):</b><br>â€¢ 1K Ã— $1.00 = $1.00<br>â€¢ 2K Ã— $1.50 = $3.00<br>â€¢ 2K Ã— $2.25 = $4.50<br><b style="color:#00ff78">Total = $8.50</b></div>' +
+    '<div class="earn-box" style="border-color:rgba(255,180,0,.4)"><b style="color:#ffb400">ðŸš€ Rule:</b> Jitne zyada views, utni tezi se kamai. Har 2K views par 50% zyada rate.</div>';
+}
+
+function act(a){
+  if (a === 'settings'){
+    var currentLang = 'en';
+    try { currentLang = localStorage.getItem('mj_lang') || 'en'; } catch(e){}
+    openModal('âš™ Settings',
+      '<div class="form-row"><label>ðŸŒ Language / à¤­à¤¾à¤·à¤¾</label><select id="modalLang"><option value="en">English</option><option value="hi">à¤¹à¤¿à¤¨à¥à¤¦à¥€ (Hindi)</option></select></div>' +
+      '<button class="btn-save" id="saveSettingsBtn" style="margin-top:8px;width:100%">Save Settings</button>' +
+      '<p style="margin-top:14px;font-size:.75rem;color:#6f9981">Language change karne se pura dashboard switch ho jayega.</p>'
+    );
+    setTimeout(function(){ var el = document.getElementById('modalLang'); if (el) el.value = currentLang; }, 50);
+  }
+  else if (a === 'info'){
+    try { infoLang = localStorage.getItem('mj_info_lang') || localStorage.getItem('mj_lang') || 'en'; } catch(e){}
+    openModal('â„¹ Information', infoContent[infoLang] || infoContent.en);
+    bindInfoLangButtons();
+  }
+  else if (a === 'bonus' || a === 'earnings'){
+    openModal(a === 'bonus' ? 'ðŸŽ Bonus System' : 'ðŸ’° Earnings Model', earningsModalHTML());
+    setTimeout(highlightTier, 100);
+  }
+  else if (a === 'support') openModal('â˜ Help & Support', '<p>Contact: <a href="mailto:mayajaalsupport@gmail.com">mayajaalsupport@gmail.com</a></p><p>Telegram: <a href="https://t.me/Mayajaalfilebot" target="_blank">@Mayajaalfilebot</a></p>');
+  else if (a === 'privacy') window.open('/privacy.html', '_blank');
+  else if (a === 'terms') window.open('/terms.html', '_blank');
+}
+
+function highlightTier(){
+  var tbl = document.getElementById('earnTable');
+  if (!tbl || !currentUser) return;
+  db.ref('users/' + currentUser.uid + '/dashboard/totalViews').once('value', function(snap){
+    var v = snap.val() || 0;
+    var rows = tbl.querySelectorAll('tbody tr');
+    for (var i = 0; i < rows.length; i++){
+      var range = rows[i].getAttribute('data-range').split('-');
+      var lo = +range[0], hi = +range[1];
+      if (v >= lo && v < hi){ rows[i].classList.add('hl'); break; }
+    }
+  });
+}
+
+document.addEventListener('click', function(e){
+  var b = e.target.closest('[data-act]');
+  if (b){ e.preventDefault(); act(b.dataset.act); }
+});
+
+$('logoutMenuBtn').onclick = function(){
+  toggleMenu(false);
+  if (confirm('Logout karna hai?')) auth.signOut();
+};
+
+/* i18n */
+var translations = {
+  en: { eyebrow:'VIDEOS Â· LINKS Â· BEYOND', welcome:'ENTER THE', tagline:'Your digital universe. One portal for your files, links, tools and community.', online:'ONLINE', apiTitle:'ðŸ”‘ YOUR API KEY', apiDesc:'Yeh key aapke Gmail se linked hai. Har account ki alag hoti hai aur hamesha same rehti hai.', activate:'Activate in Telegram Bot', dashTitle:'EARNINGS DASHBOARD', totalLinks:'Total Links', totalViews:'Total Views', todayViews:'Today Views', conv:'Conversions', totalInc:'Total Income', todayInc:'Today Income', chartTitle:'Views (Last 7 Days)', botsTitle:'OFFICIAL BOTS' },
+  hi: { eyebrow:'à¤µà¥€à¤¡à¤¿à¤¯à¥‹ Â· à¤²à¤¿à¤‚à¤• Â· à¤”à¤° à¤­à¥€', welcome:'à¤¸à¥à¤µà¤¾à¤—à¤¤ à¤¹à¥ˆ', tagline:'à¤†à¤ªà¤•à¥€ à¤¡à¤¿à¤œà¤¿à¤Ÿà¤² à¤¦à¥à¤¨à¤¿à¤¯à¤¾ â€” à¤«à¤¾à¤‡à¤², à¤²à¤¿à¤‚à¤•, à¤Ÿà¥‚à¤² à¤”à¤° à¤•à¤®à¥à¤¯à¥à¤¨à¤¿à¤Ÿà¥€ à¤à¤• à¤œà¤—à¤¹à¥¤', online:'à¤šà¤¾à¤²à¥‚', apiTitle:'ðŸ”‘ à¤†à¤ªà¤•à¥€ API Key', apiDesc:'à¤¯à¤¹ key à¤†à¤ªà¤•à¥‡ Gmail à¤¸à¥‡ à¤œà¥à¤¡à¤¼à¥€ à¤¹à¥ˆà¥¤ à¤¹à¤° account à¤•à¥€ à¤…à¤²à¤— à¤¹à¥‹à¤¤à¥€ à¤¹à¥ˆ à¤”à¤° à¤¹à¤®à¥‡à¤¶à¤¾ à¤µà¤¹à¥€ à¤°à¤¹à¥‡à¤—à¥€à¥¤', activate:'à¤Ÿà¥‡à¤²à¥€à¤—à¥à¤°à¤¾à¤® à¤¬à¥‰à¤Ÿ à¤®à¥‡à¤‚ à¤à¤•à¥à¤Ÿà¤¿à¤µà¥‡à¤Ÿ à¤•à¤°à¥‡à¤‚', dashTitle:'à¤•à¤®à¤¾à¤ˆ à¤¡à¥ˆà¤¶à¤¬à¥‹à¤°à¥à¤¡', totalLinks:'à¤•à¥à¤² à¤²à¤¿à¤‚à¤•', totalViews:'à¤•à¥à¤² à¤µà¥à¤¯à¥‚à¤œà¤¼', todayViews:'à¤†à¤œ à¤•à¥‡ à¤µà¥à¤¯à¥‚à¤œà¤¼', conv:'à¤•à¤¨à¥à¤µà¤°à¥à¤œà¤¼à¤¨', totalInc:'à¤•à¥à¤² à¤•à¤®à¤¾à¤ˆ', todayInc:'à¤†à¤œ à¤•à¥€ à¤•à¤®à¤¾à¤ˆ', chartTitle:'à¤µà¥à¤¯à¥‚à¤œà¤¼ (à¤ªà¤¿à¤›à¤²à¥‡ 7 à¤¦à¤¿à¤¨)', botsTitle:'à¤‘à¤«à¤¿à¤¶à¤¿à¤¯à¤² à¤¬à¥‰à¤Ÿ' }
+};
+function setLang(lang){
+  var d = translations[lang] || translations.en;
+  $('i18nEyebrow').textContent = d.eyebrow;
+  $('i18nWelcome').textContent = d.welcome;
+  $('i18nTagline').textContent = d.tagline;
+  $('i18nOnline').textContent = d.online;
+  $('i18nApiTitle').textContent = d.apiTitle;
+  $('i18nApiDesc').textContent = d.apiDesc;
+  $('i18nActivate').textContent = d.activate;
+  $('i18nDashTitle').textContent = d.dashTitle;
+  $('i18nTotalLinks').textContent = d.totalLinks;
+  $('i18nTotalViews').textContent = d.totalViews;
+  $('i18nTodayViews').textContent = d.todayViews;
+  $('i18nConv').textContent = d.conv;
+  $('i18nTotalInc').textContent = d.totalInc;
+  $('i18nTodayInc').textContent = d.todayInc;
+  $('i18nChartTitle').textContent = d.chartTitle;
+  $('i18nBotsTitle').textContent = d.botsTitle;
+  try { localStorage.setItem('mj_lang', lang); } catch(e){}
+}
+try { setLang(localStorage.getItem('mj_lang') || 'en'); } catch(e){ setLang('en'); }
+</script>
+
+
+<style>
+    #main-google-login-btn:hover {
+        background-color: #f8f9fa;
+        border-color: #d2e3fc;
+    }
+</style>
+
+
+
+
+</body>
+</html>
