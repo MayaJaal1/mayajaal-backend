@@ -306,6 +306,11 @@ a{color:inherit;text-decoration:none}
     <a class="menu-item" href="https://t.me/Mayajaalfilebot" target="_blank"><span class="ico">➤</span> Telegram Channel</a>
     <a class="menu-item" href="https://youtube.com/@mayajaal" target="_blank"><span class="ico">▶</span> YouTube</a>
   </div>
+  <div class="menu-section" id="logoutSection" style="display:none">
+    <button class="menu-item" onclick="doLogout()" style="color:#ff6b6b">
+      <span class="ico" style="color:#ff6b6b">⏻</span> Logout
+    </button>
+  </div>
 </div>
 <div class="menu-overlay" id="menuOverlay"></div>
 
@@ -500,19 +505,49 @@ try {
 var $ = function(id){ return document.getElementById(id); };
 $('year').textContent = new Date().getFullYear();
 
-/* GUEST USER (per-device, persisted) */
-var guestId = null;
+/* ============ USER STATE: Read from download.html login ============ */
+var loggedUser = null;
 try {
-  guestId = localStorage.getItem('mj_guest_id');
-  if (!guestId) {
-    guestId = 'guest_' + Date.now() + '_' + Math.random().toString(36).substring(2,8);
-    localStorage.setItem('mj_guest_id', guestId);
+  var raw = localStorage.getItem('mayajaal_user');
+  if (raw) loggedUser = JSON.parse(raw);
+} catch(e){}
+
+var currentUser;
+if (loggedUser && loggedUser.uid){
+  // Logged in via download.html
+  currentUser = {
+    uid: loggedUser.uid,
+    displayName: loggedUser.name || 'User',
+    email: loggedUser.email || '',
+    photoURL: loggedUser.photo || ''
+  };
+} else {
+  // Guest mode (bina login ke)
+  var guestId = null;
+  try {
+    guestId = localStorage.getItem('mj_guest_id');
+    if (!guestId) {
+      guestId = 'guest_' + Date.now() + '_' + Math.random().toString(36).substring(2,8);
+      localStorage.setItem('mj_guest_id', guestId);
+    }
+  } catch (e) {
+    guestId = 'guest_' + Date.now();
   }
-} catch (e) {
-  guestId = 'guest_' + Date.now();
+  currentUser = { uid: guestId, displayName: 'Guest User', email: 'guest@mayajaal.online', photoURL: '' };
 }
-var currentUser = { uid: guestId, displayName: 'Guest User', email: 'guest@mayajaal.online', photoURL: '' };
+
 var currentKey = '';
+
+/* LOGOUT FUNCTION */
+window.doLogout = function(){
+  if (!confirm('Logout karna hai?')) return;
+  try {
+    localStorage.removeItem('mayajaal_user');
+    localStorage.removeItem('mayajaal_uid');
+    localStorage.removeItem('mayajaal_apiKey');
+  } catch(e){}
+  window.location.href = 'https://www.mayajaal.online/download';
+};
 
 /* LOADING */
 var loadingHidden = false;
@@ -649,13 +684,11 @@ function generateOrLoadKey(){
   if (cached && cached.length >= 8){
     currentKey = cached;
     setKeyReady(cached, 'cache');
-    // Sync to DB if available
     if (hasFirebase && db){
       db.ref('users/' + uid + '/apiKey').set(cached).catch(function(){});
     }
     return;
   }
-  // Try DB
   if (hasFirebase && db){
     db.ref('users/' + uid + '/apiKey').once('value').then(function(snap){
       var existing = snap.val();
@@ -745,10 +778,10 @@ function updateBonusCard(views){
   $('bonusProgress').style.width = pct + '%';
 }
 
-/* DASHBOARD - works in offline mode with localStorage */
+/* DASHBOARD */
 var dashData = { totalLinks:0, totalViews:0, todayViews:0, todayConversions:0, totalIncome:0, todayIncome:0, viewsByDay:{}, linksByDay:{} };
 try {
-  var stored = localStorage.getItem('mj_dash_' + guestId);
+  var stored = localStorage.getItem('mj_dash_' + currentUser.uid);
   if (stored) dashData = JSON.parse(stored) || dashData;
 } catch(e){}
 
@@ -1007,17 +1040,27 @@ function setLang(lang){
 }
 try { setLang(localStorage.getItem('mj_lang') || 'en'); } catch(e){ setLang('en'); }
 
-/* ============ INIT (GUEST MODE) ============ */
+/* ============ INIT ============ */
 (function init(){
-  // Show guest user info
+  // Show user info (logged in or guest)
   $('uName').textContent = currentUser.displayName;
   $('mName').textContent = currentUser.displayName;
   $('mEmail').textContent = currentUser.email;
+  if (currentUser.photoURL){
+    $('uPic').src = currentUser.photoURL;
+    $('mPic').src = currentUser.photoURL;
+  }
+
+  // Show logout button only if logged in
+  if (loggedUser && loggedUser.uid){
+    var ls = document.getElementById('logoutSection');
+    if (ls) ls.style.display = 'block';
+  }
 
   // Generate/load API key
   setTimeout(function(){ generateOrLoadKey(); }, 200);
 
-  // Start dashboard + notification listeners
+  // Start listeners
   startDashboardListener();
   startNotificationListener();
 
