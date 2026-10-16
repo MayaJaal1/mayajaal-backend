@@ -2,10 +2,35 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+<meta name="viewport" content="width=1280, initial-scale=0.5, minimum-scale=0.3, maximum-scale=2.0, user-scalable=yes, viewport-fit=cover" />
 <meta name="theme-color" content="#020705" />
 <title>MayaJaal.online – Earn Money Online</title>
 <meta name="description" content="Connect your API key, download the app, and start earning money online with MayaJaal." />
+
+<!--
+========================================
+FIREBASE VIEW TRACKING RULES (Bot side)
+========================================
+Structure: users/{uid}/dashboard/
+
+viewsByDay: { "2026-10-16": 150 }       - daily views (chart)
+linksByDay: { "2026-10-16": 3 }         - daily links (chart)
+appSharesByDay: { "2026-10-16": 8 }     - daily app shares (chart)
+earningsByDay: { "2026-10-16": 1.50 }   - daily earnings (chart)
+
+VIEW COUNTING RULES (bot must follow):
+1. 1 view = watch at least 10 seconds of video
+2. 1 IP address = 1 view per 24 hours
+3. Invalid / bot / repeated views are ignored
+4. Referral credit ONLY after friend LOGS IN and watches valid views
+5. Sharing link alone = NO reward
+
+BOT UPDATES NEEDED:
+- On video watch (10s+): viewsByDay[today] += 1
+- On new share: appSharesByDay[today] += 1
+- On referral valid view: referrer's viewsByDay[today] += 1
+========================================
+-->
 
 <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
@@ -21,20 +46,6 @@ html,body{overflow-x:hidden}
 ::-webkit-scrollbar-track{background:#020705}
 ::-webkit-scrollbar-thumb{background:#0a3d24;border-radius:10px;border:2px solid #020705}
 ::-webkit-scrollbar-thumb:hover{background:#00c963}
-
-/* GLOBAL SPLASH */
-#splashLoader{position:fixed;inset:0;z-index:999999;display:flex;align-items:center;justify-content:center;background:radial-gradient(ellipse at center,#031a0e 0%,#020705 70%);transition:opacity .45s ease,visibility .45s}
-#splashLoader.hide{opacity:0;visibility:hidden;pointer-events:none}
-#splashLoader .sp-inner{text-align:center;padding:20px}
-#splashLoader .sp-eye{width:110px;height:110px;margin:0 auto 20px;display:block;filter:drop-shadow(0 0 30px rgba(0,255,120,.6));animation:spPulse 2s ease-in-out infinite}
-@keyframes spPulse{0%,100%{filter:drop-shadow(0 0 25px rgba(0,255,120,.5));transform:scale(1)}50%{filter:drop-shadow(0 0 55px rgba(0,255,120,.95));transform:scale(1.05)}}
-#splashLoader .sp-brand{font-size:2.6rem;font-weight:900;letter-spacing:-1.5px;color:#00ff78;text-shadow:0 0 25px rgba(0,255,120,.7);margin-bottom:6px;font-family:'Courier New',monospace}
-#splashLoader .sp-brand span{color:#d7ffe7;font-weight:400}
-#splashLoader .sp-tag{color:#6f9981;font-size:.72rem;letter-spacing:.35em;text-transform:uppercase;margin-bottom:28px;font-family:'Courier New',monospace}
-#splashLoader .sp-bar{width:220px;height:4px;background:rgba(0,255,120,.12);border-radius:99px;overflow:hidden;margin:0 auto 16px;position:relative}
-#splashLoader .sp-bar i{position:absolute;top:0;left:0;height:100%;width:40%;background:linear-gradient(90deg,transparent,#00ff78,#00c963,transparent);border-radius:99px;animation:spSlide 1.6s ease-in-out infinite}
-@keyframes spSlide{0%{left:-45%}100%{left:100%}}
-#splashLoader .sp-status{color:#9bffbd;font-size:.76rem;letter-spacing:.12em;font-family:'Courier New',monospace;min-height:1.2em}
 
 /* PRE-LOGIN VIEW */
 #preLoginView{
@@ -213,7 +224,6 @@ html,body{overflow-x:hidden}
 #postLoginView .badge{margin-left:auto;background:linear-gradient(135deg,#ff3d3d,#c81e1e);color:#fff;font-size:.6rem;font-weight:800;padding:3px 8px;border-radius:99px;min-width:22px;text-align:center;box-shadow:0 0 10px rgba(255,61,61,.5);letter-spacing:.05em}
 #postLoginView .badge.green{background:linear-gradient(135deg,#00ff78,#00c963);color:#001b0c;box-shadow:0 0 10px rgba(0,255,120,.5)}
 
-/* LOGOUT - sticky footer always visible */
 #postLoginView .menu-footer{margin-top:auto;flex-shrink:0;padding:14px 14px 16px;border-top:1px solid rgba(0,255,120,.18);background:linear-gradient(180deg,rgba(3,19,11,.98),rgba(2,10,6,.99));box-shadow:0 -8px 20px rgba(0,0,0,.5);position:relative;z-index:2}
 #postLoginView .logout-btn{display:flex;align-items:center;justify-content:center;gap:10px;width:100%;padding:14px 18px;background:linear-gradient(135deg,#ff3d3d,#c81e1e);color:#fff;border-radius:12px;font-weight:800;font-size:.9rem;letter-spacing:.05em;transition:.25s;box-shadow:0 4px 18px rgba(255,61,61,.4);border:1px solid rgba(255,255,255,.15);position:relative;overflow:hidden}
 #postLoginView .logout-btn::before{content:"";position:absolute;top:0;left:-100%;width:100%;height:100%;background:linear-gradient(90deg,transparent,rgba(255,255,255,.25),transparent);transition:.6s}
@@ -285,7 +295,6 @@ html,body{overflow-x:hidden}
 #postLoginView .activate-btn{display:block;background:linear-gradient(135deg,#ff6b6b,#e63946);color:#fff;padding:15px 20px;border-radius:12px;font-weight:900;font-size:.9rem;text-align:center;margin-top:16px;transition:.2s;box-shadow:0 0 30px rgba(255,61,61,.45),0 6px 18px rgba(0,0,0,.3);letter-spacing:.04em;border:1px solid rgba(255,255,255,.1)}
 #postLoginView .activate-btn:hover{background:linear-gradient(135deg,#ff3d3d,#c81e1e);transform:translateY(-2px);box-shadow:0 0 50px rgba(255,61,61,.8),0 8px 22px rgba(0,0,0,.4)}
 
-/* RATE CARD (replaces Bonus Multiplier) */
 #postLoginView .rate-card{background:linear-gradient(135deg,rgba(5,28,17,.95),rgba(2,10,7,.95));border:1px solid rgba(255,180,0,.35);border-radius:18px;padding:20px;position:relative;overflow:hidden}
 #postLoginView .rate-card::before{content:"";position:absolute;top:0;left:0;right:0;height:1px;background:linear-gradient(90deg,transparent,#ffb400,transparent);opacity:.7}
 #postLoginView .rate-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;flex-wrap:wrap;gap:8px}
@@ -304,7 +313,6 @@ html,body{overflow-x:hidden}
 #postLoginView .rate-table td:last-child{color:#ffd76b;font-weight:700;text-align:right}
 #postLoginView .rate-table tr:last-child td{border-bottom:0}
 
-/* WITHDRAW CARD */
 #postLoginView .withdraw-card{background:linear-gradient(135deg,rgba(8,42,23,.98) 0%,rgba(3,18,10,.98) 100%);border:2px solid rgba(0,255,120,.5);border-radius:22px;padding:24px 22px;position:relative;overflow:hidden;box-shadow:0 0 40px rgba(0,255,120,.15),inset 0 0 60px rgba(0,255,120,.03)}
 #postLoginView .withdraw-card::before{content:"";position:absolute;top:0;left:0;right:0;height:2px;background:linear-gradient(90deg,transparent,#00ff78,#00c963,#00ff78,transparent);opacity:.9}
 #postLoginView .withdraw-head{display:flex;align-items:center;gap:10px;margin-bottom:14px;flex-wrap:wrap}
@@ -416,33 +424,6 @@ html,body{overflow-x:hidden}
 </head>
 <body>
 
-<!-- SPLASH -->
-<div id="splashLoader">
-  <div class="sp-inner">
-    <svg class="sp-eye" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
-      <defs>
-        <radialGradient id="spIris" cx="50%" cy="45%" r="60%">
-          <stop offset="0%" stop-color="#0a3d24"/><stop offset="40%" stop-color="#0a7a42"/>
-          <stop offset="75%" stop-color="#00ff78"/><stop offset="100%" stop-color="#041a0e"/>
-        </radialGradient>
-        <clipPath id="spClip"><path d="M8 50 Q25 15 50 18 Q75 15 92 50 Q75 85 50 82 Q25 85 8 50 Z"/></clipPath>
-      </defs>
-      <path d="M8 50 Q25 15 50 18 Q75 15 92 50 Q75 85 50 82 Q25 85 8 50 Z" fill="#f0f7f2" stroke="#0a1f12" stroke-width="1.5"/>
-      <g clip-path="url(#spClip)">
-        <ellipse cx="50" cy="50" rx="16" ry="18" fill="url(#spIris)"/>
-        <ellipse cx="50" cy="50" rx="7" ry="8" fill="#000"/>
-        <circle cx="45" cy="43" r="3" fill="#fff" opacity=".95"/>
-      </g>
-      <path d="M8 50 Q25 15 50 18 Q75 15 92 50" fill="none" stroke="#00ff78" stroke-width="2" stroke-linecap="round"/>
-      <path d="M8 50 Q25 85 50 82 Q75 85 92 50" fill="none" stroke="#00c963" stroke-width="1.5"/>
-    </svg>
-    <div class="sp-brand"><span class="lg-maya">Maya</span><span class="lg-jaal">Jaal</span></div>
-    <div class="sp-tag">The Digital Network</div>
-    <div class="sp-bar"><i></i></div>
-    <div class="sp-status" id="splashText">INITIALIZING MATRIX</div>
-  </div>
-</div>
-
 <!-- PRE-LOGIN VIEW -->
 <div id="preLoginView">
 
@@ -484,7 +465,7 @@ html,body{overflow-x:hidden}
 <header class="hero">
   <h1>Welcome to <span>MayaJaal.online</span> 🚀</h1>
   <p>Connect your API key, download the app, and start earning money online. Upload videos, share links, and earn from views.</p>
-  <a href="https://github.com/MayaJaal1/Mayajaall/releases/latest/download/app-release.apk" class="btn btn-green" download>📥 Download App</a>
+  <a href="https://cdn.mayajaal.online/MayaJaal.apk" class="btn btn-green" download>📥 Download App</a>
   <a href="#earning" class="btn btn-outline">💰 View Earning Rates</a>
 </header>
 
@@ -529,18 +510,19 @@ html,body{overflow-x:hidden}
     <table>
       <thead><tr><th>Views / Shares</th><th>Earning</th></tr></thead>
       <tbody>
-        <tr><td>1,000 Views</td><td class="earn-amt">$1</td></tr>
-        <tr><td>1,500 Views</td><td class="earn-amt">$2</td></tr>
-        <tr><td>2,000 Views</td><td class="earn-amt">$3</td></tr>
-        <tr><td>3,000 Views</td><td class="earn-amt">$5</td></tr>
-        <tr><td>5,000 Views</td><td class="earn-amt">$9</td></tr>
-        <tr><td>10,000 Views</td><td class="earn-amt">$19</td></tr>
-        <tr><td>20,000 Views</td><td class="earn-amt">$39</td></tr>
+        <tr><td>1,000 Views</td><td class="earn-amt">$1.50</td></tr>
+        <tr><td>2,000 Views</td><td class="earn-amt">$2.50</td></tr>
+        <tr><td>4,000 Views</td><td class="earn-amt">$5.00</td></tr>
+        <tr><td>6,000 Views</td><td class="earn-amt">$7.50</td></tr>
+        <tr><td>10,000 Views</td><td class="earn-amt">$12.50</td></tr>
+        <tr><td>20,000 Views</td><td class="earn-amt">$25.00</td></tr>
+        <tr><td>50,000 Views</td><td class="earn-amt">$62.50</td></tr>
+        <tr><td>100,000 Views</td><td class="earn-amt">$125.00</td></tr>
       </tbody>
     </table>
   </div>
   <p style="text-align:center;color:var(--muted);max-width:700px;margin:20px auto 0;font-size:.95rem;line-height:1.7">
-    <b style="color:var(--accent)">Rate formula:</b> First 1,000 views pay <b style="color:#fff">$1</b>. Every additional 1,000 views after that pay <b style="color:#fff">$2</b>.
+    <b style="color:var(--accent)">Rate formula:</b> First 1,000 views pay <b style="color:#fff">$1.50</b>. Next 1,000 views add <b style="color:#fff">$1.00</b> (total $2.50 at 2,000 views). After 2,000 views, every additional 2,000 valid views pay <b style="color:#fff">$2.50</b> more.
   </p>
 </section>
 
@@ -562,7 +544,7 @@ html,body{overflow-x:hidden}
   <div class="cta-box">
     <h3>🎯 Start Today!</h3>
     <p>Download app → connect bot → upload video → convert link → share → get views → earn $5 → withdraw via UPI or Bank Transfer!</p>
-    <a href="https://github.com/MayaJaal1/Mayajaall/releases/latest/download/app-release.apk" class="btn btn-green" download>📥 Download App</a>
+    <a href="https://cdn.mayajaal.online/MayaJaal.apk" class="btn btn-green" download>📥 Download App</a>
     <a href="https://t.me/Mayajaalfilebot" target="_blank" class="btn">🤖 Open Upload Bot</a>
   </div>
 </section>
@@ -573,7 +555,7 @@ html,body{overflow-x:hidden}
   <p style="margin-top:10px;font-size:0.8rem;">© 2025 MayaJaal.online</p>
 </footer>
 
-<a href="https://github.com/MayaJaal1/Mayajaall/releases/latest/download/app-release.apk" class="float-cta" download>📥 Download App</a>
+<a href="https://cdn.mayajaal.online/MayaJaal.apk" class="float-cta" download>📥 Download App</a>
 
 <div class="success-overlay" id="successOverlay">
   <div class="success-card">
@@ -767,27 +749,49 @@ html,body{overflow-x:hidden}
   <!-- EARNINGS RATE CARD -->
   <div class="rate-card">
     <div class="rate-head">
-      <h2 class="snk d1">💰 EARNINGS RATE</h2>
-      <span class="rate-current" id="rateCurrent">$1.00 / 1K</span>
+      <h2 class="snk d1">💚 EARNINGS MODEL</h2>
+      <span class="rate-current" id="rateCurrent">$1.50 / 1K</span>
     </div>
     <div class="rate-grid">
-      <div class="rate-stat"><h5>First 1K Views</h5><div class="bv" id="rateFirst">$1.00</div></div>
-      <div class="rate-stat"><h5>Every 1K After That</h5><div class="bv" id="rateAfter">$2.00</div></div>
+      <div class="rate-stat"><h5>First 1,000 Views</h5><div class="bv">$1.50</div></div>
+      <div class="rate-stat"><h5>Next 1,000 Views</h5><div class="bv">+$1.00</div></div>
+      <div class="rate-stat"><h5>Every 2K After 2K</h5><div class="bv">+$2.50</div></div>
+      <div class="rate-stat"><h5>At 100K Views</h5><div class="bv">$125.00</div></div>
     </div>
     <div class="rate-info">
-      <b>How it works:</b> Your first 1,000 views pay <b>$1</b>. Every 1,000 views after that pay <b>$2</b>.
+      <b>How it works:</b> First 1,000 views pay <b>$1.50</b>. Next 1,000 views add <b>$1.00</b> (total $2.50 at 2K). After 2,000 views, every additional 2,000 valid views pay <b>$2.50</b> more.
     </div>
     <table class="rate-table">
       <thead><tr><th>Total Views</th><th>Total Earning</th></tr></thead>
       <tbody>
-        <tr><td>1,000</td><td>$1</td></tr>
-        <tr><td>2,000</td><td>$3</td></tr>
-        <tr><td>3,000</td><td>$5</td></tr>
-        <tr><td>5,000</td><td>$9</td></tr>
-        <tr><td>10,000</td><td>$19</td></tr>
-        <tr><td>20,000</td><td>$39</td></tr>
+        <tr><td>1,000</td><td>$1.50</td></tr>
+        <tr><td>2,000</td><td>$2.50</td></tr>
+        <tr><td>4,000</td><td>$5.00</td></tr>
+        <tr><td>6,000</td><td>$7.50</td></tr>
+        <tr><td>8,000</td><td>$10.00</td></tr>
+        <tr><td>10,000</td><td>$12.50</td></tr>
+        <tr><td>20,000</td><td>$25.00</td></tr>
+        <tr><td>50,000</td><td>$62.50</td></tr>
+        <tr><td>100,000</td><td>$125.00</td></tr>
       </tbody>
     </table>
+
+    <div style="margin-top:22px;padding-top:18px;border-top:1px dashed rgba(0,255,120,.25);">
+      <h3 style="font-size:.85rem;color:#a78bfa;letter-spacing:.12em;text-transform:uppercase;margin-bottom:14px;">📲 APP SHARE REWARDS</h3>
+      <p style="color:#a8c9b6;font-size:.78rem;line-height:1.6;margin-bottom:14px;">
+        Invite friends to MayaJaal and earn rewards on their <b style="color:#ffd76b;">valid views</b>. Reward only counts after your friend <b style="color:#ffd76b;">logs in</b> and watches valid videos — not just by sharing.
+      </p>
+      <ol style="color:#c6e8d4;font-size:.78rem;line-height:1.9;padding-left:20px;margin-bottom:12px;">
+        <li>Share your Referral Link.</li>
+        <li>Friend opens the app through your link.</li>
+        <li>Friend downloads the app, creates account, and <b style="color:#ffd76b;">logs in</b>.</li>
+        <li>Friend watches videos and completes valid views (10s+ watch, 1 view per IP per 24h).</li>
+        <li>You earn rewards based on their <b>valid views</b>.</li>
+      </ol>
+      <div style="background:rgba(255,184,0,.08);border-left:3px solid #ffb800;padding:12px 14px;border-radius:8px;color:#ffd76b;font-size:.76rem;line-height:1.7;">
+        <b>⚠ Important:</b> Sharing the link alone earns nothing. Friend must log in and generate real activity.
+      </div>
+    </div>
   </div>
 
   <div class="ad-slot has-ad" data-ad="mid2">
@@ -843,6 +847,10 @@ html,body{overflow-x:hidden}
     <div class="chart-box">
       <h4>💲 <span class="snk d3">Earnings in USD (Last 7 Days)</span></h4>
       <canvas id="chartEarnings"></canvas>
+    </div>
+    <div class="chart-box">
+      <h4>📲 <span class="snk d4">App Shares (Last 7 Days)</span></h4>
+      <canvas id="chartAppShares"></canvas>
     </div>
   </div>
 
@@ -917,7 +925,6 @@ function showPreLogin(){
   if (matrixRAF) { cancelAnimationFrame(matrixRAF); matrixRAF = null; }
   var ls = $('loadingScreen');
   if (ls) { ls.classList.remove('hide'); ls.style.display = ''; }
-  hideSplash();
 }
 
 function showPostLogin(user){
@@ -949,19 +956,6 @@ function showPostLogin(user){
   startNotificationListener();
   startLoadingMessages();
   hideLoading();
-  hideSplash();
-}
-
-/* SPLASH */
-var splashHidden = false;
-function hideSplash(){
-  if (splashHidden) return;
-  splashHidden = true;
-  var s = $('splashLoader');
-  if (s){
-    s.classList.add('hide');
-    setTimeout(function(){ s.style.display = 'none'; }, 500);
-  }
 }
 
 /* USER STORAGE */
@@ -1049,7 +1043,6 @@ if (auth){
       if (!currentUser || currentUser.uid !== u.uid){
         showPostLogin(u);
       } else {
-        hideSplash();
         hideLoading();
       }
     } else {
@@ -1082,6 +1075,15 @@ function triggerGoogleLogin(btn){
   var origText = txtSpan ? txtSpan.textContent : '';
   if (txtSpan) txtSpan.textContent = 'Connecting...';
 
+  clearTimeout(window.__loginResetTimer);
+  window.__loginResetTimer = setTimeout(function(){
+    document.querySelectorAll('.google-login-trigger').forEach(function(b){
+      b.disabled = false;
+      var s = b.querySelector('span');
+      if (s && s.textContent === 'Connecting...') s.textContent = origText || 'Sign in with Google';
+    });
+  }, 2000);
+
   var provider = new firebase.auth.GoogleAuthProvider();
   provider.setCustomParameters({ prompt: 'select_account' });
 
@@ -1113,7 +1115,7 @@ function triggerGoogleLogin(btn){
     .catch(function(error){
       console.error('Login error:', error);
       allBtns.forEach(function(b){ b.disabled = false; });
-      if (txtSpan) txtSpan.textContent = origText;
+      if (txtSpan) txtSpan.textContent = origText || 'Sign in with Google';
       if (error.code !== 'auth/popup-closed-by-user' && error.code !== 'auth/cancelled-popup-request'){
         alert('Login failed: ' + error.message);
       }
@@ -1304,10 +1306,10 @@ function doBlink(){ if (!eyeBox) return; eyeBox.classList.add('blink'); setTimeo
 function scheduleBlink(){ setTimeout(function(){ doBlink(); setTimeout(doBlink, 280); scheduleBlink(); }, 2500 + Math.random()*3000); }
 scheduleBlink();
 
-/* LOADING SCREEN */
+/* LOADING SCREEN - MAX 2 SECONDS */
 var loadingHidden = false;
 var loadStartTime = Date.now();
-var MIN_LOADING_MS = 1100;
+var MIN_LOADING_MS = 2000;
 var loadingMessages = ['INITIALIZING MATRIX','CONNECTING TO NETWORK','VERIFYING IDENTITY','LOADING DASHBOARD'];
 var loadingMsgIdx = 0;
 var loadingMsgTimer = null;
@@ -1339,15 +1341,7 @@ function hideLoading(){
     }
   }, wait);
 }
-
-var splashMsgs = ['INITIALIZING MATRIX','CONNECTING TO NETWORK','VERIFYING IDENTITY','LOADING DASHBOARD'];
-var splashIdx = 0;
-setInterval(function(){
-  if (splashHidden) return;
-  splashIdx = (splashIdx + 1) % splashMsgs.length;
-  var el = $('splashText');
-  if (el) el.textContent = splashMsgs[splashIdx];
-}, 500);
+setTimeout(function(){ if (!loadingHidden) hideLoading(); }, 2000);
 
 /* API KEY */
 function generateKey(){
@@ -1451,29 +1445,27 @@ if (copyBtn) {
   };
 }
 
-/* ============================================================
-   NEW EARNINGS MODEL
-   First 1,000 views = $1
-   Every 1,000 views after that = $2
-   ============================================================ */
+/* EARNINGS MODEL — First 1K=$1.50, next 1K=+$1.00, every 2K after=+$2.50 */
 function calcEarnings(views){
   views = Math.max(0, Number(views) || 0);
   if (views <= 0) return 0;
-  if (views <= 1000) return round2((views / 1000) * 1);
-  return round2(1 + ((views - 1000) / 1000) * 2);
+  if (views <= 1000) return round2((views/1000) * 1.5);
+  if (views <= 2000) return round2(1.5 + ((views - 1000)/1000) * 1.0);
+  return round2(2.5 + ((views - 2000)/2000) * 2.5);
 }
 function round2(n){ return Math.round(n * 100) / 100; }
 
 function updateRateCard(views){
   views = Math.max(0, Number(views) || 0);
   var curRate;
-  if (views < 1000) curRate = '$1.00 / 1K';
-  else curRate = '$2.00 / 1K';
+  if (views < 1000) curRate = '$1.50 / 1K';
+  else if (views < 2000) curRate = '$1.00 / 1K';
+  else curRate = '$2.50 / 2K';
   var rc = $('rateCurrent'); if (rc) rc.textContent = curRate;
 }
 
 /* DASHBOARD */
-var dashData = { totalLinks:0, totalViews:0, todayViews:0, todayConversions:0, totalIncome:0, todayIncome:0, viewsByDay:{}, linksByDay:{} };
+var dashData = { totalLinks:0, totalViews:0, todayViews:0, todayConversions:0, totalIncome:0, todayIncome:0, viewsByDay:{}, linksByDay:{}, appSharesByDay:{} };
 
 function renderDashboard(d){
   var views = d.totalViews || 0;
@@ -1487,7 +1479,7 @@ function renderDashboard(d){
   $('sInc').textContent = '$' + finalIncome.toFixed(2);
   $('sTodayInc').textContent = '$' + (d.todayIncome || 0).toFixed(2);
   updateRateCard(views);
-  updateCharts(d.viewsByDay || {}, d.linksByDay || {});
+  updateCharts(d.viewsByDay || {}, d.linksByDay || {}, d.appSharesByDay || {});
   var lt = $('liveTxt'); if (lt) lt.textContent = 'Live';
 }
 
@@ -1533,20 +1525,23 @@ function baseChart(canvasEl, label, color, bg, yTickCb){
     }
   });
 }
-var viewsChart = null, linksChart = null, earningsChart = null;
-function updateCharts(vb, lb){
+var viewsChart = null, linksChart = null, earningsChart = null, appSharesChart = null;
+function updateCharts(vb, lb, ab){
   var t = last7Days();
   var vData = t.keys.map(function(k){ return vb[k] || 0; });
   var lData = t.keys.map(function(k){ return lb[k] || 0; });
   var eData = t.keys.map(function(k){ return calcEarnings(vb[k] || 0); });
-  var vEl = $('chartViews'), lEl = $('chartLinks'), eEl = $('chartEarnings');
-  if (!vEl || !lEl || !eEl || typeof Chart === 'undefined') return;
-  if (!viewsChart) viewsChart = baseChart(vEl, 'Views', '#00ff78', 'rgba(0,255,120,.15)');
-  if (!linksChart) linksChart = baseChart(lEl, 'Links', '#00c963', 'rgba(0,201,99,.15)');
-  if (!earningsChart) earningsChart = baseChart(eEl, 'Earnings', '#ffb400', 'rgba(255,180,0,.15)', function(v){ return '$' + Number(v).toFixed(2); });
-  viewsChart.data.labels = t.labels; viewsChart.data.datasets[0].data = vData; viewsChart.update();
-  linksChart.data.labels = t.labels; linksChart.data.datasets[0].data = lData; linksChart.update();
-  earningsChart.data.labels = t.labels; earningsChart.data.datasets[0].data = eData; earningsChart.update();
+  var aData = t.keys.map(function(k){ return (ab && ab[k]) || 0; });
+  var vEl = $('chartViews'), lEl = $('chartLinks'), eEl = $('chartEarnings'), aEl = $('chartAppShares');
+  if (typeof Chart === 'undefined') return;
+  if (vEl && !viewsChart) viewsChart = baseChart(vEl, 'Views', '#00ff78', 'rgba(0,255,120,.15)');
+  if (lEl && !linksChart) linksChart = baseChart(lEl, 'Links', '#00c963', 'rgba(0,201,99,.15)');
+  if (eEl && !earningsChart) earningsChart = baseChart(eEl, 'Earnings', '#ffb400', 'rgba(255,180,0,.15)', function(v){ return '$' + Number(v).toFixed(2); });
+  if (aEl && !appSharesChart) appSharesChart = baseChart(aEl, 'App Shares', '#a78bfa', 'rgba(167,139,250,.15)');
+  if (viewsChart){ viewsChart.data.labels = t.labels; viewsChart.data.datasets[0].data = vData; viewsChart.update(); }
+  if (linksChart){ linksChart.data.labels = t.labels; linksChart.data.datasets[0].data = lData; linksChart.update(); }
+  if (earningsChart){ earningsChart.data.labels = t.labels; earningsChart.data.datasets[0].data = eData; earningsChart.update(); }
+  if (appSharesChart){ appSharesChart.data.labels = t.labels; appSharesChart.data.datasets[0].data = aData; appSharesChart.update(); }
 }
 
 /* NOTIFICATIONS */
@@ -1654,21 +1649,22 @@ var infoContent =
   '<li>Views update <b>live</b> on your dashboard.</li></ol></div>' +
 
   '<div class="info-block bonus"><h4>💰 STEP 5 — Earnings Model</h4>' +
-  '<p style="margin-bottom:10px"><b>Simple 2-tier rate:</b></p>' +
+  '<p style="margin-bottom:10px"><b>Simple 3-tier rate:</b></p>' +
   '<ul>' +
-  '<li><b>First 1,000 views:</b> pay <b>$1 per 1,000 views</b>.</li>' +
-  '<li><b>Every 1,000 views after that:</b> pay <b>$2 per 1,000 views</b>.</li>' +
+  '<li><b>First 1,000 views:</b> pay <b>$1.50 per 1K views</b>.</li>' +
+  '<li><b>Next 1,000 views:</b> add <b>$1.00 per 1K views</b> (total $2.50 at 2K).</li>' +
+  '<li><b>Every 2,000 views after:</b> pay <b>$2.50 per 2K views</b>.</li>' +
   '</ul>' +
   '<table class="earn-table" style="margin-top:10px"><thead><tr><th>Views</th><th>Earning</th></tr></thead><tbody>' +
-  '<tr><td>1,000</td><td>$1</td></tr>' +
-  '<tr><td>1,500</td><td>$2</td></tr>' +
-  '<tr><td>2,000</td><td>$3</td></tr>' +
-  '<tr><td>3,000</td><td>$5</td></tr>' +
-  '<tr><td>5,000</td><td>$9</td></tr>' +
-  '<tr><td>10,000</td><td>$19</td></tr>' +
-  '<tr><td>20,000</td><td>$39</td></tr>' +
+  '<tr><td>1,000</td><td>$1.50</td></tr>' +
+  '<tr><td>2,000</td><td>$2.50</td></tr>' +
+  '<tr><td>4,000</td><td>$5.00</td></tr>' +
+  '<tr><td>6,000</td><td>$7.50</td></tr>' +
+  '<tr><td>10,000</td><td>$12.50</td></tr>' +
+  '<tr><td>20,000</td><td>$25.00</td></tr>' +
+  '<tr><td>100,000</td><td>$125.00</td></tr>' +
   '</tbody></table>' +
-  '<div class="info-tip">🚀 <b>Pro tip:</b> The more views you get, the more you earn — rate doubles after your first 1,000 views.</div></div>' +
+  '<div class="info-tip">🚀 <b>Pro tip:</b> The more views you get, the more you earn — rate increases as you cross thresholds.</div></div>' +
 
   '<div class="info-block payout"><h4>💵 STEP 6 — Withdraw Money</h4><ul>' +
   '<li><b>Minimum withdrawal:</b> $5</li>' +
@@ -1681,27 +1677,30 @@ var infoContent =
   '<li>Never share your API key with anyone.</li>' +
   '<li>Do not abuse, spam, or upload illegal content.</li>' +
   '<li>Follow copyright rules.</li>' +
-  '<li>Multiple accounts for the same user are not allowed.</li></ul></div>';
+  '<li>Multiple accounts for the same user are not allowed.</li>' +
+  '<li>1 view = 10+ second watch; 1 IP = 1 view per 24 hours.</li></ul></div>';
 
 function earningsModalHTML(){
   return '<p style="color:#00ff78;font-weight:800;font-size:.95rem;margin-bottom:12px">💰 MAYAJAAL EARNINGS MODEL</p>' +
-    '<div class="earn-box"><b style="color:#00ff78">📌 TIER 1:</b> First <b>1,000 views = $1</b> (rate: $1 per 1,000 views)<br>' +
-    '<b style="color:#ffd76b">📌 TIER 2:</b> Every <b>1,000 views after that = $2</b> (rate: $2 per 1,000 views)</div>' +
+    '<div class="earn-box"><b style="color:#00ff78">📌 TIER 1:</b> First <b>1,000 views = $1.50</b><br>' +
+    '<b style="color:#ffd76b">📌 TIER 2:</b> Next 1,000 views = <b>+$1.00</b> (total $2.50 at 2K)<br>' +
+    '<b style="color:#a78bfa">📌 TIER 3:</b> Every 2,000 views after 2K = <b>+$2.50</b></div>' +
     '<p style="font-size:.82rem;color:#b6d5c2;margin-bottom:8px"><b>Complete Rate Table:</b></p>' +
-    '<table class="earn-table"><thead><tr><th>Views</th><th>Rate / 1K</th><th>Total Income</th></tr></thead><tbody>' +
-    '<tr><td>1,000</td><td>$1</td><td>$1</td></tr>' +
-    '<tr><td>1,500</td><td>$2</td><td>$2</td></tr>' +
-    '<tr><td>2,000</td><td>$2</td><td>$3</td></tr>' +
-    '<tr><td>3,000</td><td>$2</td><td>$5</td></tr>' +
-    '<tr><td>5,000</td><td>$2</td><td>$9</td></tr>' +
-    '<tr><td>10,000</td><td>$2</td><td>$19</td></tr>' +
-    '<tr><td>20,000</td><td>$2</td><td>$39</td></tr>' +
+    '<table class="earn-table"><thead><tr><th>Views</th><th>Total Income</th></tr></thead><tbody>' +
+    '<tr><td>1,000</td><td>$1.50</td></tr>' +
+    '<tr><td>2,000</td><td>$2.50</td></tr>' +
+    '<tr><td>4,000</td><td>$5.00</td></tr>' +
+    '<tr><td>6,000</td><td>$7.50</td></tr>' +
+    '<tr><td>10,000</td><td>$12.50</td></tr>' +
+    '<tr><td>20,000</td><td>$25.00</td></tr>' +
+    '<tr><td>50,000</td><td>$62.50</td></tr>' +
+    '<tr><td>100,000</td><td>$125.00</td></tr>' +
     '</tbody></table>' +
     '<div class="earn-box"><b style="color:#ffd76b">🧮 Example (5,000 views):</b><br>' +
-    '• First 1,000 × $1 = $1<br>' +
-    '• Remaining 4,000 × $2 per 1K = $8<br>' +
-    '<b style="color:#00ff78">Total = $9</b></div>' +
-    '<p style="font-size:.8rem;color:#a8c9b6;margin-top:10px"><b>Simple rule:</b> After the first 1,000 views, the rate doubles to $2 per 1,000 views. The more views, the more you earn.</p>';
+    '• First 1,000 × $1.50 = $1.50<br>' +
+    '• Next 1,000 × $1.00 = $1.00<br>' +
+    '• Next 3,000 / 2K × $2.50 = $3.75<br>' +
+    '<b style="color:#00ff78">Total = $6.25</b></div>';
 }
 
 function withdrawModalHTML(){
@@ -1771,6 +1770,39 @@ function setLang(lang){
   try { localStorage.setItem('mj_lang', lang); } catch(e){}
 }
 try { setLang('en'); } catch(e){}
+
+/* DOWNLOAD CLICK SOUND + SMOOTH */
+(function(){
+  window.__playDownloadSound = function(){
+    try {
+      var AC = window.AudioContext || window.webkitAudioContext;
+      if (!AC) return;
+      var ctx = new AC(), now = ctx.currentTime;
+      [{f:523.25,t:0,d:.30,v:.16},{f:659.25,t:.08,d:.36,v:.15},{f:783.99,t:.16,d:.42,v:.13}].forEach(function(t){
+        var o = ctx.createOscillator(), g = ctx.createGain();
+        o.type = 'sine'; o.frequency.value = t.f;
+        var s = now + t.t;
+        g.gain.setValueAtTime(0, s);
+        g.gain.linearRampToValueAtTime(t.v, s + 0.02);
+        g.gain.exponentialRampToValueAtTime(0.0001, s + t.d);
+        o.connect(g); g.connect(ctx.destination);
+        o.start(s); o.stop(s + t.d + 0.05);
+      });
+      setTimeout(function(){ try{ ctx.close(); }catch(e){} }, 1500);
+    } catch(e){}
+  };
+  document.addEventListener('click', function(e){
+    var a = e.target.closest('a');
+    if (!a) return;
+    var href = a.getAttribute('href') || '';
+    var isApk = href.indexOf('MayaJaal.apk') > -1 || (a.hasAttribute('download') && (a.classList.contains('btn-green') || a.classList.contains('float-cta')));
+    if (!isApk) return;
+    window.__playDownloadSound();
+    a.style.transition = 'transform .15s ease';
+    a.style.transform = 'scale(.95)';
+    setTimeout(function(){ a.style.transform = 'scale(1)'; }, 160);
+  }, true);
+})();
 </script>
 
 <!-- GLOBAL AD SCRIPTS -->
