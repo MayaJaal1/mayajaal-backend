@@ -7,19 +7,18 @@
 <title>MayaJaal.online – Earn Money Online</title>
 <meta name="description" content="Connect your API key, download the app, and start earning money online with MayaJaal." />
 
-<!-- FIREBASE (compat, single init for both views) -->
 <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-database-compat.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
 <style>
-/* ============ SHARED RESET ============ */
+/* GLOBAL RESET */
 *{margin:0;padding:0;box-sizing:border-box}
+html,body{overflow-x:hidden}
+.view-hidden{display:none !important}
 
-/* ============================================================
-   PRE-LOGIN VIEW  (purple landing page)
-   ============================================================ */
+/* ================= PRE-LOGIN VIEW ================= */
 #preLoginView{
   --primary:#6a11cb;--secondary:#2575fc;--accent:#ffb800;--dark:#0f0f23;--card:#1a1a2e;
   --text:#eaeaea;--muted:#a0a0b8;--green:#00c896;
@@ -90,22 +89,23 @@
 #preLoginView .google-btn:disabled{opacity:.7;cursor:wait}
 #preLoginView .google-btn img{width:24px;height:24px}
 #preLoginView .login-footer-note{margin-top:25px;color:#666;font-size:.85rem;display:flex;align-items:center;justify-content:center;gap:6px}
+#preLoginView .hidden{display:none !important}
+#preLoginView .success-overlay{position:fixed;inset:0;z-index:9999;background:rgba(15,15,35,.95);display:none;align-items:center;justify-content:center;backdrop-filter:blur(8px)}
+#preLoginView .success-overlay.on{display:flex}
+#preLoginView .success-card{background:linear-gradient(145deg,#1a1a2e,#16213e);border:1px solid rgba(0,200,150,.5);border-radius:24px;padding:45px 35px;text-align:center;max-width:400px;width:90%;box-shadow:0 25px 70px rgba(0,200,150,.3);animation:mjPopIn .4s ease-out}
+@keyframes mjPopIn{0%{transform:scale(.85);opacity:0}100%{transform:scale(1);opacity:1}}
+#preLoginView .success-icon{font-size:60px;margin-bottom:15px}
+#preLoginView .success-card h3{color:#00c896;font-size:1.5rem;margin-bottom:10px}
+#preLoginView .success-card p{color:#a0a0b8;font-size:.95rem;margin-bottom:20px}
+#preLoginView .loader{width:40px;height:40px;margin:0 auto;border:4px solid rgba(0,200,150,.2);border-top:4px solid #00c896;border-radius:50%;animation:mjSpin .8s linear infinite}
+@keyframes mjSpin{0%{transform:rotate(0deg)}100%{transform:rotate(360deg)}}
 
-/* ============================================================
-   POST-LOGIN VIEW  (green matrix dashboard)
-   ============================================================ */
-#postLoginView{
-  background:#020705;color:#effff5;min-height:100vh;overflow-x:hidden;
-  -webkit-font-smoothing:antialiased;-webkit-tap-highlight-color:transparent;
-  font-family:'Courier New','SF Mono',Consolas,monospace;
-}
+/* ================= POST-LOGIN VIEW ================= */
+#postLoginView{background:#020705;color:#effff5;min-height:100vh;overflow-x:hidden;-webkit-font-smoothing:antialiased;-webkit-tap-highlight-color:transparent;font-family:'Courier New','SF Mono',Consolas,monospace}
 #postLoginView button{font-family:inherit;cursor:pointer;border:0;background:none;color:inherit}
 #postLoginView a{color:inherit;text-decoration:none}
 #postLoginView #matrix{position:fixed;inset:0;width:100%;height:100%;z-index:0;opacity:.5;pointer-events:none}
-#postLoginView .vig{position:fixed;inset:0;z-index:1;pointer-events:none;background:
-  radial-gradient(ellipse at 50% 25%,transparent 0%,rgba(0,20,10,.5) 55%,#000 100%),
-  linear-gradient(180deg,rgba(0,255,120,.04) 0%,transparent 30%,transparent 70%,rgba(0,255,120,.03) 100%)}
-
+#postLoginView .vig{position:fixed;inset:0;z-index:1;pointer-events:none;background:radial-gradient(ellipse at 50% 25%,transparent 0%,rgba(0,20,10,.5) 55%,#000 100%),linear-gradient(180deg,rgba(0,255,120,.04) 0%,transparent 30%,transparent 70%,rgba(0,255,120,.03) 100%)}
 #postLoginView .loading-screen{position:fixed;inset:0;z-index:500;display:flex;align-items:center;justify-content:center;background:radial-gradient(ellipse at center,#031a0e 0%,#020705 70%);transition:opacity .55s ease,visibility .55s}
 #postLoginView .loading-screen.hide{opacity:0;visibility:hidden;pointer-events:none}
 #postLoginView .loading-card{text-align:center;padding:20px;position:relative}
@@ -123,13 +123,9 @@
 #postLoginView .loading-grid-ring::before{content:"";position:absolute;top:-3px;left:50%;width:6px;height:6px;background:#00ff78;border-radius:50%;box-shadow:0 0 12px #00ff78;transform:translateX(-50%)}
 #postLoginView .loading-grid-ring.inner{width:240px;height:240px;border-color:rgba(0,255,120,.12);animation-duration:18s;animation-direction:reverse}
 @keyframes mjSpinRing{from{transform:translate(-50%,-50%) rotate(0)}to{transform:translate(-50%,-50%) rotate(360deg)}}
-
 #postLoginView .snk{position:relative;display:inline-block;overflow:hidden;isolation:isolate;max-width:100%;padding:2px 6px;border-radius:6px}
 #postLoginView .snk.blk{display:block;width:100%}
-#postLoginView .snk::after{content:"";position:absolute;top:0;left:-90px;width:90px;height:100%;
-  background:radial-gradient(ellipse at center,rgba(255,255,255,.95) 0%,rgba(200,255,220,.75) 30%,rgba(0,255,120,.35) 60%,transparent 80%);
-  filter:blur(6px);mix-blend-mode:screen;pointer-events:none;z-index:5;
-  animation:mjSnakeSweep 4.2s ease-in-out infinite}
+#postLoginView .snk::after{content:"";position:absolute;top:0;left:-90px;width:90px;height:100%;background:radial-gradient(ellipse at center,rgba(255,255,255,.95) 0%,rgba(200,255,220,.75) 30%,rgba(0,255,120,.35) 60%,transparent 80%);filter:blur(6px);mix-blend-mode:screen;pointer-events:none;z-index:5;animation:mjSnakeSweep 4.2s ease-in-out infinite}
 @keyframes mjSnakeSweep{0%{left:-90px;opacity:0}10%{opacity:1}48%{left:100%;opacity:1}55%{left:100%;opacity:0}100%{left:100%;opacity:0}}
 #postLoginView .snk.d1::after{animation-delay:.6s}
 #postLoginView .snk.d2::after{animation-delay:1.2s}
@@ -139,10 +135,7 @@
 #postLoginView .brand-wrap{position:relative;display:inline-block;padding:6px 12px;overflow:hidden;border-radius:10px}
 #postLoginView .brand{position:relative;font-weight:900;font-size:clamp(1.8rem,5vw,2.4rem);letter-spacing:-1px;color:#00ff78;z-index:2;text-shadow:0 0 15px rgba(0,255,120,.55)}
 #postLoginView .brand span{color:#d7ffe7;font-weight:400}
-#postLoginView .brand-wrap .snake{position:absolute;top:0;left:-140px;width:140px;height:100%;
-  background:radial-gradient(ellipse at center,rgba(255,255,255,.95) 0%,rgba(200,255,220,.7) 30%,rgba(0,255,120,.3) 55%,transparent 75%);
-  filter:blur(7px);mix-blend-mode:screen;pointer-events:none;z-index:3;
-  animation:mjSnakeGo 3.5s ease-in-out infinite}
+#postLoginView .brand-wrap .snake{position:absolute;top:0;left:-140px;width:140px;height:100%;background:radial-gradient(ellipse at center,rgba(255,255,255,.95) 0%,rgba(200,255,220,.7) 30%,rgba(0,255,120,.3) 55%,transparent 75%);filter:blur(7px);mix-blend-mode:screen;pointer-events:none;z-index:3;animation:mjSnakeGo 3.5s ease-in-out infinite}
 @keyframes mjSnakeGo{0%{left:-140px;opacity:0}5%{opacity:1}45%{left:100%;opacity:1}50%{left:100%;opacity:0}55%{opacity:0}55.1%{left:100%;opacity:1}95%{left:-140px;opacity:1}100%{left:-140px;opacity:0}}
 #postLoginView .mtx{color:#00ff78;text-shadow:0 0 8px rgba(0,255,120,.55),0 0 2px rgba(0,255,120,.9);letter-spacing:.05em}
 #postLoginView .menu-btn{position:fixed;top:14px;left:14px;z-index:100;width:44px;height:44px;border-radius:12px;background:#04180e;border:1px solid rgba(0,255,120,.35);display:flex;flex-direction:column;justify-content:center;align-items:center;gap:5px;padding:10px;transition:.2s}
@@ -297,16 +290,8 @@
 #postLoginView .info-block code{background:rgba(0,255,120,.15);padding:3px 8px;border-radius:5px;color:#7fffb8;font-size:.78rem;border:1px solid rgba(0,255,120,.25)}
 #postLoginView .info-tip{background:rgba(0,255,120,.06);border:1px dashed rgba(0,255,120,.35);border-radius:10px;padding:12px;margin:12px 0;color:#9bffbd;font-size:.8rem;line-height:1.6}
 #postLoginView .info-tip b{color:#00ff78}
-@media(min-width:600px){
-  #postLoginView .grid{grid-template-columns:repeat(3,1fr)}
-  #postLoginView .loading-brand{font-size:3rem}
-}
-@media(min-width:900px){
-  #postLoginView .grid{grid-template-columns:repeat(6,1fr)}
-  #postLoginView .chart-grid{grid-template-columns:1fr 1fr 1fr}
-  #postLoginView .chart-box{height:340px}
-  #postLoginView .api-card{padding:32px 30px 28px}
-}
+@media(min-width:600px){#postLoginView .grid{grid-template-columns:repeat(3,1fr)}#postLoginView .loading-brand{font-size:3rem}}
+@media(min-width:900px){#postLoginView .grid{grid-template-columns:repeat(6,1fr)}#postLoginView .chart-grid{grid-template-columns:1fr 1fr 1fr}#postLoginView .chart-box{height:340px}#postLoginView .api-card{padding:32px 30px 28px}}
 @media(max-width:520px){
   #postLoginView .brand{font-size:1.5rem}
   #postLoginView .user-chip .uc-name{display:none}
@@ -325,15 +310,12 @@
   #postLoginView .ad-slot{min-height:80px}
   #postLoginView .ad-slot.tall{min-height:200px}
 }
-
-/* Hidden state */
-.view-hidden{display:none!important}
 </style>
 </head>
 <body>
 
 <!-- ============================================================
-     PRE-LOGIN VIEW
+     PRE-LOGIN VIEW (from download (5).html) — full, unchanged
      ============================================================ -->
 <div id="preLoginView">
 
@@ -450,11 +432,20 @@
 
 <a href="https://github.com/MayaJaal1/Mayajaall/releases/latest" class="float-cta" download>📥 Download App</a>
 
+<div class="success-overlay" id="successOverlay">
+  <div class="success-card">
+    <div class="success-icon">✅</div>
+    <h3>Login Successful!</h3>
+    <p>Loading your dashboard...</p>
+    <div class="loader"></div>
+  </div>
+</div>
+
 </div><!-- /preLoginView -->
 
 
 <!-- ============================================================
-     POST-LOGIN VIEW  (dashboard)
+     POST-LOGIN VIEW (from index (3).html) — full, only login-gate removed
      ============================================================ -->
 <div id="postLoginView" class="view-hidden">
 
@@ -688,7 +679,7 @@
 
 <script>
 /* ============================================================
-   FIREBASE INIT (single, shared)
+   FIREBASE INIT (single)
    ============================================================ */
 var firebaseConfig = {
   apiKey: "AIzaSyDI5hgBbaUeTpXcPIlAnq5yDjIenfY-ylM",
@@ -706,24 +697,26 @@ try {
   db = firebase.database();
   auth = firebase.auth();
   hasFirebase = true;
-} catch(e) { console.log('Firebase not available'); }
+} catch(e){ console.log('Firebase not available'); }
 
 var $ = function(id){ return document.getElementById(id); };
 $('year').textContent = new Date().getFullYear();
 
+var currentUser = null;
+var currentKey = '';
+var matrixRunning = false;
+var matrixRAF = null;
+
 /* ============================================================
    VIEW TOGGLE
    ============================================================ */
-var currentUser = null;
-var currentKey = '';
-var matrixStarted = false;
-
 function showPreLogin(){
   $('preLoginView').classList.remove('view-hidden');
   $('postLoginView').classList.add('view-hidden');
-  document.body.style.background = '';
-  // Stop matrix drawing (canvas is inside hidden view)
-  matrixStarted = false;
+  matrixRunning = false;
+  if (matrixRAF) { cancelAnimationFrame(matrixRAF); matrixRAF = null; }
+  var ls = $('loadingScreen');
+  if (ls) { ls.classList.remove('hide'); ls.style.display = ''; }
 }
 
 function showPostLogin(user){
@@ -741,23 +734,27 @@ function showPostLogin(user){
     $('mPic').src = user.photoURL;
   }
 
-  // Start matrix rain (once)
-  if (!matrixStarted){
-    matrixStarted = true;
+  // Start matrix once
+  if (!matrixRunning){
+    matrixRunning = true;
     resizeCanvas();
     drawMatrix();
   }
+
+  // Reset loading screen
+  var ls = $('loadingScreen');
+  if (ls){ ls.classList.remove('hide'); ls.style.display = ''; }
+  hideLoading();
 
   // Generate API key + listeners
   generateOrLoadKey();
   startDashboardListener();
   startNotificationListener();
   startLoadingMessages();
-  hideLoading();
 }
 
 /* ============================================================
-   USER STORAGE HELPERS
+   USER STORAGE
    ============================================================ */
 function getUserFromStorage(){
   try{
@@ -787,40 +784,40 @@ function clearUserStorage(){
   }catch(e){}
 }
 
-/* ============================================================
-   LOGOUT
-   ============================================================ */
 window.doLogout = function(){
   if (!confirm('Logout karna hai? Aapko dobara login karna padega.')) return;
   clearUserStorage();
   try {
-    if (auth) {
-      auth.signOut().then(function(){ /* onAuthStateChanged will toggle view */ });
-    } else {
-      showPreLogin();
-    }
+    if (auth) auth.signOut().then(function(){});
+    else showPreLogin();
   } catch(e){ showPreLogin(); }
 };
 
 /* ============================================================
-   AUTH STATE — this is the ONLY gate
+   AUTH STATE (the ONLY gate)
    ============================================================ */
-if (auth) {
+if (auth){
   auth.onAuthStateChanged(function(user){
     if (user){
+      // Only allow Google accounts
+      var provider = (user.providerData && user.providerData[0]) ? user.providerData[0].providerId : '';
+      if (provider && provider !== 'google.com'){
+        alert('Only Google (Gmail) login allowed.');
+        auth.signOut();
+        return;
+      }
       var u = { uid:user.uid, displayName:user.displayName||user.email||'User', email:user.email||'', photoURL:user.photoURL||'' };
       saveUserToStorage(u);
       showPostLogin(u);
     } else {
-      // Allow localStorage fallback (in case Firebase auth is slow)
       var stored = getUserFromStorage();
       if (stored){ showPostLogin(stored); }
       else { showPreLogin(); }
     }
   });
 } else {
-  var stored = getUserFromStorage();
-  if (stored) showPostLogin(stored);
+  var stored0 = getUserFromStorage();
+  if (stored0) showPostLogin(stored0);
   else showPreLogin();
 }
 
@@ -831,10 +828,7 @@ var loginBtn = document.getElementById('google-login-btn');
 var loginBtnText = document.getElementById('google-btn-text');
 if (loginBtn){
   loginBtn.addEventListener('click', function(){
-    if (!auth){
-      alert('Login is not available right now. Please refresh.');
-      return;
-    }
+    if (!auth){ alert('Login not available right now.'); return; }
     loginBtn.disabled = true;
     loginBtnText.textContent = 'Connecting...';
 
@@ -850,7 +844,7 @@ if (loginBtn){
           email: user.email || '',
           photoURL: user.photoURL || ''
         });
-        // Save to Firebase DB
+        // Save to DB
         try {
           db.ref('users/' + user.uid).update({
             uid: user.uid,
@@ -860,7 +854,12 @@ if (loginBtn){
             lastLogin: firebase.database.ServerValue.TIMESTAMP
           }).catch(function(){});
         } catch(e){}
-        // onAuthStateChanged will switch the view — no redirect!
+        // Show success overlay briefly, then onAuthStateChanged switches
+        var ov = document.getElementById('successOverlay');
+        if (ov){
+          ov.classList.add('on');
+          setTimeout(function(){ ov.classList.remove('on'); }, 900);
+        }
       })
       .catch(function(error){
         console.error('Login error:', error);
@@ -874,7 +873,7 @@ if (loginBtn){
 }
 
 /* ============================================================
-   PRE-LOGIN — LANGUAGE + FADE-IN
+   PRE-LOGIN: translations, changeLang, fade-in, smooth scroll
    ============================================================ */
 var translations = {
   en:{nav_features:"Features",nav_earning:"Earning",nav_steps:"How To",nav_api:"API",
@@ -1029,4 +1028,728 @@ var translations = {
     feat3h:"Массовый конвертер",feat3p:"Конвертируйте много ссылок.",
     feat4h:"Мгновенная оплата",feat4p:"Вывод через UPI. Без комиссий.",
     earn_title:"💰 Тарифы заработка",earn_sub:"Больше просмотров = больше дохода.",
-    tbl_h1:"Просмотры / Шеры",tbl_h2:"Заработок",tbl_r1:"1,000 Просмотров",tbl_r2:"2,000 Просмотров",tbl_r3:"После 2k, каждые 1,000",tbl_r4:"10,000 Просмотров",tbl_r5:"20,000 Просмотров",tbl_r
+    tbl_h1:"Просмотры / Шеры",tbl_h2:"Заработок",tbl_r1:"1,000 Просмотров",tbl_r2:"2,000 Просмотров",tbl_r3:"После 2k, каждые 1,000",tbl_r4:"10,000 Просмотров",tbl_r5:"20,000 Просмотров",tbl_r6:"1,000 Шеров (с логином)",
+    steps_title:"🚀 Как заработать",steps_sub:"7 простых шагов.",
+    s1h:"Подключить бота",s1p:"Подключите Telegram ботов.",s2h:"Загрузить видео",s2p:"Загрузите видео в верхний бот.",
+    s3h:"Конвертировать",s3p:"Нижний бот конвертирует.",s4h:"Поделиться",s4p:"Делитесь в WhatsApp, Facebook, Instagram.",
+    s5h:"Получить просмотры",s5p:"Больше кликов = больше дохода.",s6h:"Доход начисляется",s6p:"Деньги добавляются по просмотрам.",
+    s7h:"Вывести",s7p:"Вывод от $5 через UPI за 24 часа.",
+    cta_h:"🎯 Начните сегодня!",cta_p:"Скачайте → подключите → загрузите → конвертируйте → делитесь → $5 → вывод!",
+    cta_btn:"📥 Скачать App",cta_b2:"🤖 Открыть бот",foot:"Зарабатывай, Расти! 🚀",float_btn:"📥 Скачать"
+  },
+  ar:{nav_features:"الميزات",nav_earning:"الأرباح",nav_steps:"كيف",nav_api:"API",
+    hero_title:"مرحبًا بك في <span>MayaJaal.online</span> 🚀",
+    hero_sub:"اتصل بمفتاح API الخاص بك، حمّل التطبيق وابدأ بكسب المال.",
+    hero_btn1:"📥 حمّل التطبيق",hero_btn2:"💰 عرض الأسعار",
+    api_title:"🔗 اتصل بـ <span>API Key</span>",
+    api_sub:"مفتاح Matrix المشفر جاهز. انقر للنسخ.",
+    copy_btn:"📋 نسخ",api_note:"أرسل <strong>/api YOUR_KEY</strong> للبوت.",
+    feat_title:"✨ لماذا <span>MayaJaal</span>؟",feat_sub:"كل ما تحتاجه في مكان واحد.",
+    feat1h:"اكسب مالًا حقيقيًا",feat1p:"دفع لكل مشاهدة. الحد الأدنى $5.",
+    feat2h:"فيديوهات غير محدودة",feat2p:"ارفع ما تريد من الفيديوهات.",
+    feat3h:"محول جماعي",feat3p:"حوّل روابط متعددة دفعة واحدة.",
+    feat4h:"دفع فوري",feat4p:"اسحب عبر UPI. بدون رسوم خفية.",
+    earn_title:"💰 أسعار الأرباح",earn_sub:"أكثر مشاهدات = أكثر أرباح.",
+    tbl_h1:"المشاهدات / المشاركات",tbl_h2:"الربح",tbl_r1:"1,000 مشاهدة",tbl_r2:"2,000 مشاهدة",tbl_r3:"بعد 2k، كل 1,000",tbl_r4:"10,000 مشاهدة",tbl_r5:"20,000 مشاهدة",tbl_r6:"1,000 مشاركة (مع تسجيل الدخول)",
+    steps_title:"🚀 كيف تكسب",steps_sub:"7 خطوات سهلة.",
+    s1h:"اتصل بالبوت",s1p:"اتصل ببوتات تيليجرام.",s2h:"ارفع الفيديو",s2p:"ارفع الفيديو للبوت الأعلى.",
+    s3h:"حوّل الرابط",s3p:"البوت الأسفل يحوّل الرابط.",s4h:"شارك الرابط",s4p:"شارك على واتساب، فيسبوك، إنستغرام.",
+    s5h:"احصل على مشاهدات",s5p:"مزيد من النقرات = مزيد من الأرباح.",s6h:"تتراكم الأرباح",s6p:"يُضاف المال حسب المشاهدات.",
+    s7h:"اسحب",s7p:"السحب من $5 عبر UPI في 24 ساعة.",
+    cta_h:"🎯 ابدأ اليوم!",cta_p:"حمّل → اتصل → ارفع → حوّل → شارك → $5 → اسحب!",
+    cta_btn:"📥 حمّل التطبيق",cta_b2:"🤖 افتح البوت",foot:"اكسب، انمُ، افُز! 🚀",float_btn:"📥 حمّل"
+  },
+  zh:{nav_features:"功能",nav_earning:"收益",nav_steps:"如何",nav_api:"API",
+    hero_title:"欢迎来到 <span>MayaJaal.online</span> 🚀",
+    hero_sub:"连接 API key，下载应用，开始在线赚钱。",
+    hero_btn1:"📥 立即下载",hero_btn2:"💰 查看收益",
+    api_title:"🔗 连接您的 <span>API Key</span>",
+    api_sub:"您的加密 Matrix Key 已就绪。一键复制。",
+    copy_btn:"📋 复制",api_note:"发送 <strong>/api YOUR_KEY</strong> 给机器人。",
+    feat_title:"✨ 为什么选择 <span>MayaJaal</span>？",feat_sub:"一切功能尽在一处。",
+    feat1h:"赚取真钱",feat1p:"每次观看和分享都有收益。最低 $5 提现。",
+    feat2h:"无限视频",feat2p:"上传任意数量的视频。",
+    feat3h:"批量转换",feat3p:"一次转换多个链接。",
+    feat4h:"即时付款",feat4p:"通过 UPI 提现。无隐藏费用。",
+    earn_title:"💰 收益费率",earn_sub:"观看和分享越多，赚得越多。",
+    tbl_h1:"观看/分享",tbl_h2:"收益",tbl_r1:"1,000 观看",tbl_r2:"2,000 观看",tbl_r3:"2k 后每 1,000",tbl_r4:"10,000 观看",tbl_r5:"20,000 观看",tbl_r6:"1,000 应用分享（含登录）",
+    steps_title:"🚀 如何赚钱",steps_sub:"7 个简单步骤。",
+    s1h:"连接机器人",s1p:"连接 Telegram 机器人。",s2h:"上传视频",s2p:"上传视频到上方机器人。",
+    s3h:"转换链接",s3p:"下方机器人转换链接。",s4h:"分享链接",s4p:"分享到 WhatsApp、Facebook、Instagram。",
+    s5h:"获得观看",s5p:"点击越多 = 赚得越多。",s6h:"收益累积",s6p:"按观看量记账。",
+    s7h:"提现",s7p:"$5 起 UPI 提现，24 小时内到账。",
+    cta_h:"🎯 今天就开始!",cta_p:"下载 → 连接 → 上传 → 转换 → 分享 → $5 → 提现！",
+    cta_btn:"📥 立即下载",cta_b2:"🤖 打开机器人",foot:"赚钱，成长，赢！🚀",float_btn:"📥 下载"
+  },
+  ja:{nav_features:"機能",nav_earning:"収益",nav_steps:"方法",nav_api:"API",
+    hero_title:"<span>MayaJaal.online</span> へようこそ 🚀",
+    hero_sub:"API key を接続し、アプリをダウンロードしてオンラインで稼ぎましょう。",
+    hero_btn1:"📥 今すぐダウンロード",hero_btn2:"💰 収益レートを見る",
+    api_title:"🔗 <span>API Key</span> を接続",
+    api_sub:"暗号化された Matrix Key の準備ができました。タップでコピー。",
+    copy_btn:"📋 コピー",api_note:"<strong>/api YOUR_KEY</strong> をボットに送信。",
+    feat_title:"✨ なぜ <span>MayaJaal</span>？",feat_sub:"オンラインで稼ぐために必要なすべて。",
+    feat1h:"本当のお金を稼ぐ",feat1p:"視聴と共有ごとに支払い。最低 $5 出金。",
+    feat2h:"無制限の動画",feat2p:"好きなだけ動画をアップロード。",
+    feat3h:"一括変換",feat3p:"複数のリンクを一度に変換。",
+    feat4h:"即時支払い",feat4p:"UPI で即出金。隠れた手数料なし。",
+    earn_title:"💰 収益レート",earn_sub:"再生と共有が多いほど稼げます。",
+    tbl_h1:"再生/共有",tbl_h2:"収益",tbl_r1:"1,000 再生",tbl_r2:"2,000 再生",tbl_r3:"2k 以降 1,000 ごと",tbl_r4:"10,000 再生",tbl_r5:"20,000 再生",tbl_r6:"1,000 シェア（ログイン付き）",
+    steps_title:"🚀 稼ぎ方",steps_sub:"7 つの簡単なステップ。",
+    s1h:"ボット接続",s1p:"Telegram ボットを接続。",s2h:"動画アップロード",s2p:"上のボットに動画をアップロード。",
+    s3h:"リンク変換",s3p:"下のボットがリンクを変換。",s4h:"リンク共有",s4p:"WhatsApp、Facebook、Instagram で共有。",
+    s5h:"再生を獲得",s5p:"クリックが多いほど稼げる。",s6h:"収益が貯まる",s6p:"再生に応じて加算。",
+    s7h:"出金",s7p:"$5 から UPI で出金、24 時間以内。",
+    cta_h:"🎯 今すぐ開始!",cta_p:"ダウンロード → 接続 → アップ → 変換 → 共有 → $5 → 出金！",
+    cta_btn:"📥 今すぐダウンロード",cta_b2:"🤖 ボットを開く",foot:"稼げ、成長し、勝て！🚀",float_btn:"📥 ダウンロード"
+  },
+  id:{nav_features:"Fitur",nav_earning:"Penghasilan",nav_steps:"Cara",nav_api:"API",
+    hero_title:"Selamat datang di <span>MayaJaal.online</span> 🚀",
+    hero_sub:"Hubungkan API key, unduh aplikasi, dan mulai hasilkan uang online.",
+    hero_btn1:"📥 Unduh Sekarang",hero_btn2:"💰 Lihat Tarif",
+    api_title:"🔗 Hubungkan <span>API Key</span>",
+    api_sub:"Matrix Key terenkripsi Anda siap. Ketuk untuk menyalin.",
+    copy_btn:"📋 Salin",api_note:"Kirim <strong>/api YOUR_KEY</strong> ke bot.",
+    feat_title:"✨ Kenapa <span>MayaJaal</span>?",feat_sub:"Semua yang Anda butuhkan dalam satu tempat.",
+    feat1h:"Hasilkan Uang Nyata",feat1p:"Dibayar per tayangan. Minimum $5.",
+    feat2h:"Video Tak Terbatas",feat2p:"Unggah sebanyak yang Anda mau.",
+    feat3h:"Konverter Massal",feat3p:"Konversi banyak tautan sekaligus.",
+    feat4h:"Pembayaran Instan",feat4p:"Tarik via UPI. Tanpa biaya tersembunyi.",
+    earn_title:"💰 Tarif Penghasilan",earn_sub:"Lebih banyak tayangan = lebih banyak hasil.",
+    tbl_h1:"Tayangan / Bagikan",tbl_h2:"Penghasilan",tbl_r1:"1.000 Tayangan",tbl_r2:"2.000 Tayangan",tbl_r3:"Setelah 2k, setiap 1.000",tbl_r4:"10.000 Tayangan",tbl_r5:"20.000 Tayangan",tbl_r6:"1.000 Berbagi (dengan login)",
+    steps_title:"🚀 Cara Menghasilkan",steps_sub:"7 langkah mudah.",
+    s1h:"Hubungkan Bot",s1p:"Hubungkan bot Telegram.",s2h:"Unggah Video",s2p:"Unggah ke bot atas.",
+    s3h:"Konversi Link",s3p:"Bot bawah mengonversi.",s4h:"Bagikan Link",s4p:"Bagikan ke WhatsApp, Facebook, Instagram.",
+    s5h:"Dapatkan Tayangan",s5p:"Lebih banyak klik = lebih banyak hasil.",s6h:"Penghasilan Terkumpul",s6p:"Uang ditambah sesuai tayangan.",
+    s7h:"Tarik",s7p:"Tarik pada $5 via UPI dalam 24 jam.",
+    cta_h:"🎯 Mulai Sekarang!",cta_p:"Unduh → hubungkan → unggah → konversi → bagikan → $5 → tarik!",
+    cta_btn:"📥 Unduh Sekarang",cta_b2:"🤖 Buka Bot",foot:"Hasilkan, Tumbuh! 🚀",float_btn:"📥 Unduh"
+  },
+  bn:{nav_features:"বৈশিষ্ট্য",nav_earning:"আয়",nav_steps:"কীভাবে",nav_api:"API",
+    hero_title:"<span>MayaJaal.online</span> এ স্বাগতম 🚀",
+    hero_sub:"API key কানেক্ট করুন, অ্যাপ ডাউনলোড করুন এবং অনলাইনে টাকা আয় করুন।",
+    hero_btn1:"📥 এখনই ডাউনলোড",hero_btn2:"💰 আয়ের হার দেখুন",
+    api_title:"🔗 আপনার <span>API Key</span> কানেক্ট করুন",
+    api_sub:"আপনার এনক্রিপ্টেড Matrix Key প্রস্তুত। কপি করতে ট্যাপ করুন।",
+    copy_btn:"📋 কপি",api_note:"বটকে <strong>/api YOUR_KEY</strong> পাঠান।",
+    feat_title:"✨ কেন <span>MayaJaal</span>?",feat_sub:"সব কিছু এক জায়গায়।",
+    feat1h:"আসল টাকা আয়",feat1p:"প্রতি ভিউতে পেমেন্ট। সর্বনিম্ন $5।",
+    feat2h:"আনলিমিটেড ভিডিও",feat2p:"যত খুশি ভিডিও আপলোড করুন।",
+    feat3h:"বাল্ক কনভার্টার",feat3p:"একসাথে অনেক লিংক কনভার্ট।",
+    feat4h:"তাত্ক্ষণিক পেমেন্ট",feat4p:"UPI তে উইথড্র। কোনো লুকানো চার্জ নেই।",
+    earn_title:"💰 আয়ের হার",earn_sub:"যত বেশি ভিউ, তত বেশি আয়।",
+    tbl_h1:"ভিউ / শেয়ার",tbl_h2:"আয়",tbl_r1:"1,000 ভিউ",tbl_r2:"2,000 ভিউ",tbl_r3:"2k পরে প্রতি 1,000",tbl_r4:"10,000 ভিউ",tbl_r5:"20,000 ভিউ",tbl_r6:"1,000 শেয়ার (লগইন সহ)",
+    steps_title:"🚀 কীভাবে আয় করবেন",steps_sub:"৭টি সহজ ধাপ।",
+    s1h:"বট কানেক্ট",s1p:"Telegram বট কানেক্ট করুন।",s2h:"ভিডিও আপলোড",s2p:"উপরের বটে ভিডিও আপলোড করুন।",
+    s3h:"লিংক কনভার্ট",s3p:"নিচের বট লিংক কনভার্ট করে।",s4h:"লিংক শেয়ার",s4p:"WhatsApp, Facebook, Instagram এ শেয়ার করুন।",
+    s5h:"ভিউ পান",s5p:"বেশি ক্লিক = বেশি আয়।",s6h:"আয় জমা",s6p:"ভিউ অনুযায়ী টাকা যোগ হয়।",
+    s7h:"উইথড্র",s7p:"$5 এ UPI দিয়ে উইথড্র, ২৪ ঘণ্টায় পেমেন্ট।",
+    cta_h:"🎯 আজই শুরু করুন!",cta_p:"ডাউনলোড → কানেক্ট → আপলোড → কনভার্ট → শেয়ার → $5 → উইথড্র!",
+    cta_btn:"📥 এখনই ডাউনলোড",cta_b2:"🤖 বট খুলুন",foot:"আয় করুন, বাড়ুন! 🚀",float_btn:"📥 ডাউনলোড"
+  },
+  ta:{nav_features:"அம்சங்கள்",nav_earning:"வருவாய்",nav_steps:"எப்படி",nav_api:"API",
+    hero_title:"<span>MayaJaal.online</span> க்கு வரவேற்கிறோம் 🚀",
+    hero_sub:"API key இணைக்கவும், ஆப் பதிவிறக்கவும், ஆன்லைனில் பணம் சம்பாதிக்கவும்.",
+    hero_btn1:"📥 இப்போது பதிவிறக்கம்",hero_btn2:"💰 விகிதங்களை பார்க்க",
+    api_title:"🔗 உங்கள் <span>API Key</span> இணைக்கவும்",
+    api_sub:"உங்கள் என்க்ரிப்ட் Matrix Key தயார். நகலெடுக்க தட்டவும்.",
+    copy_btn:"📋 நகலெடு",api_note:"பாட்-க்கு <strong>/api YOUR_KEY</strong> அனுப்பவும்.",
+    feat_title:"✨ ஏன் <span>MayaJaal</span>?",feat_sub:"எல்லாமும் ஒரே இடத்தில்.",
+    feat1h:"உண்மையான பணம்",feat1p:"ஒவ்வொரு பார்வைக்கும் பணம். குறைந்தபட்சம் $5.",
+    feat2h:"வரம்பற்ற வீடியோக்கள்",feat2p:"விருப்பப்படி வீடியோக்களை பதிவேற்றவும்.",
+    feat3h:"மொத்த மாற்றி",feat3p:"பல இணைப்புகளை ஒரே நேரத்தில் மாற்றவும்.",
+    feat4h:"உடனடி பணம்",feat4p:"UPI மூலம் எடுக்கவும். மறைவான கட்டணம் இல்லை.",
+    earn_title:"💰 வருவாய் விகிதங்கள்",earn_sub:"அதிக பார்வைகள் = அதிக வருவாய்.",
+    tbl_h1:"பார்வைகள் / பங்குகள்",tbl_h2:"வருவாய்",tbl_r1:"1,000 பார்வைகள்",tbl_r2:"2,000 பார்வைகள்",tbl_r3:"2k க்கு பின் ஒவ்வொரு 1,000",tbl_r4:"10,000 பார்வைகள்",tbl_r5:"20,000 பார்வைகள்",tbl_r6:"1,000 பங்குகள் (உள்நுழைவுடன்)",
+    steps_title:"🚀 எப்படி சம்பாதிப்பது",steps_sub:"7 எளிய படிகள்.",
+    s1h:"பாட் இணைக்கவும்",s1p:"Telegram பாட்களை இணைக்கவும்.",s2h:"வீடியோ பதிவேற்றம்",s2p:"மேல் பாட்-க்கு வீடியோ பதிவேற்றவும்.",
+    s3h:"இணைப்பு மாற்று",s3p:"கீழ் பாட் மாற்றுகிறது.",s4h:"இணைப்பு பகிர்",s4p:"WhatsApp, Facebook, Instagram இல் பகிரவும்.",
+    s5h:"பார்வைகள் பெற",s5p:"அதிக கிளிக்குகள் = அதிக வருவாய்.",s6h:"வருவாய் சேரும்",s6p:"பார்வைகளுக்கேற்ப சேர்க்கப்படும்.",
+    s7h:"எடுக்கவும்",s7p:"$5 இல் UPI மூலம் எடுக்கவும், 24 மணி நேரத்தில்.",
+    cta_h:"🎯 இன்றே தொடங்கு!",cta_p:"பதிவிறக்கம் → இணை → பதிவேற்று → மாற்று → பகிர் → $5 → எடு!",
+    cta_btn:"📥 இப்போது பதிவிறக்கம்",cta_b2:"🤖 பாட் திறக்க",foot:"சம்பாதி, வளர்! 🚀",float_btn:"📥 பதிவிறக்கம்"
+  },
+  ur:{nav_features:"خصوصیات",nav_earning:"کمائی",nav_steps:"کیسے",nav_api:"API",
+    hero_title:"<span>MayaJaal.online</span> میں خوش آمدید 🚀",
+    hero_sub:"API key کنیکٹ کریں، ایپ ڈاؤن لوڈ کریں اور آن لائن پیسے کمائیں۔",
+    hero_btn1:"📥 ابھی ڈاؤن لوڈ",hero_btn2:"💰 ریٹ دیکھیں",
+    api_title:"🔗 اپنی <span>API Key</span> کنیکٹ کریں",
+    api_sub:"آپ کی انکرپٹڈ Matrix Key تیار ہے۔ کاپی کے لیے ٹیپ کریں۔",
+    copy_btn:"📋 کاپی",api_note:"بوٹ کو <strong>/api YOUR_KEY</strong> بھیجیں۔",
+    feat_title:"✨ <span>MayaJaal</span> کیوں؟",feat_sub:"سب کچھ ایک جگہ۔",
+    feat1h:"اصلی پیسے کمائیں",feat1p:"ہر ویو پر ادائیگی۔ کم از کم $5۔",
+    feat2h:"لامحدود ویڈیوز",feat2p:"جتنی چاہیں ویڈیوز اپلوڈ کریں۔",
+    feat3h:"بلک کنورٹر",feat3p:"ایک ساتھ کئی لنکس کنورٹ کریں۔",
+    feat4h:"فوری ادائیگی",feat4p:"UPI سے نکالیں۔ کوئی چھپا چارج نہیں۔",
+    earn_title:"💰 کمائی کے ریٹ",earn_sub:"زیادہ ویوز = زیادہ کمائی۔",
+    tbl_h1:"ویوز / شیئرز",tbl_h2:"کمائی",tbl_r1:"1,000 ویوز",tbl_r2:"2,000 ویوز",tbl_r3:"2k کے بعد ہر 1,000",tbl_r4:"10,000 ویوز",tbl_r5:"20,000 ویوز",tbl_r6:"1,000 شیئرز (لاگ ان کے ساتھ)",
+    steps_title:"🚀 کیسے کمائیں",steps_sub:"7 آسان مراحل۔",
+    s1h:"بوٹ کنیکٹ کریں",s1p:"ٹیلیگرام بوٹس کنیکٹ کریں۔",s2h:"ویڈیو اپلوڈ",s2p:"اوپر والے بوٹ میں ویڈیو اپلوڈ کریں۔",
+    s3h:"لنک کنورٹ",s3p:"نیچے والا بوٹ کنورٹ کرتا ہے۔",s4h:"لنک شیئر",s4p:"واٹس ایپ، فیس بک، انسٹاگرام پر شیئر کریں۔",
+    s5h:"ویوز حاصل کریں",s5p:"زیادہ کلکس = زیادہ کمائی۔",s6h:"کمائی جمع",s6p:"ویوز کے حساب سے رقم شامل ہوتی ہے۔",
+    s7h:"نکاسی",s7p:"$5 پر UPI سے نکالیں، 24 گھنٹے میں ادائیگی۔",
+    cta_h:"🎯 آج ہی شروع کریں!",cta_p:"ڈاؤن لوڈ → کنیکٹ → اپلوڈ → کنورٹ → شیئر → $5 → نکالیں!",
+    cta_btn:"📥 ابھی ڈاؤن لوڈ",cta_b2:"🤖 بوٹ کھولیں",foot:"کمائیں، بڑھیں! 🚀",float_btn:"📥 ڈاؤن لوڈ"
+  }
+};
+
+function changeLang(lang){
+  var t = translations[lang] || translations.en;
+  document.querySelectorAll('#preLoginView [data-i18n]').forEach(function(el){
+    var key = el.getAttribute('data-i18n');
+    if (t[key]) el.innerHTML = t[key];
+  });
+  document.documentElement.lang = lang;
+  document.documentElement.dir = (lang === 'ar' || lang === 'ur') ? 'rtl' : 'ltr';
+  try { localStorage.setItem('mayaLang', lang); } catch(e){}
+}
+
+/* Pre-login fade-in observer */
+try {
+  var observer = new IntersectionObserver(function(entries){
+    entries.forEach(function(entry){ if (entry.isIntersecting) entry.target.classList.add('show'); });
+  }, { threshold: 0.1 });
+  document.querySelectorAll('#preLoginView .fade-in').forEach(function(el){ observer.observe(el); });
+} catch(e){}
+
+/* Smooth scroll for # links */
+document.querySelectorAll('#preLoginView a[href^="#"]').forEach(function(a){
+  a.addEventListener('click', function(e){
+    var target = document.querySelector(a.getAttribute('href'));
+    if (target){ e.preventDefault(); target.scrollIntoView({ behavior:'smooth', block:'start' }); }
+  });
+});
+
+/* Restore language */
+try {
+  var savedLang = localStorage.getItem('mayaLang');
+  if (savedLang){
+    var sel = document.getElementById('langSelect');
+    if (sel) sel.value = savedLang;
+    changeLang(savedLang);
+  }
+} catch(e){}
+
+/* ============================================================
+   POST-LOGIN: Matrix rain
+   ============================================================ */
+var canvas = $('matrix'), ctx = canvas ? canvas.getContext('2d') : null;
+var drops = [], fontSize = 14, cols = 0;
+function resizeCanvas(){
+  if (!canvas || !ctx) return;
+  var dpr = Math.min(devicePixelRatio || 1, 2);
+  canvas.width = innerWidth * dpr; canvas.height = innerHeight * dpr;
+  canvas.style.width = innerWidth + 'px'; canvas.style.height = innerHeight + 'px';
+  ctx.setTransform(dpr,0,0,dpr,0,0);
+  cols = Math.ceil(innerWidth / fontSize); drops = [];
+  for (var i=0;i<cols;i++) drops.push(Math.random()*-80);
+}
+function drawMatrix(){
+  if (!canvas || !ctx || !matrixRunning) return;
+  ctx.fillStyle = 'rgba(0,5,3,.1)';
+  ctx.fillRect(0,0,innerWidth,innerHeight);
+  ctx.font = fontSize + 'px monospace';
+  var ch = 'ア0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+  for (var i=0;i<drops.length;i++){
+    var c = ch[Math.floor(Math.random()*ch.length)];
+    ctx.fillStyle = Math.random() > .93 ? '#c6ffdc' : '#00c963';
+    ctx.fillText(c, i*fontSize, drops[i]*fontSize);
+    if (drops[i]*fontSize > innerHeight && Math.random() > .975) drops[i] = 0;
+    drops[i] += .5;
+  }
+  matrixRAF = requestAnimationFrame(drawMatrix);
+}
+addEventListener('resize', function(){ if (matrixRunning) resizeCanvas(); });
+
+/* Eye fibers */
+var fibers = $('fibers');
+if (fibers){
+  for (var i = 0; i < 90; i++){
+    var a = (i * Math.PI * 2 / 90) + Math.random() * .1;
+    var r1 = 55 + Math.random() * 10, r2 = 105 + Math.random() * 20;
+    var x1 = 400 + Math.cos(a) * r1, y1 = 170 + Math.sin(a) * r1;
+    var x2 = 400 + Math.cos(a) * r2, y2 = 170 + Math.sin(a) * r2;
+    var l = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+    l.setAttribute('x1', x1); l.setAttribute('y1', y1);
+    l.setAttribute('x2', x2); l.setAttribute('y2', y2);
+    l.setAttribute('stroke', '#031c0e');
+    l.setAttribute('stroke-width', (Math.random()*1.4 + .3).toFixed(2));
+    l.setAttribute('opacity', (Math.random()*.5 + .3).toFixed(2));
+    fibers.appendChild(l);
+  }
+}
+
+/* Blink */
+var eyeBox = $('eyeBox');
+function doBlink(){ if (!eyeBox) return; eyeBox.classList.add('blink'); setTimeout(function(){ eyeBox.classList.remove('blink'); }, 150); }
+function scheduleBlink(){ setTimeout(function(){ doBlink(); setTimeout(doBlink, 280); scheduleBlink(); }, 2500 + Math.random()*3000); }
+scheduleBlink();
+
+/* ============================================================
+   LOADING SCREEN (dashboard)
+   ============================================================ */
+var loadingHidden = false;
+var loadStartTime = Date.now();
+var MIN_LOADING_MS = 1100;
+var loadingMessages = ['INITIALIZING MATRIX','CONNECTING TO NETWORK','VERIFYING IDENTITY','LOADING DASHBOARD'];
+var loadingMsgIdx = 0;
+var loadingMsgTimer = null;
+
+function startLoadingMessages(){
+  var txtEl = $('loadingText');
+  if (!txtEl) return;
+  if (loadingMsgTimer) clearInterval(loadingMsgTimer);
+  loadingMsgTimer = setInterval(function(){
+    if (loadingHidden){ clearInterval(loadingMsgTimer); return; }
+    loadingMsgIdx = (loadingMsgIdx + 1) % loadingMessages.length;
+    txtEl.textContent = loadingMessages[loadingMsgIdx];
+  }, 550);
+}
+function hideLoading(){
+  if (loadingHidden) {
+    // reset for re-login
+    loadingHidden = false;
+    var ls2 = $('loadingScreen');
+    if (ls2){ ls2.classList.remove('hide'); ls2.style.display = ''; }
+  }
+  var elapsed = Date.now() - loadStartTime;
+  var wait = Math.max(0, MIN_LOADING_MS - elapsed);
+  setTimeout(function(){
+    loadingHidden = true;
+    if (loadingMsgTimer) clearInterval(loadingMsgTimer);
+    var ls = $('loadingScreen');
+    if (ls){
+      ls.classList.add('hide');
+      setTimeout(function(){ ls.style.display = 'none'; }, 600);
+    }
+  }, wait);
+}
+
+/* ============================================================
+   API KEY
+   ============================================================ */
+function generateKey(){
+  var chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+  var out = '';
+  try {
+    var arr = new Uint32Array(24);
+    crypto.getRandomValues(arr);
+    for (var i=0;i<24;i++) out += chars[arr[i] % chars.length];
+  } catch(e){
+    for (var i=0;i<24;i++) out += chars[Math.floor(Math.random()*chars.length)];
+  }
+  return out;
+}
+
+function lsGet(uid){ try { return localStorage.getItem('mj_key_' + uid); } catch(e){ return null; } }
+function lsSet(uid, key){ try { localStorage.setItem('mj_key_' + uid, key); } catch(e){} }
+
+function setKeyLoading(){
+  var el = $('apiKeyEl');
+  if (!el) return;
+  el.classList.add('loading');
+  el.classList.remove('retry');
+  el.onclick = null;
+  el.textContent = 'LOADING KEY...';
+  var cb = $('copyBtn');
+  if (cb) cb.disabled = true;
+}
+function setKeyReady(key, source){
+  var el = $('apiKeyEl');
+  if (!el) return;
+  el.classList.remove('loading');
+  el.classList.remove('retry');
+  el.onclick = null;
+  el.textContent = key;
+  var cb = $('copyBtn');
+  if (cb) cb.disabled = false;
+  $('cmdEl').textContent = '/api ' + key;
+  $('botBtn').href = 'https://t.me/Mayajaalfilebot?start=api_' + key;
+  console.log('✅ Key ready (' + source + '):', key);
+}
+
+function generateOrLoadKey(){
+  if (!currentUser) return;
+  var uid = currentUser.uid;
+  setKeyLoading();
+  var cached = lsGet(uid);
+  if (cached && cached.length >= 8){
+    currentKey = cached;
+    setKeyReady(cached, 'cache');
+    if (hasFirebase && db){
+      db.ref('users/' + uid + '/apiKey').set(cached).catch(function(){});
+    }
+    return;
+  }
+  if (hasFirebase && db){
+    db.ref('users/' + uid + '/apiKey').once('value').then(function(snap){
+      var existing = snap.val();
+      if (existing && typeof existing === 'string' && existing.length >= 8){
+        currentKey = existing;
+        lsSet(uid, existing);
+        setKeyReady(existing, 'DB');
+      } else {
+        var newKey = generateKey();
+        currentKey = newKey;
+        lsSet(uid, newKey);
+        setKeyReady(newKey, 'generated');
+        db.ref('users/' + uid + '/apiKey').set(newKey).catch(function(){});
+      }
+    }).catch(function(){
+      var newKey = generateKey();
+      currentKey = newKey;
+      lsSet(uid, newKey);
+      setKeyReady(newKey, 'offline');
+    });
+  } else {
+    var newKey = generateKey();
+    currentKey = newKey;
+    lsSet(uid, newKey);
+    setKeyReady(newKey, 'offline');
+  }
+}
+
+var copyBtn = $('copyBtn');
+if (copyBtn) {
+  copyBtn.onclick = function(){
+    if (!currentKey) return;
+    var cmd = '/api ' + currentKey;
+    var done = function(){
+      var b = $('copyBtn');
+      b.textContent = '✅ COPIED'; b.classList.add('copied');
+      if (navigator.vibrate) navigator.vibrate(50);
+      setTimeout(function(){ b.textContent = '📋 COPY'; b.classList.remove('copied'); }, 2000);
+    };
+    var fallback = function(){
+      var ta = document.createElement('textarea'); ta.value = cmd;
+      ta.style.position='fixed'; ta.style.left='-9999px';
+      document.body.appendChild(ta); ta.select();
+      try { document.execCommand('copy'); } catch(e){}
+      document.body.removeChild(ta); done();
+    };
+    if (navigator.clipboard && window.isSecureContext){
+      navigator.clipboard.writeText(cmd).then(done).catch(fallback);
+    } else {
+      fallback();
+    }
+  };
+}
+
+/* ============================================================
+   EARNINGS CALC
+   ============================================================ */
+function calcEarnings(views){
+  views = Math.max(0, Number(views) || 0);
+  if (views <= 0) return 0;
+  if (views <= 1000) return round2((views/1000) * 1);
+  var income = 1;
+  var remaining = views - 1000;
+  var tier = 1;
+  while (remaining > 0){
+    var chunk = Math.min(remaining, 2000);
+    income += (chunk/1000) * Math.pow(1.5, tier);
+    remaining -= chunk;
+    tier++;
+    if (tier > 30) break;
+  }
+  return round2(income);
+}
+function getTierInfo(views){
+  views = Math.max(0, Number(views) || 0);
+  if (views < 1000) return { tier: 1, rate: 1.00, from: 0, to: 1000, next: 1000 - views };
+  var tier = 1, start = 1000;
+  while (views >= start + 2000){ tier++; start += 2000; if (tier > 30) break; }
+  return { tier: tier + 1, rate: round2(Math.pow(1.5, tier)), from: start, to: start + 2000, next: start + 2000 - views };
+}
+function round2(n){ return Math.round(n * 100) / 100; }
+
+function updateBonusCard(views){
+  var t = getTierInfo(views);
+  var bt = $('bonusTier'); if (bt) bt.textContent = 'TIER ' + t.tier;
+  var br = $('bonusRate'); if (br) br.innerHTML = '$' + t.rate.toFixed(2) + '<span style="font-size:.65rem;color:#8a7a4a">/1K</span>';
+  var bn = $('bonusNext'); if (bn) bn.innerHTML = t.next + '<span style="font-size:.65rem;color:#8a7a4a"> views</span>';
+  var bf = $('bonusFrom'); if (bf) bf.textContent = views;
+  var bto = $('bonusTo'); if (bto) bto.textContent = t.to;
+  var span = t.to - t.from;
+  var pct = span > 0 ? Math.min(100, ((views - t.from) / span) * 100) : 0;
+  var bp = $('bonusProgress'); if (bp) bp.style.width = pct + '%';
+}
+
+/* ============================================================
+   DASHBOARD
+   ============================================================ */
+var dashData = { totalLinks:0, totalViews:0, todayViews:0, todayConversions:0, totalIncome:0, todayIncome:0, viewsByDay:{}, linksByDay:{} };
+
+function renderDashboard(d){
+  var views = d.totalViews || 0;
+  var liveIncome = calcEarnings(views);
+  var storedInc = d.totalIncome || 0;
+  var finalIncome = Math.max(liveIncome, storedInc);
+  $('sLinks').textContent = d.totalLinks || 0;
+  $('sViews').textContent = views;
+  $('sTodayViews').textContent = d.todayViews || 0;
+  $('sConv').textContent = d.todayConversions || 0;
+  $('sInc').textContent = '$' + finalIncome.toFixed(2);
+  $('sTodayInc').textContent = '$' + (d.todayIncome || 0).toFixed(2);
+  updateBonusCard(views);
+  updateCharts(d.viewsByDay || {}, d.linksByDay || {});
+  var lt = $('liveTxt'); if (lt) lt.textContent = 'Live';
+}
+
+function startDashboardListener(){
+  if (!currentUser) return;
+  if (hasFirebase && db){
+    try {
+      db.ref('users/' + currentUser.uid + '/dashboard').on('value', function(snap){
+        var d = snap.val() || {};
+        renderDashboard(d);
+      }, function(){ renderDashboard(dashData); });
+      return;
+    } catch(e){}
+  }
+  renderDashboard(dashData);
+}
+
+/* ============================================================
+   CHARTS
+   ============================================================ */
+function last7Days(){
+  var days = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+  var labels = [], keys = [];
+  var today = new Date();
+  for (var k = 6; k >= 0; k--){
+    var dt = new Date(today);
+    dt.setDate(today.getDate() - k);
+    var key = dt.getFullYear() + '-' + String(dt.getMonth()+1).padStart(2,'0') + '-' + String(dt.getDate()).padStart(2,'0');
+    keys.push(key); labels.push(days[dt.getDay()]);
+  }
+  return { labels: labels, keys: keys };
+}
+function baseChart(canvasEl, label, color, bg, yTickCb){
+  return new Chart(canvasEl.getContext('2d'), {
+    type: 'line',
+    data: { labels: [], datasets: [{ label: label, data: [], borderColor: color, backgroundColor: bg, borderWidth: 3, tension: .35, fill: true, pointBackgroundColor: color, pointRadius: 6, pointHoverRadius: 8, pointBorderColor: '#001b0c', pointBorderWidth: 2 }] },
+    options: {
+      responsive: true, maintainAspectRatio: false, animation: { duration: 700 },
+      interaction: { intersect: false, mode: 'index' },
+      plugins: {
+        legend: { display: false },
+        tooltip: { backgroundColor: '#03110a', borderColor: color, borderWidth: 1, titleColor: color, bodyColor: '#effff5', padding: 12, displayColors: false, callbacks: yTickCb ? { label: function(c){ return yTickCb(c.parsed.y); } } : undefined }
+      },
+      scales: {
+        y: { beginAtZero: true, suggestedMax: 10, grid: { color: 'rgba(0,255,120,.08)' }, ticks: { color: '#91b8a4', font: { size: 11 }, callback: yTickCb ? function(v){ return yTickCb(v); } : function(v){ return v; } } },
+        x: { grid: { display: false }, ticks: { color: '#91b8a4', font: { size: 11 } } }
+      }
+    }
+  });
+}
+var viewsChart = null, linksChart = null, earningsChart = null;
+function updateCharts(vb, lb){
+  var t = last7Days();
+  var vData = t.keys.map(function(k){ return vb[k] || 0; });
+  var lData = t.keys.map(function(k){ return lb[k] || 0; });
+  var eData = t.keys.map(function(k){ return calcEarnings(vb[k] || 0); });
+  var vEl = $('chartViews'), lEl = $('chartLinks'), eEl = $('chartEarnings');
+  if (!vEl || !lEl || !eEl || typeof Chart === 'undefined') return;
+  if (!viewsChart) viewsChart = baseChart(vEl, 'Views', '#00ff78', 'rgba(0,255,120,.15)');
+  if (!linksChart) linksChart = baseChart(lEl, 'Links', '#00c963', 'rgba(0,201,99,.15)');
+  if (!earningsChart) earningsChart = baseChart(eEl, 'Earnings', '#ffb400', 'rgba(255,180,0,.15)', function(v){ return '$' + Number(v).toFixed(2); });
+  viewsChart.data.labels = t.labels; viewsChart.data.datasets[0].data = vData; viewsChart.update();
+  linksChart.data.labels = t.labels; linksChart.data.datasets[0].data = lData; linksChart.update();
+  earningsChart.data.labels = t.labels; earningsChart.data.datasets[0].data = eData; earningsChart.update();
+}
+
+/* ============================================================
+   NOTIFICATIONS
+   ============================================================ */
+function startNotificationListener(){
+  if (!currentUser) return;
+  if (hasFirebase && db){
+    try {
+      db.ref('users/' + currentUser.uid + '/notifications').on('value', function(snap){
+        var d = snap.val() || {};
+        var arr = Object.keys(d).map(function(k){ return d[k]; }).filter(Boolean);
+        var unread = arr.filter(function(n){ return !n.read; }).length;
+        var dot = $('notifDot');
+        if (dot){
+          if (unread > 0){ dot.textContent = unread > 9 ? '9+' : unread; dot.style.display = 'flex'; }
+          else dot.style.display = 'none';
+        }
+      });
+    } catch(e){}
+  }
+}
+function openNotifications(){
+  if (!currentUser || !hasFirebase || !db){
+    openModal('🔔 Notifications', '<p class="notif-empty">Abhi koi notification nahi hai.</p>');
+    return;
+  }
+  db.ref('users/' + currentUser.uid + '/notifications').once('value', function(snap){
+    var d = snap.val() || {};
+    var arr = Object.keys(d).map(function(k){ var o = Object.assign({}, d[k]); o._id = k; return o; }).filter(Boolean);
+    arr.sort(function(x,y){ return (y.time||0) - (x.time||0); });
+    var html = '';
+    if (!arr.length) html = '<p class="notif-empty">📭 Abhi koi notification nahi hai.</p>';
+    else html = arr.slice(0,30).map(function(n){
+      var dt = n.time ? new Date(n.time).toLocaleString() : '';
+      return '<div class="notif-item"><div>' + (n.text || 'Notification') + '</div><div class="nt">' + dt + '</div></div>';
+    }).join('');
+    openModal('🔔 Notifications', html);
+  }).catch(function(){
+    openModal('🔔 Notifications', '<p class="notif-empty">Abhi koi notification nahi hai.</p>');
+  });
+}
+var notifBtn = $('notifBtn');
+if (notifBtn) notifBtn.addEventListener('click', openNotifications);
+
+/* ============================================================
+   MENU
+   ============================================================ */
+var menuBtn = $('menuBtn'), sideMenu = $('sideMenu'), overlay = $('menuOverlay');
+function toggleMenu(open){
+  if (!sideMenu) return;
+  if (open === undefined) open = !sideMenu.classList.contains('open');
+  sideMenu.classList.toggle('open', open);
+  if (menuBtn) menuBtn.classList.toggle('open', open);
+  if (overlay) overlay.classList.toggle('open', open);
+}
+if (menuBtn) menuBtn.addEventListener('click', function(){ toggleMenu(); });
+if (overlay) overlay.addEventListener('click', function(){ toggleMenu(false); });
+
+function openModal(title, body){
+  $('mTitle').textContent = title;
+  $('mBody').innerHTML = body;
+  $('modalBg').classList.add('on');
+  toggleMenu(false);
+  var saveBtn = document.getElementById('saveSettingsBtn');
+  if (saveBtn){
+    saveBtn.onclick = function(){
+      var lang = document.getElementById('modalLang').value;
+      setLang(lang);
+      closeModal();
+    };
+  }
+}
+function closeModal(){ $('modalBg').classList.remove('on'); }
+var mClose = $('mClose'); if (mClose) mClose.onclick = closeModal;
+var modalBg = $('modalBg'); if (modalBg) modalBg.onclick = function(e){ if (e.target.id === 'modalBg') closeModal(); };
+
+/* ============================================================
+   INFO CONTENT (en + hi)
+   ============================================================ */
+var infoLang = 'en';
+try { infoLang = localStorage.getItem('mj_info_lang') || localStorage.getItem('mj_lang') || 'en'; } catch(e){}
+
+var infoContent = {
+  en: '<div class="info-lang-switch"><button data-info-lang="en" class="active">English</button><button data-info-lang="hi">हिन्दी</button></div>' +
+    '<p style="color:#00ff78;font-weight:800;font-size:1rem;margin-bottom:12px">Welcome to MayaJaal 👁️</p>' +
+    '<p style="color:#a8c9b6;font-size:.84rem;line-height:1.7;margin-bottom:16px">MayaJaal is a digital network where you upload files/videos, generate shareable links, and earn money from views.</p>' +
+    '<div class="info-block"><h4>🔑 STEP 1 — Get Your API Key</h4><ol><li>Your unique API key is shown in the green box above (marked STEP 1).</li><li>Each account gets a <b>different key</b>.</li><li>Tap <code>📋 COPY</code> to copy it as <code>/api YOUR_KEY</code>.</li></ol></div>' +
+    '<div class="info-block"><h4>⚡ STEP 2 — Connect API to Telegram Bot</h4><ol><li>Open Telegram and search: <a href="https://t.me/Mayajaalfilebot" target="_blank">@Mayajaalfilebot</a></li><li>Press <b>START</b>.</li><li>Paste and send: <code>/api YOUR_KEY</code></li><li>You will see <b>"✅ Connected successfully"</b>.</li></ol></div>' +
+    '<div class="info-block"><h4>📤 STEP 3 — Upload Files / Videos</h4><ol><li>In <b>@Mayajaalfilebot</b>, send any video / file.</li><li>The bot converts it and gives you a <b>shareable link</b>.</li><li>For bulk, use <a href="https://t.me/MayaJaalBulkConverterbot" target="_blank">@MayaJaalBulkConverterbot</a>.</li></ol></div>' +
+    '<div class="info-block"><h4>🔗 STEP 4 — Share & Get Views</h4><ol><li>Share your link on <b>WhatsApp, Telegram, Instagram, YouTube, Facebook</b>.</li><li>Every time someone opens your link, a <b>view</b> is counted.</li><li>Views update <b>live</b> on this dashboard.</li></ol></div>' +
+    '<div class="info-block bonus"><h4>💰 STEP 5 — Earn Money</h4><ul><li><b>Base rate:</b> 1,000 views = <b>$1.00</b></li><li><b>Bonus:</b> Every next 2,000 views → rate × 1.5 (50% boost)</li><li><b>Example:</b> 5,000 views = <b>$8.50</b></li></ul><div class="info-tip">🚀 <b>Pro tip:</b> More views = higher rate.</div></div>' +
+    '<div class="info-block payout"><h4>💵 STEP 6 — Withdraw Money</h4><ul><li><b>Minimum withdrawal:</b> $20</li><li><b>Payment methods:</b> Bank Transfer · UPI</li><li><b>Processing time:</b> 24 – 48 hours</li></ul></div>' +
+    '<div class="info-block warn"><h4>⚠️ Rules & Safety</h4><ul><li>Never share your API key.</li><li>Do not abuse, spam, or upload illegal content.</li><li>Follow copyright rules.</li></ul></div>',
+  hi: '<div class="info-lang-switch"><button data-info-lang="en">English</button><button data-info-lang="hi" class="active">हिन्दी</button></div>' +
+    '<p style="color:#00ff78;font-weight:800;font-size:1rem;margin-bottom:12px">MayaJaal में आपका स्वागत है 👁️</p>' +
+    '<p style="color:#a8c9b6;font-size:.84rem;line-height:1.7;margin-bottom:16px">MayaJaal एक डिजिटल नेटवर्क है जहाँ आप फाइल/वीडियो अपलोड करते हैं, शेयर करने योग्य लिंक बनाते हैं, और व्यूज़ से पैसे कमाते हैं।</p>' +
+    '<div class="info-block"><h4>🔑 स्टेप 1 — अपनी API Key लें</h4><ol><li>आपकी <b>unique API key</b> ऊपर हरे बॉक्स में दिखेगी (STEP 1 लिखा है)।</li><li>हर account की <b>अलग key</b> होती है।</li><li><code>📋 COPY</code> दबाकर <code>/api YOUR_KEY</code> कॉपी करें।</li></ol></div>' +
+    '<div class="info-block"><h4>⚡ स्टेप 2 — API को Bot से जोड़ें</h4><ol><li>Telegram खोलें: <a href="https://t.me/Mayajaalfilebot" target="_blank">@Mayajaalfilebot</a></li><li><b>START</b> दबाएँ।</li><li>कॉपी किया command भेजें: <code>/api YOUR_KEY</code></li><li>दिखेगा <b>"✅ Connected successfully"</b>।</li></ol></div>' +
+    '<div class="info-block"><h4>📤 स्टेप 3 — फाइल / वीडियो अपलोड करें</h4><ol><li><b>@Mayajaalfilebot</b> में कोई भी video / file भेजें।</li><li>Bot convert करके एक <b>shareable link</b> देगा।</li><li>कई links के लिए <a href="https://t.me/MayaJaalBulkConverterbot" target="_blank">@MayaJaalBulkConverterBot</a> इस्तेमाल करें।</li></ol></div>' +
+    '<div class="info-block"><h4>🔗 स्टेप 4 — शेयर करें और व्यूज़ पाएँ</h4><ol><li>अपना link <b>WhatsApp, Telegram, Instagram, YouTube, Facebook</b> पर शेयर करें।</li><li>जब भी कोई link खोलेगा — एक <b>view</b> गिना जाएगा।</li></ol></div>' +
+    '<div class="info-block bonus"><h4>💰 स्टेप 5 — पैसे कमाएँ</h4><ul><li><b>Base rate:</b> 1,000 views = <b>$1.00</b></li><li><b>Bonus:</b> हर अगले 2,000 views पर rate × 1.5</li><li><b>उदाहरण:</b> 5,000 views = <b>$8.50</b></li></ul></div>' +
+    '<div class="info-block payout"><h4>💵 स्टेप 6 — पैसे निकालें</h4><ul><li><b>Minimum withdrawal:</b> $20</li><li><b>Payment methods:</b> Bank Transfer · UPI</li><li><b>प्रोसेसिंग टाइम:</b> 24 – 48 घंटे</li></ul></div>' +
+    '<div class="info-block warn"><h4>⚠️ नियम और सुरक्षा</h4><ul><li>अपनी API key किसी से शेयर न करें।</li><li>गलत इस्तेमाल, spam, illegal content न करें।</li></ul></div>'
+};
+
+function switchInfoLang(lang){
+  infoLang = lang;
+  try { localStorage.setItem('mj_info_lang', lang); } catch(e){}
+  $('mBody').innerHTML = infoContent[lang] || infoContent.en;
+  bindInfoLangButtons();
+}
+function bindInfoLangButtons(){
+  var btns = $('mBody').querySelectorAll('[data-info-lang]');
+  for (var i=0;i<btns.length;i++){
+    btns[i].onclick = function(){ switchInfoLang(this.getAttribute('data-info-lang')); };
+  }
+}
+
+function earningsModalHTML(){
+  return '<p style="color:#00ff78;font-weight:800;font-size:.95rem;margin-bottom:12px">💰 MAYAJAAL EARNINGS MODEL</p>' +
+    '<div class="earn-box"><b style="color:#00ff78">📌 BASE:</b> Pehle <b>1,000 views = $1.00</b><br><b style="color:#ffd76b">📌 BONUS:</b> Har extra <b>2,000 views</b> ke baad rate <b>× 1.5</b> (50% boost).</div>' +
+    '<p style="font-size:.82rem;color:#b6d5c2;margin-bottom:8px"><b>Tier Table:</b></p>' +
+    '<table class="earn-table" id="earnTable"><thead><tr><th>Views</th><th>Rate / 1K</th><th>Total Income</th></tr></thead>' +
+    '<tbody>' +
+      '<tr><td>0 – 1,000</td><td>$1.00</td><td>$1.00</td></tr>' +
+      '<tr><td>1K – 3K</td><td>$1.50</td><td>$4.00</td></tr>' +
+      '<tr><td>3K – 5K</td><td>$2.25</td><td>$8.50</td></tr>' +
+      '<tr><td>5K – 7K</td><td>$3.38</td><td>$15.25</td></tr>' +
+      '<tr><td>7K – 9K</td><td>$5.06</td><td>$25.38</td></tr>' +
+      '<tr><td>9K – 11K</td><td>$7.59</td><td>$40.56</td></tr>' +
+    '</tbody></table>' +
+    '<div class="earn-box"><b style="color:#ffd76b">🧮 Example (5,000 views):</b><br>• 1K × $1.00 = $1.00<br>• 2K × $1.50 = $3.00<br>• 2K × $2.25 = $4.50<br><b style="color:#00ff78">Total = $8.50</b></div>';
+}
+
+function act(a){
+  if (a === 'settings'){
+    var currentLang = 'en';
+    try { currentLang = localStorage.getItem('mj_lang') || 'en'; } catch(e){}
+    openModal('⚙ Settings',
+      '<div class="form-row"><label>🌐 Language / भाषा</label><select id="modalLang"><option value="en">English</option><option value="hi">हिन्दी (Hindi)</option></select></div>' +
+      '<button class="btn-save" id="saveSettingsBtn" style="margin-top:8px;width:100%">Save Settings</button>'
+    );
+    setTimeout(function(){ var el = document.getElementById('modalLang'); if (el) el.value = currentLang; }, 50);
+  }
+  else if (a === 'info'){
+    try { infoLang = localStorage.getItem('mj_info_lang') || localStorage.getItem('mj_lang') || 'en'; } catch(e){}
+    openModal('ℹ Information', infoContent[infoLang] || infoContent.en);
+    bindInfoLangButtons();
+  }
+  else if (a === 'bonus' || a === 'earnings'){
+    openModal(a === 'bonus' ? '🎁 Bonus System' : '💰 Earnings Model', earningsModalHTML());
+  }
+  else if (a === 'support') openModal('☏ Help & Support', '<p>Contact: <a href="mailto:mayajaalsupport@gmail.com">mayajaalsupport@gmail.com</a></p><p>Telegram: <a href="https://t.me/Mayajaalfilebot" target="_blank">@Mayajaalfilebot</a></p>');
+  else if (a === 'privacy') window.open('/privacy.html', '_blank');
+  else if (a === 'terms') window.open('/terms.html', '_blank');
+}
+
+document.addEventListener('click', function(e){
+  var b = e.target.closest('[data-act]');
+  if (b){ e.preventDefault(); act(b.dataset.act); }
+});
+
+/* ============================================================
+   DASHBOARD i18n
+   ============================================================ */
+var dashI18n = {
+  en: { eyebrow:'VIDEOS · LINKS · BEYOND', welcome:'ENTER THE', tagline:'Your digital universe. One portal for your files, links, tools and community.', online:'ONLINE', apiTitle:'🔑 YOUR API KEY', apiDesc:'Yeh key aapke account se linked hai. Har user ki alag hoti hai aur hamesha same rehti hai.', activate:'Activate in Telegram Bot', dashTitle:'EARNINGS DASHBOARD', totalLinks:'Total Links', totalViews:'Total Views', todayViews:'Today Views', conv:'Conversions', totalInc:'Total Income', todayInc:'Today Income', chartTitle:'Views (Last 7 Days)', botsTitle:'OFFICIAL BOTS' },
+  hi: { eyebrow:'वीडियो · लिंक · और भी', welcome:'स्वागत है', tagline:'आपकी डिजिटल दुनिया — फाइल, लिंक, टूल और कम्युनिटी एक जगह।', online:'चालू', apiTitle:'🔑 आपकी API Key', apiDesc:'यह key आपके account से जुड़ी है। हर user की अलग होती है और हमेशा वही रहेगी।', activate:'टेलीग्राम बॉट में एक्टिवेट करें', dashTitle:'कमाई डैशबोर्ड', totalLinks:'कुल लिंक', totalViews:'कुल व्यूज़', todayViews:'आज के व्यूज़', conv:'कन्वर्ज़न', totalInc:'कुल कमाई', todayInc:'आज की कमाई', chartTitle:'व्यूज़ (पिछले 7 दिन)', botsTitle:'ऑफिशियल बॉट' }
+};
+function setLang(lang){
+  var d = dashI18n[lang] || dashI18n.en;
+  var el;
+  el = $('i18nEyebrow'); if (el) el.textContent = d.eyebrow;
+  el = $('i18nWelcome'); if (el) el.textContent = d.welcome;
+  el = $('i18nTagline'); if (el) el.textContent = d.tagline;
+  el = $('i18nOnline'); if (el) el.textContent = d.online;
+  el = $('i18nApiTitle'); if (el) el.textContent = d.apiTitle;
+  el = $('i18nApiDesc'); if (el) el.textContent = d.apiDesc;
+  el = $('i18nActivate'); if (el) el.textContent = d.activate;
+  el = $('i18nDashTitle'); if (el) el.textContent = d.dashTitle;
+  el = $('i18nTotalLinks'); if (el) el.textContent = d.totalLinks;
+  el = $('i18nTotalViews'); if (el) el.textContent = d.totalViews;
+  el = $('i18nTodayViews'); if (el) el.textContent = d.todayViews;
+  el = $('i18nConv'); if (el) el.textContent = d.conv;
+  el = $('i18nTotalInc'); if (el) el.textContent = d.totalInc;
+  el = $('i18nTodayInc'); if (el) el.textContent = d.todayInc;
+  el = $('i18nChartTitle'); if (el) el.textContent = d.chartTitle;
+  el = $('i18nBotsTitle'); if (el) el.textContent = d.botsTitle;
+  try { localStorage.setItem('mj_lang', lang); } catch(e){}
+}
+try { setLang(localStorage.getItem('mj_lang') || 'en'); } catch(e){ setLang('en'); }
+</script>
+
+</body>
+</html>
