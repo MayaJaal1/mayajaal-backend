@@ -22,90 +22,42 @@ html,body{overflow-x:hidden}
 ::-webkit-scrollbar-thumb{background:#0a3d24;border-radius:10px;border:2px solid #020705}
 ::-webkit-scrollbar-thumb:hover{background:#00c963}
 
-/* ============ GLOBAL SPLASH LOADER ============ */
-#splashLoader{
-  position:fixed;inset:0;z-index:999999;
-  display:flex;align-items:center;justify-content:center;
-  background:radial-gradient(ellipse at center,#031a0e 0%,#020705 70%);
-  transition:opacity .45s ease,visibility .45s;
-}
+/* GLOBAL SPLASH */
+#splashLoader{position:fixed;inset:0;z-index:999999;display:flex;align-items:center;justify-content:center;background:radial-gradient(ellipse at center,#031a0e 0%,#020705 70%);transition:opacity .45s ease,visibility .45s}
 #splashLoader.hide{opacity:0;visibility:hidden;pointer-events:none}
-#splashLoader .sp-inner{text-align:center;padding:20px;position:relative}
-#splashLoader .sp-eye{
-  width:110px;height:110px;margin:0 auto 20px;display:block;
-  filter:drop-shadow(0 0 30px rgba(0,255,120,.6));
-  animation:spPulse 2s ease-in-out infinite;
-}
-@keyframes spPulse{
-  0%,100%{filter:drop-shadow(0 0 25px rgba(0,255,120,.5));transform:scale(1)}
-  50%{filter:drop-shadow(0 0 55px rgba(0,255,120,.95));transform:scale(1.05)}
-}
-#splashLoader .sp-brand{
-  font-size:2.6rem;font-weight:900;letter-spacing:-1.5px;
-  color:#00ff78;text-shadow:0 0 25px rgba(0,255,120,.7);
-  margin-bottom:6px;font-family:'Courier New',monospace;
-}
+#splashLoader .sp-inner{text-align:center;padding:20px}
+#splashLoader .sp-eye{width:110px;height:110px;margin:0 auto 20px;display:block;filter:drop-shadow(0 0 30px rgba(0,255,120,.6));animation:spPulse 2s ease-in-out infinite}
+@keyframes spPulse{0%,100%{filter:drop-shadow(0 0 25px rgba(0,255,120,.5));transform:scale(1)}50%{filter:drop-shadow(0 0 55px rgba(0,255,120,.95));transform:scale(1.05)}}
+#splashLoader .sp-brand{font-size:2.6rem;font-weight:900;letter-spacing:-1.5px;color:#00ff78;text-shadow:0 0 25px rgba(0,255,120,.7);margin-bottom:6px;font-family:'Courier New',monospace}
 #splashLoader .sp-brand span{color:#d7ffe7;font-weight:400}
-#splashLoader .sp-tag{
-  color:#6f9981;font-size:.72rem;letter-spacing:.35em;
-  text-transform:uppercase;margin-bottom:28px;
-  font-family:'Courier New',monospace;
-}
-#splashLoader .sp-bar{
-  width:220px;height:4px;background:rgba(0,255,120,.12);
-  border-radius:99px;overflow:hidden;margin:0 auto 16px;position:relative;
-}
-#splashLoader .sp-bar i{
-  position:absolute;top:0;left:0;height:100%;width:40%;
-  background:linear-gradient(90deg,transparent,#00ff78,#00c963,transparent);
-  border-radius:99px;animation:spSlide 1.6s ease-in-out infinite;
-}
+#splashLoader .sp-tag{color:#6f9981;font-size:.72rem;letter-spacing:.35em;text-transform:uppercase;margin-bottom:28px;font-family:'Courier New',monospace}
+#splashLoader .sp-bar{width:220px;height:4px;background:rgba(0,255,120,.12);border-radius:99px;overflow:hidden;margin:0 auto 16px;position:relative}
+#splashLoader .sp-bar i{position:absolute;top:0;left:0;height:100%;width:40%;background:linear-gradient(90deg,transparent,#00ff78,#00c963,transparent);border-radius:99px;animation:spSlide 1.6s ease-in-out infinite}
 @keyframes spSlide{0%{left:-45%}100%{left:100%}}
-#splashLoader .sp-status{
-  color:#9bffbd;font-size:.76rem;letter-spacing:.12em;
-  font-family:'Courier New',monospace;min-height:1.2em;
-}
+#splashLoader .sp-status{color:#9bffbd;font-size:.76rem;letter-spacing:.12em;font-family:'Courier New',monospace;min-height:1.2em}
 
-/* ================= PRE-LOGIN VIEW ================= */
+/* PRE-LOGIN VIEW */
 #preLoginView{
   --primary:#6a11cb;--secondary:#2575fc;--accent:#ffb800;--dark:#0f0f23;--card:#1a1a2e;
   --text:#eaeaea;--muted:#a0a0b8;--green:#00c896;
   background:linear-gradient(135deg,#0f0f23 0%,#1a1a2e 50%,#0f0f23 100%);
-  color:var(--text);line-height:1.6;min-height:100vh;overflow-x:hidden;
-  font-family:'Segoe UI',Tahoma,sans-serif;
+  color:var(--text);line-height:1.6;min-height:100vh;overflow-x:hidden;font-family:'Segoe UI',Tahoma,sans-serif;
 }
 #preLoginView a{text-decoration:none;color:inherit}
-#preLoginView .navbar{
-  position:sticky;top:0;z-index:1000;
-  background:rgba(15,15,35,.95);backdrop-filter:blur(10px);
-  padding:12px 20px;display:flex;justify-content:space-between;align-items:center;
-  border-bottom:1px solid rgba(106,17,203,.3);flex-wrap:wrap;gap:10px;
-}
-#preLoginView .logo{font-size:1.4rem;font-weight:800;background:linear-gradient(90deg,#6a11cb,#2575fc,#ffb800);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent}
+#preLoginView .navbar{position:sticky;top:0;z-index:1000;background:rgba(15,15,35,.95);backdrop-filter:blur(10px);padding:12px 20px;display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid rgba(106,17,203,.3);flex-wrap:wrap;gap:10px}
+#preLoginView .logo{font-size:1.4rem;font-weight:900;letter-spacing:-.5px;display:inline-flex;align-items:baseline}
+#preLoginView .logo .lg-maya{color:#a78bfa}
+#preLoginView .logo .lg-jaal{color:#eaeaea;font-weight:400}
 #preLoginView .nav-links{display:flex;gap:16px;align-items:center;flex-wrap:wrap}
 #preLoginView .nav-links a{color:var(--muted);font-size:.92rem;transition:.3s}
 #preLoginView .nav-links a:hover{color:var(--accent)}
 #preLoginView .lang-select{background:var(--card);color:var(--text);border:1px solid rgba(106,17,203,.5);padding:7px 12px;border-radius:8px;font-size:.85rem;cursor:pointer;outline:none}
 #preLoginView .lang-select option{background:var(--dark);color:var(--text)}
-
-/* NAVBAR LOGIN BUTTON (always visible) */
-#preLoginView .nav-login-btn{
-  display:inline-flex;align-items:center;gap:8px;
-  background:#fff;color:#3c4043;border:none;
-  padding:9px 16px;border-radius:50px;font-size:.85rem;font-weight:700;
-  cursor:pointer;transition:.25s;font-family:'Roboto',Arial,sans-serif;
-  box-shadow:0 4px 15px rgba(0,0,0,.35);
-  position:relative;z-index:5;
-}
-#preLoginView .nav-login-btn:hover:not(:disabled){
-  transform:translateY(-2px);
-  box-shadow:0 8px 22px rgba(255,255,255,.25);
-  background:#f8f9fa;
-}
+#preLoginView .nav-login-btn{display:inline-flex;align-items:center;gap:8px;background:#fff;color:#3c4043;border:none;padding:9px 16px;border-radius:50px;font-size:.85rem;font-weight:700;cursor:pointer;transition:.25s;font-family:'Roboto',Arial,sans-serif;box-shadow:0 4px 15px rgba(0,0,0,.35);position:relative;z-index:5}
+#preLoginView .nav-login-btn:hover:not(:disabled){transform:translateY(-2px);box-shadow:0 8px 22px rgba(255,255,255,.25);background:#f8f9fa}
 #preLoginView .nav-login-btn:disabled{opacity:.7;cursor:wait}
 #preLoginView .nav-login-btn svg{width:18px;height:18px;flex-shrink:0;pointer-events:none}
 #preLoginView .nav-login-btn span{pointer-events:none;white-space:nowrap}
-
 @media(max-width:768px){
   #preLoginView .nav-links a{display:none}
   #preLoginView .nav-links{gap:8px}
@@ -113,7 +65,6 @@ html,body{overflow-x:hidden}
   #preLoginView .nav-login-btn{padding:8px 12px;font-size:.78rem}
   #preLoginView .nav-login-btn svg{width:16px;height:16px}
 }
-
 #preLoginView .hero{padding:50px 20px 36px;text-align:center;position:relative;overflow:hidden}
 #preLoginView .hero::before{content:'';position:absolute;top:-50%;left:50%;transform:translateX(-50%);width:600px;height:600px;background:radial-gradient(circle,rgba(106,17,203,.4),transparent 70%);z-index:-1;animation:mjPulse 4s infinite}
 @keyframes mjPulse{0%,100%{opacity:.5}50%{opacity:1}}
@@ -156,34 +107,14 @@ html,body{overflow-x:hidden}
 @keyframes mjBounce{0%,100%{transform:translateY(0)}50%{transform:translateY(-8px)}}
 #preLoginView .fade-in{opacity:0;transform:translateY(30px);transition:.6s}
 #preLoginView .fade-in.show{opacity:1;transform:translateY(0)}
-
-/* LOGIN CARD */
-#preLoginView .login-card{
-  background:linear-gradient(145deg,#1a1a2e 0%,#16213e 100%);
-  border-radius:24px;padding:44px 32px;max-width:480px;margin:0 auto;
-  text-align:center;position:relative;overflow:hidden;
-  box-shadow:0 25px 70px rgba(106,17,203,.35);
-}
-#preLoginView .login-card::before{
-  content:'';position:absolute;top:-2px;left:-2px;right:-2px;bottom:-2px;
-  background:linear-gradient(45deg,#6a11cb,#2575fc,#00c896,#ffb800,#6a11cb);
-  border-radius:24px;z-index:-1;background-size:400% 400%;
-  animation:mjGradientBorder 6s ease infinite;opacity:.7;
-}
+#preLoginView .login-card{background:linear-gradient(145deg,#1a1a2e 0%,#16213e 100%);border-radius:24px;padding:44px 32px;max-width:480px;margin:0 auto;text-align:center;position:relative;overflow:hidden;box-shadow:0 25px 70px rgba(106,17,203,.35)}
+#preLoginView .login-card::before{content:'';position:absolute;top:-2px;left:-2px;right:-2px;bottom:-2px;background:linear-gradient(45deg,#6a11cb,#2575fc,#00c896,#ffb800,#6a11cb);border-radius:24px;z-index:-1;background-size:400% 400%;animation:mjGradientBorder 6s ease infinite;opacity:.7}
 @keyframes mjGradientBorder{0%{background-position:0% 50%}50%{background-position:100% 50%}100%{background-position:0% 50%}}
 #preLoginView .login-icon{font-size:3.2rem;margin-bottom:14px;filter:drop-shadow(0 0 20px rgba(106,17,203,.8));animation:mjFloatIcon 3s ease-in-out infinite}
 @keyframes mjFloatIcon{0%,100%{transform:translateY(0)}50%{transform:translateY(-8px)}}
 #preLoginView .login-card h3{font-size:1.5rem;font-weight:800;background:linear-gradient(90deg,#fff,#a78bfa,#2575fc);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;margin-bottom:10px;letter-spacing:.5px}
 #preLoginView .login-card .login-sub{color:var(--muted);font-size:.95rem;margin-bottom:26px;line-height:1.6}
-#preLoginView .google-btn{
-  display:flex;align-items:center;justify-content:center;gap:12px;
-  width:100%;background:#fff;color:#3c4043;border:none;
-  padding:16px 22px;border-radius:12px;font-size:1.02rem;font-weight:700;
-  cursor:pointer;transition:all .25s;
-  box-shadow:0 8px 25px rgba(0,0,0,.3);
-  font-family:'Roboto',Arial,sans-serif;
-  position:relative;z-index:5;
-}
+#preLoginView .google-btn{display:flex;align-items:center;justify-content:center;gap:12px;width:100%;background:#fff;color:#3c4043;border:none;padding:16px 22px;border-radius:12px;font-size:1.02rem;font-weight:700;cursor:pointer;transition:all .25s;box-shadow:0 8px 25px rgba(0,0,0,.3);font-family:'Roboto',Arial,sans-serif;position:relative;z-index:5}
 #preLoginView .google-btn:hover:not(:disabled){background:#f8f9fa;transform:translateY(-3px);box-shadow:0 12px 35px rgba(255,255,255,.2)}
 #preLoginView .google-btn:disabled{opacity:.7;cursor:wait}
 #preLoginView .google-btn svg{width:22px;height:22px;flex-shrink:0;pointer-events:none}
@@ -199,20 +130,20 @@ html,body{overflow-x:hidden}
 #preLoginView .loader{width:40px;height:40px;margin:0 auto;border:4px solid rgba(0,200,150,.2);border-top:4px solid #00c896;border-radius:50%;animation:mjSpin .8s linear infinite}
 @keyframes mjSpin{0%{transform:rotate(0deg)}100%{transform:rotate(360deg)}}
 
-/* ================= POST-LOGIN VIEW ================= */
+/* POST-LOGIN VIEW */
 #postLoginView{background:#020705;color:#effff5;min-height:100vh;overflow-x:hidden;-webkit-font-smoothing:antialiased;-webkit-tap-highlight-color:transparent;font-family:'Courier New','SF Mono',Consolas,monospace}
 #postLoginView button{font-family:inherit;cursor:pointer;border:0;background:none;color:inherit}
 #postLoginView a{color:inherit;text-decoration:none}
 #postLoginView #matrix{position:fixed;inset:0;width:100%;height:100%;z-index:0;opacity:.5;pointer-events:none}
 #postLoginView .vig{position:fixed;inset:0;z-index:1;pointer-events:none;background:radial-gradient(ellipse at 50% 25%,transparent 0%,rgba(0,20,10,.5) 55%,#000 100%),linear-gradient(180deg,rgba(0,255,120,.04) 0%,transparent 30%,transparent 70%,rgba(0,255,120,.03) 100%)}
-
 #postLoginView .loading-screen{position:fixed;inset:0;z-index:500;display:flex;align-items:center;justify-content:center;background:radial-gradient(ellipse at center,#031a0e 0%,#020705 70%);transition:opacity .55s ease,visibility .55s}
 #postLoginView .loading-screen.hide{opacity:0;visibility:hidden;pointer-events:none}
 #postLoginView .loading-card{text-align:center;padding:20px;position:relative}
 #postLoginView .loading-eye{width:120px;height:120px;margin:0 auto 22px;display:block;filter:drop-shadow(0 0 30px rgba(0,255,120,.6));animation:mjPulseGlow 2.2s ease-in-out infinite}
 @keyframes mjPulseGlow{0%,100%{filter:drop-shadow(0 0 25px rgba(0,255,120,.5));transform:scale(1)}50%{filter:drop-shadow(0 0 55px rgba(0,255,120,.95));transform:scale(1.05)}}
-#postLoginView .loading-brand{font-size:2.6rem;font-weight:900;letter-spacing:-1.5px;color:#00ff78;text-shadow:0 0 25px rgba(0,255,120,.7);margin-bottom:8px}
-#postLoginView .loading-brand span{color:#d7ffe7;font-weight:400}
+#postLoginView .loading-brand{font-size:2.6rem;font-weight:900;letter-spacing:-1.5px;margin-bottom:8px}
+#postLoginView .loading-brand .lg-maya{color:#00ff78;text-shadow:0 0 25px rgba(0,255,120,.7)}
+#postLoginView .loading-brand .lg-jaal{color:#d7ffe7;font-weight:400}
 #postLoginView .loading-tagline{color:#6f9981;font-size:.75rem;letter-spacing:.35em;text-transform:uppercase;margin-bottom:30px}
 #postLoginView .loading-bar-wrap{width:220px;height:4px;background:rgba(0,255,120,.12);border-radius:99px;overflow:hidden;margin:0 auto 18px;position:relative}
 #postLoginView .loading-bar{height:100%;width:40%;background:linear-gradient(90deg,transparent,#00ff78,#00c963,transparent);border-radius:99px;position:absolute;top:0;left:0;animation:mjLoadSlide 1.6s ease-in-out infinite}
@@ -234,8 +165,9 @@ html,body{overflow-x:hidden}
 #postLoginView .snk.d4::after{animation-delay:2.4s}
 #postLoginView .snk.d5::after{animation-delay:3s}
 #postLoginView .brand-wrap{position:relative;display:inline-block;padding:6px 12px;overflow:hidden;border-radius:10px}
-#postLoginView .brand{position:relative;font-weight:900;font-size:clamp(1.8rem,5vw,2.4rem);letter-spacing:-1px;color:#00ff78;z-index:2;text-shadow:0 0 15px rgba(0,255,120,.55)}
-#postLoginView .brand span{color:#d7ffe7;font-weight:400}
+#postLoginView .brand{position:relative;font-weight:900;font-size:clamp(1.8rem,5vw,2.4rem);letter-spacing:-1px;z-index:2;display:inline-flex;align-items:baseline}
+#postLoginView .brand .lg-maya{color:#00ff78;text-shadow:0 0 15px rgba(0,255,120,.55)}
+#postLoginView .brand .lg-jaal{color:#d7ffe7;font-weight:400}
 #postLoginView .brand-wrap .snake{position:absolute;top:0;left:-140px;width:140px;height:100%;background:radial-gradient(ellipse at center,rgba(255,255,255,.95) 0%,rgba(200,255,220,.7) 30%,rgba(0,255,120,.3) 55%,transparent 75%);filter:blur(7px);mix-blend-mode:screen;pointer-events:none;z-index:3;animation:mjSnakeGo 3.5s ease-in-out infinite}
 @keyframes mjSnakeGo{0%{left:-140px;opacity:0}5%{opacity:1}45%{left:100%;opacity:1}50%{left:100%;opacity:0}55%{opacity:0}55.1%{left:100%;opacity:1}95%{left:-140px;opacity:1}100%{left:-140px;opacity:0}}
 #postLoginView .mtx{color:#00ff78;text-shadow:0 0 8px rgba(0,255,120,.55),0 0 2px rgba(0,255,120,.9);letter-spacing:.05em}
@@ -247,30 +179,20 @@ html,body{overflow-x:hidden}
 #postLoginView .menu-btn.open span:nth-child(2){opacity:0;transform:scaleX(0)}
 #postLoginView .menu-btn.open span:nth-child(3){transform:translateY(-7px) rotate(-45deg)}
 
-/* SIDEBAR */
-#postLoginView .side-menu{
-  position:fixed;top:0;left:-340px;width:320px;height:100vh;
-  background:linear-gradient(180deg,#03130b 0%,#020a06 100%);
-  border-right:1px solid rgba(0,255,120,.3);z-index:99;
-  transition:left .35s cubic-bezier(.4,0,.2,1);
-  padding:0;overflow:hidden;
-  display:flex;flex-direction:column;
-  box-shadow:8px 0 40px rgba(0,0,0,.5);
-}
+#postLoginView .side-menu{position:fixed;top:0;left:-340px;width:320px;height:100vh;background:linear-gradient(180deg,#03130b 0%,#020a06 100%);border-right:1px solid rgba(0,255,120,.3);z-index:99;transition:left .35s cubic-bezier(.4,0,.2,1);padding:0;overflow:hidden;display:flex;flex-direction:column;box-shadow:8px 0 40px rgba(0,0,0,.5)}
 #postLoginView .side-menu.open{left:0}
 #postLoginView .menu-scroll{flex:1;min-height:0;overflow-y:auto;overflow-x:hidden}
 #postLoginView .menu-scroll::-webkit-scrollbar{width:6px}
 #postLoginView .menu-scroll::-webkit-scrollbar-thumb{background:rgba(0,255,120,.3);border-radius:99px}
 #postLoginView .menu-overlay{position:fixed;inset:0;background:rgba(0,0,0,.8);backdrop-filter:blur(4px);z-index:98;opacity:0;pointer-events:none;transition:.3s}
 #postLoginView .menu-overlay.open{opacity:1;pointer-events:auto}
-
 #postLoginView .side-brand{padding:22px 20px 18px;border-bottom:1px solid rgba(0,255,120,.15);position:relative;background:linear-gradient(180deg,rgba(0,255,120,.04),transparent);flex-shrink:0}
 #postLoginView .side-brand-inner{display:flex;align-items:center;gap:10px}
-#postLoginView .side-brand-logo{width:38px;height:38px;border-radius:11px;background:linear-gradient(135deg,#00ff78,#00c963);display:flex;align-items:center;justify-content:center;font-weight:900;font-size:1.1rem;color:#001b0c;box-shadow:0 0 20px rgba(0,255,120,.4);flex-shrink:0}
-#postLoginView .side-brand-text{font-size:1.15rem;font-weight:900;color:#00ff78;letter-spacing:-.5px;line-height:1}
-#postLoginView .side-brand-text span{color:#d7ffe7;font-weight:400}
+#postLoginView .side-brand-logo{width:38px;height:38px;border-radius:11px;background:linear-gradient(135deg,#00ff78,#00c963);display:flex;align-items:center;justify-content:center;font-weight:900;font-size:1.15rem;color:#001b0c;box-shadow:0 0 20px rgba(0,255,120,.4);flex-shrink:0}
+#postLoginView .side-brand-text{font-size:1.2rem;font-weight:900;letter-spacing:-.5px;line-height:1;display:inline-flex;align-items:baseline}
+#postLoginView .side-brand-text .lg-maya{color:#00ff78}
+#postLoginView .side-brand-text .lg-jaal{color:#d7ffe7;font-weight:400}
 #postLoginView .side-brand-sub{font-size:.6rem;color:#6f9981;letter-spacing:.3em;text-transform:uppercase;margin-top:4px;font-weight:700}
-
 #postLoginView .menu-user{margin:16px 14px;padding:14px;background:linear-gradient(135deg,rgba(0,255,120,.08),rgba(0,255,120,.02));border:1px solid rgba(0,255,120,.25);border-radius:14px;display:flex;align-items:center;gap:12px;position:relative;overflow:hidden;flex-shrink:0}
 #postLoginView .menu-user::before{content:"";position:absolute;top:0;left:0;right:0;height:1px;background:linear-gradient(90deg,transparent,rgba(0,255,120,.5),transparent)}
 #postLoginView .menu-user img{width:46px;height:46px;border-radius:50%;border:2px solid #00ff78;object-fit:cover;background:#000;box-shadow:0 0 15px rgba(0,255,120,.35);flex-shrink:0}
@@ -279,7 +201,6 @@ html,body{overflow-x:hidden}
 #postLoginView .menu-user .mu-name span{color:#91b8a4;font-size:.7rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;display:block}
 #postLoginView .mu-status{display:inline-flex;align-items:center;gap:4px;font-size:.6rem;color:#00ff78;margin-top:4px}
 #postLoginView .mu-status .dot-s{width:6px;height:6px;border-radius:50%;background:#00ff78;box-shadow:0 0 6px #00ff78;animation:mjPulseDot 1.6s infinite}
-
 #postLoginView .menu-section{margin:0 14px 8px;padding-top:14px;border-top:1px solid rgba(0,255,120,.12)}
 #postLoginView .menu-section:first-of-type{border-top:0;padding-top:4px}
 #postLoginView .menu-section h4{font-size:.62rem;color:#5a8d70;text-transform:uppercase;letter-spacing:.18em;margin-bottom:8px;padding-left:12px;font-weight:800}
@@ -292,10 +213,11 @@ html,body{overflow-x:hidden}
 #postLoginView .badge{margin-left:auto;background:linear-gradient(135deg,#ff3d3d,#c81e1e);color:#fff;font-size:.6rem;font-weight:800;padding:3px 8px;border-radius:99px;min-width:22px;text-align:center;box-shadow:0 0 10px rgba(255,61,61,.5);letter-spacing:.05em}
 #postLoginView .badge.green{background:linear-gradient(135deg,#00ff78,#00c963);color:#001b0c;box-shadow:0 0 10px rgba(0,255,120,.5)}
 
-#postLoginView .menu-footer{margin-top:0;flex-shrink:0;padding:14px 14px 16px;border-top:1px solid rgba(0,255,120,.18);background:linear-gradient(180deg,rgba(3,19,11,.9),rgba(2,10,6,.98));box-shadow:0 -8px 20px rgba(0,0,0,.4)}
-#postLoginView .logout-btn{display:flex;align-items:center;justify-content:center;gap:10px;width:100%;padding:14px 18px;background:linear-gradient(135deg,#ff3d3d,#c81e1e);color:#fff;border-radius:12px;font-weight:800;font-size:.88rem;letter-spacing:.05em;transition:.25s;box-shadow:0 4px 18px rgba(255,61,61,.4);border:1px solid rgba(255,255,255,.15);position:relative;overflow:hidden}
+/* LOGOUT - sticky footer always visible */
+#postLoginView .menu-footer{margin-top:auto;flex-shrink:0;padding:14px 14px 16px;border-top:1px solid rgba(0,255,120,.18);background:linear-gradient(180deg,rgba(3,19,11,.98),rgba(2,10,6,.99));box-shadow:0 -8px 20px rgba(0,0,0,.5);position:relative;z-index:2}
+#postLoginView .logout-btn{display:flex;align-items:center;justify-content:center;gap:10px;width:100%;padding:14px 18px;background:linear-gradient(135deg,#ff3d3d,#c81e1e);color:#fff;border-radius:12px;font-weight:800;font-size:.9rem;letter-spacing:.05em;transition:.25s;box-shadow:0 4px 18px rgba(255,61,61,.4);border:1px solid rgba(255,255,255,.15);position:relative;overflow:hidden}
 #postLoginView .logout-btn::before{content:"";position:absolute;top:0;left:-100%;width:100%;height:100%;background:linear-gradient(90deg,transparent,rgba(255,255,255,.25),transparent);transition:.6s}
-#postLoginView .logout-btn:hover{transform:translateY(-2px);box-shadow:0 8px 28px rgba(255,61,61,.6)}
+#postLoginView .logout-btn:hover{transform:translateY(-2px);box-shadow:0 8px 28px rgba(255,61,61,.65)}
 #postLoginView .logout-btn:hover::before{left:100%}
 #postLoginView .logout-btn:active{transform:translateY(0)}
 #postLoginView .logout-btn .lo-ico{font-size:1.05rem}
@@ -338,17 +260,8 @@ html,body{overflow-x:hidden}
 #postLoginView .ad-slot.has-ad{padding:0;border:0;background:transparent;min-height:0}
 #postLoginView .ad-slot.has-ad::before{display:none}
 
-#postLoginView .api-card{
-  background:linear-gradient(135deg,rgba(42,8,8,.98) 0%,rgba(18,3,3,.98) 50%,rgba(32,6,6,.98) 100%);
-  border:2px solid rgba(255,61,61,.6);
-  border-radius:22px;padding:26px 24px 24px;position:relative;overflow:hidden;
-  box-shadow:0 0 50px rgba(255,61,61,.22),inset 0 0 80px rgba(255,61,61,.05);
-  animation:mjApiPulseRed 3.5s ease-in-out infinite;
-}
-@keyframes mjApiPulseRed{
-  0%,100%{box-shadow:0 0 50px rgba(255,61,61,.22),inset 0 0 80px rgba(255,61,61,.05)}
-  50%{box-shadow:0 0 75px rgba(255,61,61,.42),inset 0 0 100px rgba(255,61,61,.09)}
-}
+#postLoginView .api-card{background:linear-gradient(135deg,rgba(42,8,8,.98) 0%,rgba(18,3,3,.98) 50%,rgba(32,6,6,.98) 100%);border:2px solid rgba(255,61,61,.6);border-radius:22px;padding:26px 24px 24px;position:relative;overflow:hidden;box-shadow:0 0 50px rgba(255,61,61,.22),inset 0 0 80px rgba(255,61,61,.05);animation:mjApiPulseRed 3.5s ease-in-out infinite}
+@keyframes mjApiPulseRed{0%,100%{box-shadow:0 0 50px rgba(255,61,61,.22),inset 0 0 80px rgba(255,61,61,.05)}50%{box-shadow:0 0 75px rgba(255,61,61,.42),inset 0 0 100px rgba(255,61,61,.09)}}
 #postLoginView .api-card::before{content:"";position:absolute;top:0;left:0;right:0;height:2px;background:linear-gradient(90deg,transparent,#ff3d3d,#ff6b6b,#ff3d3d,transparent);opacity:.9;animation:mjTopLineRed 3s ease-in-out infinite}
 @keyframes mjTopLineRed{0%,100%{opacity:.5}50%{opacity:1}}
 #postLoginView .api-card::after{content:"";position:absolute;bottom:-30px;right:-30px;width:180px;height:180px;border-radius:50%;background:radial-gradient(circle,rgba(255,61,61,.18) 0%,transparent 70%);pointer-events:none}
@@ -372,18 +285,41 @@ html,body{overflow-x:hidden}
 #postLoginView .activate-btn{display:block;background:linear-gradient(135deg,#ff6b6b,#e63946);color:#fff;padding:15px 20px;border-radius:12px;font-weight:900;font-size:.9rem;text-align:center;margin-top:16px;transition:.2s;box-shadow:0 0 30px rgba(255,61,61,.45),0 6px 18px rgba(0,0,0,.3);letter-spacing:.04em;border:1px solid rgba(255,255,255,.1)}
 #postLoginView .activate-btn:hover{background:linear-gradient(135deg,#ff3d3d,#c81e1e);transform:translateY(-2px);box-shadow:0 0 50px rgba(255,61,61,.8),0 8px 22px rgba(0,0,0,.4)}
 
-#postLoginView .bonus-card{background:linear-gradient(135deg,rgba(5,28,17,.95),rgba(2,10,7,.95));border:1px solid rgba(255,180,0,.35);border-radius:18px;padding:20px;position:relative;overflow:hidden}
-#postLoginView .bonus-card::before{content:"";position:absolute;top:0;left:0;right:0;height:1px;background:linear-gradient(90deg,transparent,#ffb400,transparent);opacity:.7}
-#postLoginView .bonus-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;flex-wrap:wrap;gap:8px}
-#postLoginView .bonus-head h2{font-size:.78rem;color:#ffb400;letter-spacing:.15em;text-transform:uppercase;text-shadow:0 0 8px rgba(255,180,0,.5)}
-#postLoginView .bonus-tier{background:rgba(255,180,0,.15);border:1px solid rgba(255,180,0,.4);color:#ffd76b;padding:5px 12px;border-radius:99px;font-size:.72rem;font-weight:800}
-#postLoginView .bonus-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:14px}
-#postLoginView .bonus-stat{background:#020a06;border:1px solid rgba(255,180,0,.25);border-radius:12px;padding:12px;text-align:center}
-#postLoginView .bonus-stat h5{font-size:.62rem;color:#8a7a4a;text-transform:uppercase;letter-spacing:.08em;margin-bottom:5px;font-weight:normal}
-#postLoginView .bonus-stat .bv{font-size:1.2rem;font-weight:bold;color:#ffd76b;text-shadow:0 0 10px rgba(255,180,0,.5)}
-#postLoginView .progress-wrap{background:#020a06;border:1px solid rgba(255,180,0,.25);border-radius:99px;height:12px;overflow:hidden;margin-top:6px}
-#postLoginView .progress-bar{height:100%;background:linear-gradient(90deg,#00ff78,#ffb400);border-radius:99px;transition:width .6s ease}
-#postLoginView .progress-label{display:flex;justify-content:space-between;font-size:.68rem;color:#8a7a4a;margin-top:6px}
+/* RATE CARD (replaces Bonus Multiplier) */
+#postLoginView .rate-card{background:linear-gradient(135deg,rgba(5,28,17,.95),rgba(2,10,7,.95));border:1px solid rgba(255,180,0,.35);border-radius:18px;padding:20px;position:relative;overflow:hidden}
+#postLoginView .rate-card::before{content:"";position:absolute;top:0;left:0;right:0;height:1px;background:linear-gradient(90deg,transparent,#ffb400,transparent);opacity:.7}
+#postLoginView .rate-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;flex-wrap:wrap;gap:8px}
+#postLoginView .rate-head h2{font-size:.78rem;color:#ffb400;letter-spacing:.15em;text-transform:uppercase;text-shadow:0 0 8px rgba(255,180,0,.5)}
+#postLoginView .rate-current{background:rgba(255,180,0,.15);border:1px solid rgba(255,180,0,.4);color:#ffd76b;padding:5px 12px;border-radius:99px;font-size:.72rem;font-weight:800}
+#postLoginView .rate-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:14px}
+#postLoginView .rate-stat{background:#020a06;border:1px solid rgba(255,180,0,.25);border-radius:12px;padding:12px;text-align:center}
+#postLoginView .rate-stat h5{font-size:.62rem;color:#8a7a4a;text-transform:uppercase;letter-spacing:.08em;margin-bottom:5px;font-weight:normal}
+#postLoginView .rate-stat .bv{font-size:1.2rem;font-weight:bold;color:#ffd76b;text-shadow:0 0 10px rgba(255,180,0,.5)}
+#postLoginView .rate-info{margin-top:12px;padding:12px;background:rgba(0,255,120,.05);border-radius:10px;border-left:3px solid #00ff78;font-size:.78rem;color:#a8c9b6;line-height:1.7}
+#postLoginView .rate-info b{color:#00ff78}
+#postLoginView .rate-table{width:100%;border-collapse:collapse;margin-top:12px;font-size:.76rem}
+#postLoginView .rate-table th,#postLoginView .rate-table td{padding:7px 4px;text-align:left;border-bottom:1px solid rgba(255,180,0,.15)}
+#postLoginView .rate-table th{color:#ffb400;text-transform:uppercase;font-size:.62rem;letter-spacing:.08em;font-weight:800}
+#postLoginView .rate-table td{color:#c6e8d4}
+#postLoginView .rate-table td:last-child{color:#ffd76b;font-weight:700;text-align:right}
+#postLoginView .rate-table tr:last-child td{border-bottom:0}
+
+/* WITHDRAW CARD */
+#postLoginView .withdraw-card{background:linear-gradient(135deg,rgba(8,42,23,.98) 0%,rgba(3,18,10,.98) 100%);border:2px solid rgba(0,255,120,.5);border-radius:22px;padding:24px 22px;position:relative;overflow:hidden;box-shadow:0 0 40px rgba(0,255,120,.15),inset 0 0 60px rgba(0,255,120,.03)}
+#postLoginView .withdraw-card::before{content:"";position:absolute;top:0;left:0;right:0;height:2px;background:linear-gradient(90deg,transparent,#00ff78,#00c963,#00ff78,transparent);opacity:.9}
+#postLoginView .withdraw-head{display:flex;align-items:center;gap:10px;margin-bottom:14px;flex-wrap:wrap}
+#postLoginView .withdraw-step{background:linear-gradient(135deg,#00ff78,#00c963);color:#001b0c;padding:5px 13px;border-radius:99px;font-size:.65rem;font-weight:900;letter-spacing:.12em;box-shadow:0 0 20px rgba(0,255,120,.5)}
+#postLoginView .withdraw-card h2{font-size:.9rem;color:#00ff78;letter-spacing:.18em;text-transform:uppercase;margin:0;text-shadow:0 0 10px rgba(0,255,120,.6);font-weight:800}
+#postLoginView .withdraw-desc{color:#a8c9b6;font-size:.82rem;margin-bottom:16px;line-height:1.6}
+#postLoginView .withdraw-grid{display:grid;grid-template-columns:1fr 1fr;gap:11px;margin-bottom:14px}
+#postLoginView .withdraw-item{background:#020a06;border:1px solid rgba(0,255,120,.25);border-radius:12px;padding:14px 12px;text-align:center}
+#postLoginView .withdraw-item h5{font-size:.6rem;color:#6f9981;text-transform:uppercase;letter-spacing:.1em;margin-bottom:6px;font-weight:700}
+#postLoginView .withdraw-item .bv{font-size:1.05rem;font-weight:bold;color:#00ff78;text-shadow:0 0 10px rgba(0,255,120,.5);line-height:1.3}
+#postLoginView .withdraw-item .sub{font-size:.62rem;color:#7fffb8;margin-top:3px;letter-spacing:.03em}
+#postLoginView .withdraw-btn{display:block;background:linear-gradient(135deg,#00ff78,#00d96b);color:#001b0c;padding:15px 20px;border-radius:12px;font-weight:900;font-size:.9rem;text-align:center;transition:.2s;box-shadow:0 0 30px rgba(0,255,120,.4),0 6px 18px rgba(0,0,0,.3);letter-spacing:.04em;cursor:pointer;border:0;width:100%;font-family:inherit}
+#postLoginView .withdraw-btn:hover{background:linear-gradient(135deg,#00e86b,#00c05a);transform:translateY(-2px);box-shadow:0 0 50px rgba(0,255,120,.7),0 8px 22px rgba(0,0,0,.4)}
+#postLoginView .withdraw-note{margin-top:12px;padding:12px;background:rgba(0,255,120,.06);border-radius:10px;border-left:3px solid #00ff78;font-size:.76rem;color:#a8c9b6;line-height:1.7}
+#postLoginView .withdraw-note b{color:#00ff78}
 
 #postLoginView .dash-title{display:flex;align-items:center;justify-content:space-between;margin:26px 0 14px;flex-wrap:wrap;gap:10px}
 #postLoginView .dash-title h2{font-size:1.05rem;letter-spacing:.05em;display:flex;align-items:center;gap:8px}
@@ -430,7 +366,6 @@ html,body{overflow-x:hidden}
 #postLoginView .earn-table th,#postLoginView .earn-table td{padding:8px 6px;text-align:left;border-bottom:1px solid rgba(0,255,120,.15)}
 #postLoginView .earn-table th{color:#00ff78;text-transform:uppercase;font-size:.68rem;letter-spacing:.08em}
 #postLoginView .earn-table td{color:#c6e8d4}
-#postLoginView .earn-table tr.hl{background:rgba(0,255,120,.08)}
 #postLoginView .earn-box{background:#020a06;border:1px dashed rgba(0,255,120,.35);border-radius:10px;padding:12px;margin:12px 0;color:#7fffb8;font-size:.8rem;line-height:1.7}
 #postLoginView .notif-item{padding:12px;border-radius:10px;background:#04180e;border-left:3px solid #00ff78;margin-bottom:10px;font-size:.82rem;color:#c6e8d4}
 #postLoginView .notif-item .nt{font-size:.66rem;color:#6f9981;margin-top:4px}
@@ -466,7 +401,7 @@ html,body{overflow-x:hidden}
   #postLoginView .key-text{font-size:.82rem;letter-spacing:1.5px}
   #postLoginView .bot-links{grid-template-columns:1fr}
   #postLoginView .chart-box{height:260px;padding:14px}
-  #postLoginView .bonus-grid{grid-template-columns:1fr}
+  #postLoginView .rate-grid,#postLoginView .withdraw-grid{grid-template-columns:1fr}
   #postLoginView .hero{padding:22px 12px}
   #postLoginView .api-card h2{font-size:.78rem;letter-spacing:.12em}
   #postLoginView .copy{padding:11px 18px;font-size:.75rem}
@@ -481,7 +416,7 @@ html,body{overflow-x:hidden}
 </head>
 <body>
 
-<!-- ============ GLOBAL SPLASH LOADER ============ -->
+<!-- SPLASH -->
 <div id="splashLoader">
   <div class="sp-inner">
     <svg class="sp-eye" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
@@ -501,25 +436,23 @@ html,body{overflow-x:hidden}
       <path d="M8 50 Q25 15 50 18 Q75 15 92 50" fill="none" stroke="#00ff78" stroke-width="2" stroke-linecap="round"/>
       <path d="M8 50 Q25 85 50 82 Q75 85 92 50" fill="none" stroke="#00c963" stroke-width="1.5"/>
     </svg>
-    <div class="sp-brand">maya<span>Jaal</span></div>
+    <div class="sp-brand"><span class="lg-maya">Maya</span><span class="lg-jaal">Jaal</span></div>
     <div class="sp-tag">The Digital Network</div>
     <div class="sp-bar"><i></i></div>
     <div class="sp-status" id="splashText">INITIALIZING MATRIX</div>
   </div>
 </div>
 
-<!-- ============================================================
-     PRE-LOGIN VIEW
-     ============================================================ -->
+<!-- PRE-LOGIN VIEW -->
 <div id="preLoginView">
 
 <nav class="navbar">
-  <div class="logo">MayaJaal.online</div>
+  <div class="logo"><span class="lg-maya">Maya</span><span class="lg-jaal">Jaal</span><span style="color:#ffb800;margin-left:2px">.online</span></div>
   <div class="nav-links">
-    <a href="#features" data-i18n="nav_features">Features</a>
-    <a href="#earning" data-i18n="nav_earning">Earning</a>
-    <a href="#steps" data-i18n="nav_steps">How To</a>
-    <a href="#api" data-i18n="nav_api">API</a>
+    <a href="#features">Features</a>
+    <a href="#earning">Earning</a>
+    <a href="#steps">How To</a>
+    <a href="#api">API</a>
     <select id="langSelect" class="lang-select" onchange="changeLang(this.value)">
       <option value="en">🌐 English</option>
       <option value="hi">🇮🇳 हिन्दी</option>
@@ -549,15 +482,15 @@ html,body{overflow-x:hidden}
 </nav>
 
 <header class="hero">
-  <h1 data-i18n="hero_title">Welcome to <span>MayaJaal.online</span> 🚀</h1>
-  <p data-i18n="hero_sub">Connect your API key, download the app, and start earning money online. Upload videos, share links, and earn from views.</p>
+  <h1>Welcome to <span>MayaJaal.online</span> 🚀</h1>
+  <p>Connect your API key, download the app, and start earning money online. Upload videos, share links, and earn from views.</p>
   <a href="https://github.com/MayaJaal1/Mayajaall/releases/latest/download/app-release.apk" class="btn btn-green" download>📥 Download App</a>
-  <a href="#earning" class="btn btn-outline" data-i18n="hero_btn2">💰 View Earning Rates</a>
+  <a href="#earning" class="btn btn-outline">💰 View Earning Rates</a>
 </header>
 
 <section id="api" class="fade-in">
-  <h2 class="section-title" data-i18n="api_title">🔗 Connect Your <span>API Key</span></h2>
-  <p class="section-sub" data-i18n="api_sub">Your unique encrypted Matrix Key is ready to connect. One tap to copy, then activate in the bot.</p>
+  <h2 class="section-title">🔗 Connect Your <span>API Key</span></h2>
+  <p class="section-sub">Your unique encrypted Matrix Key is ready to connect. One tap to copy, then activate in the bot.</p>
 
   <div id="login-section">
     <div class="login-card">
@@ -573,68 +506,70 @@ html,body{overflow-x:hidden}
         </svg>
         <span>Sign in with Google</span>
       </button>
-      <div class="login-footer-note">
-        <span style="color:var(--green);">🔒</span> 100% Secure. We never post without your permission.
-      </div>
+      <div class="login-footer-note"><span style="color:var(--green);">🔒</span> 100% Secure. We never post without your permission.</div>
     </div>
   </div>
 </section>
 
 <section id="features" class="fade-in">
-  <h2 class="section-title" data-i18n="feat_title">✨ Why Choose <span>MayaJaal</span>?</h2>
-  <p class="section-sub" data-i18n="feat_sub">Everything you need to earn money online, all in one place.</p>
+  <h2 class="section-title">✨ Why Choose <span>MayaJaal</span>?</h2>
+  <p class="section-sub">Everything you need to earn money online, all in one place.</p>
   <div class="features-grid">
-    <div class="feature-card"><div class="feature-icon">💰</div><h3 data-i18n="feat1h">Earn Real Money</h3><p data-i18n="feat1p">Get paid for every view and share. Minimum withdrawal only $5 via UPI.</p></div>
-    <div class="feature-card"><div class="feature-icon">🎬</div><h3 data-i18n="feat2h">Upload Unlimited Videos</h3><p data-i18n="feat2p">Upload as many videos as you want and share them everywhere.</p></div>
-    <div class="feature-card"><div class="feature-icon">🔄</div><h3 data-i18n="feat3h">Bulk Link Converter</h3><p data-i18n="feat3p">Convert multiple links at once with our powerful Telegram bot.</p></div>
-    <div class="feature-card"><div class="feature-icon">⚡</div><h3 data-i18n="feat4h">Instant Payment</h3><p data-i18n="feat4p">Withdraw your earnings instantly via UPI. No hidden charges.</p></div>
+    <div class="feature-card"><div class="feature-icon">💰</div><h3>Earn Real Money</h3><p>Get paid for every view and share. Minimum withdrawal only $5 via UPI or Bank Transfer.</p></div>
+    <div class="feature-card"><div class="feature-icon">🎬</div><h3>Upload Unlimited Videos</h3><p>Upload as many videos as you want and share them everywhere.</p></div>
+    <div class="feature-card"><div class="feature-icon">🔄</div><h3>Bulk Link Converter</h3><p>Convert multiple links at once with our powerful Telegram bot.</p></div>
+    <div class="feature-card"><div class="feature-icon">⚡</div><h3>Instant Payment</h3><p>Withdraw earnings via UPI (24 hrs) or Bank Transfer (instant on working days).</p></div>
   </div>
 </section>
 
 <section id="earning" class="fade-in">
-  <h2 class="section-title" data-i18n="earn_title">💰 Earning Rates – How Much Will You Earn?</h2>
-  <p class="section-sub" data-i18n="earn_sub">Full rate table below. The more views and shares, the more you earn.</p>
+  <h2 class="section-title">💰 Earning Rates – How Much Will You Earn?</h2>
+  <p class="section-sub">Simple and transparent. The more views you get, the more you earn.</p>
   <div class="earn-table">
     <table>
-      <thead><tr><th data-i18n="tbl_h1">Views / Shares</th><th data-i18n="tbl_h2">Earning</th></tr></thead>
+      <thead><tr><th>Views / Shares</th><th>Earning</th></tr></thead>
       <tbody>
-        <tr><td data-i18n="tbl_r1">1,000 Views</td><td class="earn-amt">$1</td></tr>
-        <tr><td data-i18n="tbl_r2">2,000 Views</td><td class="earn-amt">$2</td></tr>
-        <tr><td data-i18n="tbl_r3">After 2k, every 1,000 Views</td><td class="earn-amt">$2</td></tr>
-        <tr><td data-i18n="tbl_r4">10,000 Views</td><td class="earn-amt">$25</td></tr>
-        <tr><td data-i18n="tbl_r5">20,000 Views</td><td class="earn-amt">$55</td></tr>
-        <tr><td data-i18n="tbl_r6">1,000 App Shares (with login)</td><td class="earn-amt">$1.5 – $2</td></tr>
+        <tr><td>1,000 Views</td><td class="earn-amt">$1</td></tr>
+        <tr><td>1,500 Views</td><td class="earn-amt">$2</td></tr>
+        <tr><td>2,000 Views</td><td class="earn-amt">$3</td></tr>
+        <tr><td>3,000 Views</td><td class="earn-amt">$5</td></tr>
+        <tr><td>5,000 Views</td><td class="earn-amt">$9</td></tr>
+        <tr><td>10,000 Views</td><td class="earn-amt">$19</td></tr>
+        <tr><td>20,000 Views</td><td class="earn-amt">$39</td></tr>
       </tbody>
     </table>
   </div>
+  <p style="text-align:center;color:var(--muted);max-width:700px;margin:20px auto 0;font-size:.95rem;line-height:1.7">
+    <b style="color:var(--accent)">Rate formula:</b> First 1,000 views pay <b style="color:#fff">$1</b>. Every additional 1,000 views after that pay <b style="color:#fff">$2</b>.
+  </p>
 </section>
 
 <section id="steps" class="fade-in">
-  <h2 class="section-title" data-i18n="steps_title">🚀 How To Earn – Step by Step</h2>
-  <p class="section-sub" data-i18n="steps_sub">Start earning in just 7 easy steps.</p>
+  <h2 class="section-title">🚀 How To Earn – Step by Step</h2>
+  <p class="section-sub">Start earning in just 7 easy steps.</p>
   <div class="steps-grid">
-    <div class="step-card"><div class="step-num">1</div><h3 data-i18n="s1h">Connect Bot</h3><p data-i18n="s1p">Connect the video upload bot and bulk converter bot on Telegram.</p></div>
-    <div class="step-card"><div class="step-num">2</div><h3 data-i18n="s2h">Upload Video</h3><p data-i18n="s2p">Upload video to the top bot (Mayajaalfilebot) — it gives you a link.</p></div>
-    <div class="step-card"><div class="step-num">3</div><h3 data-i18n="s3h">Convert Link</h3><p data-i18n="s3p">The bottom bot (MayaJaalBulkConverterbot) converts your link.</p></div>
-    <div class="step-card"><div class="step-num">4</div><h3 data-i18n="s4h">Share Link</h3><p data-i18n="s4p">Share converted link on WhatsApp, Facebook, Instagram, Telegram.</p></div>
-    <div class="step-card"><div class="step-num">5</div><h3 data-i18n="s5h">Get Views</h3><p data-i18n="s5p">The more people click, the more views and earnings.</p></div>
-    <div class="step-card"><div class="step-num">6</div><h3 data-i18n="s6h">Earning Accrues</h3><p data-i18n="s6p">Money is added to your account based on views.</p></div>
-    <div class="step-card"><div class="step-num">7</div><h3 data-i18n="s7h">Withdraw</h3><p data-i18n="s7p">Withdraw via UPI at $5. Payment within 24 hours.</p></div>
+    <div class="step-card"><div class="step-num">1</div><h3>Connect Bot</h3><p>Connect the video upload bot and bulk converter bot on Telegram.</p></div>
+    <div class="step-card"><div class="step-num">2</div><h3>Upload Video</h3><p>Upload video to the top bot (Mayajaalfilebot) — it gives you a link.</p></div>
+    <div class="step-card"><div class="step-num">3</div><h3>Convert Link</h3><p>The bottom bot (MayaJaalBulkConverterbot) converts your link.</p></div>
+    <div class="step-card"><div class="step-num">4</div><h3>Share Link</h3><p>Share converted link on WhatsApp, Facebook, Instagram, Telegram.</p></div>
+    <div class="step-card"><div class="step-num">5</div><h3>Get Views</h3><p>The more people click, the more views and earnings.</p></div>
+    <div class="step-card"><div class="step-num">6</div><h3>Earning Accrues</h3><p>Money is added to your account based on views.</p></div>
+    <div class="step-card"><div class="step-num">7</div><h3>Withdraw</h3><p>Withdraw via UPI at $5 (24 hrs) or Bank Transfer (instant, working days).</p></div>
   </div>
 </section>
 
 <section class="fade-in">
   <div class="cta-box">
-    <h3 data-i18n="cta_h">🎯 Start Today!</h3>
-    <p data-i18n="cta_p">Download app → connect bot → upload video → convert link → share → get views → earn $5 → withdraw via UPI!</p>
+    <h3>🎯 Start Today!</h3>
+    <p>Download app → connect bot → upload video → convert link → share → get views → earn $5 → withdraw via UPI or Bank Transfer!</p>
     <a href="https://github.com/MayaJaal1/Mayajaall/releases/latest/download/app-release.apk" class="btn btn-green" download>📥 Download App</a>
-    <a href="https://t.me/Mayajaalfilebot" target="_blank" class="btn" data-i18n="cta_b2">🤖 Open Upload Bot</a>
+    <a href="https://t.me/Mayajaalfilebot" target="_blank" class="btn">🤖 Open Upload Bot</a>
   </div>
 </section>
 
 <footer>
-  <div class="logo">MayaJaal.online</div>
-  <p data-i18n="foot">Earn, Grow, Win! 🚀</p>
+  <div class="logo" style="justify-content:center"><span class="lg-maya">Maya</span><span class="lg-jaal">Jaal</span><span style="color:#ffb800;margin-left:2px">.online</span></div>
+  <p>Earn, Grow, Win! 🚀</p>
   <p style="margin-top:10px;font-size:0.8rem;">© 2025 MayaJaal.online</p>
 </footer>
 
@@ -652,9 +587,7 @@ html,body{overflow-x:hidden}
 </div><!-- /preLoginView -->
 
 
-<!-- ============================================================
-     POST-LOGIN VIEW (Dashboard)
-     ============================================================ -->
+<!-- POST-LOGIN VIEW -->
 <div id="postLoginView" class="view-hidden">
 
 <canvas id="matrix"></canvas>
@@ -682,7 +615,7 @@ html,body{overflow-x:hidden}
       <path d="M8 50 Q25 15 50 18 Q75 15 92 50" fill="none" stroke="#00ff78" stroke-width="2" stroke-linecap="round"/>
       <path d="M8 50 Q25 85 50 82 Q75 85 92 50" fill="none" stroke="#00c963" stroke-width="1.5"/>
     </svg>
-    <div class="loading-brand">maya<span>Jaal</span></div>
+    <div class="loading-brand"><span class="lg-maya">Maya</span><span class="lg-jaal">Jaal</span></div>
     <div class="loading-tagline">The Digital Network</div>
     <div class="loading-bar-wrap"><div class="loading-bar"></div></div>
     <div class="loading-status" id="loadingStatus"><span class="ldot"></span><span id="loadingText">INITIALIZING MATRIX</span></div>
@@ -696,7 +629,7 @@ html,body{overflow-x:hidden}
     <div class="side-brand-inner">
       <div class="side-brand-logo">M</div>
       <div>
-        <div class="side-brand-text">maya<span>Jaal</span></div>
+        <div class="side-brand-text"><span class="lg-maya">Maya</span><span class="lg-jaal">Jaal</span></div>
         <div class="side-brand-sub">The Digital Network</div>
       </div>
     </div>
@@ -721,8 +654,8 @@ html,body{overflow-x:hidden}
 
     <div class="menu-section">
       <h4>Earnings</h4>
-      <button class="menu-item" data-act="bonus"><span class="ico">🎁</span><span class="lbl">Bonus</span><span class="badge green">NEW</span></button>
       <button class="menu-item" data-act="earnings"><span class="ico">💰</span><span class="lbl">Earnings Model</span></button>
+      <button class="menu-item" data-act="withdraw"><span class="ico">💸</span><span class="lbl">Withdraw</span><span class="badge green">NEW</span></button>
     </div>
 
     <div class="menu-section">
@@ -744,7 +677,7 @@ html,body{overflow-x:hidden}
       <span class="lo-ico">⏻</span>
       <span>Logout</span>
     </button>
-    <div class="menu-version">v2.0 · MayaJaal</div>
+    <div class="menu-version">v3.0 · MayaJaal</div>
   </div>
 </div>
 <div class="menu-overlay" id="menuOverlay"></div>
@@ -752,12 +685,9 @@ html,body{overflow-x:hidden}
 <div class="app" id="appScreen">
 <div class="wrap">
   <div class="topbar">
-    <div class="brand-wrap"><div class="snake"></div><div class="brand">maya<span>Jaal</span></div></div>
+    <div class="brand-wrap"><div class="snake"></div><div class="brand"><span class="lg-maya">Maya</span><span class="lg-jaal">Jaal</span></div></div>
     <div class="top-right">
-      <button class="notif-btn" id="notifBtn" title="Notifications" type="button">
-        🔔
-        <span class="notif-dot" id="notifDot" style="display:none">0</span>
-      </button>
+      <button class="notif-btn" id="notifBtn" title="Notifications" type="button">🔔<span class="notif-dot" id="notifDot" style="display:none">0</span></button>
       <div class="user-chip"><img id="uPic" src=""><span class="uc-name" id="uName">User</span></div>
     </div>
   </div>
@@ -792,8 +722,6 @@ html,body{overflow-x:hidden}
         <path d="M30 170 Q200 -10 400 20 Q600 -10 770 170 Q600 330 400 320 Q200 330 30 170 Z" fill="url(#sclera)"/>
         <g clip-path="url(#eyeClip)">
           <rect x="0" y="0" width="800" height="130" fill="url(#shadow)"/>
-          <path d="M60 180 Q90 160 120 175" stroke="#c98a8a" stroke-width="1" fill="none" opacity=".4"/>
-          <path d="M680 180 Q710 165 740 175" stroke="#c98a8a" stroke-width="1" fill="none" opacity=".4"/>
           <ellipse cx="400" cy="170" rx="128" ry="138" fill="url(#iris)"/>
           <g id="fibers"></g>
           <ellipse cx="400" cy="170" rx="58" ry="62" fill="url(#pupil)"/>
@@ -801,19 +729,11 @@ html,body{overflow-x:hidden}
           <ellipse cx="338" cy="102" rx="12" ry="10" fill="#fff"/>
           <circle cx="460" cy="222" r="12" fill="#c6ffdc" opacity=".7"/>
           <circle cx="325" cy="140" r="6" fill="#fff" opacity=".85"/>
-          <circle cx="430" cy="115" r="5" fill="#fff" opacity=".55"/>
           <path class="eyelid top" d="M30 170 Q200 -10 400 20 Q600 -10 770 170 L770 -30 L30 -30 Z" fill="#030803"/>
           <path class="eyelid bot" d="M30 170 Q200 330 400 320 Q600 330 770 170 L770 370 L30 370 Z" fill="#030803"/>
         </g>
         <path d="M30 170 Q200 -10 400 20 Q600 -10 770 170" fill="none" stroke="#0a1f12" stroke-width="4" stroke-linecap="round"/>
         <path d="M30 170 Q200 330 400 320 Q600 330 770 170" fill="none" stroke="#0a1f12" stroke-width="3" stroke-linecap="round"/>
-        <g stroke="#050a07" stroke-width="3" stroke-linecap="round" fill="none">
-          <path d="M90 55 Q82 20 78 5"/><path d="M170 25 Q165 -8 160 -22"/>
-          <path d="M250 12 Q247 -18 244 -35"/><path d="M330 5 Q328 -25 325 -42"/>
-          <path d="M410 8 Q408 -22 405 -40"/><path d="M490 18 Q488 -12 485 -28"/>
-          <path d="M570 38 Q568 8 565 -5"/><path d="M650 68 Q648 40 645 25"/>
-          <path d="M720 105 Q718 80 715 65"/>
-        </g>
       </svg>
     </div>
     <div class="status"><span class="dot"></span> MATRIX EYE SYSTEM · <span id="i18nOnline">ONLINE</span></div>
@@ -827,19 +747,13 @@ html,body{overflow-x:hidden}
   </div>
 
   <div class="api-card">
-    <div class="api-head">
-      <span class="api-step">STEP 1</span>
-      <h2 class="snk d1" id="i18nApiTitle">🔑 YOUR API KEY</h2>
-    </div>
-    <p class="api-desc" id="i18nApiDesc">Yeh key aapke account se linked hai. Har user ki alag hoti hai aur hamesha same rehti hai.</p>
+    <div class="api-head"><span class="api-step">STEP 1</span><h2 id="i18nApiTitle">🔑 YOUR API KEY</h2></div>
+    <p class="api-desc" id="i18nApiDesc">This key is linked to your account. Each user has a unique key that never changes.</p>
     <div class="api-row">
       <div class="key-text loading" id="apiKeyEl">LOADING KEY...</div>
       <button class="copy" id="copyBtn" disabled>📋 COPY</button>
     </div>
-    <div class="bot-hint">
-      <span class="hint-label">⚡ Bot me bhejein:</span>
-      <code id="cmdEl">/api YOUR_KEY</code>
-    </div>
+    <div class="bot-hint"><span class="hint-label">⚡ Send to Bot:</span><code id="cmdEl">/api YOUR_KEY</code></div>
     <a href="https://t.me/Mayajaalfilebot" id="botBtn" target="_blank" class="activate-btn">⚡ <span id="i18nActivate">Activate in Telegram Bot</span></a>
   </div>
 
@@ -850,18 +764,30 @@ html,body{overflow-x:hidden}
     <script src="https://dcengg.org/22/470dccb4e97c61ebf61e75825a395e9d"></script>
   </div>
 
-  <div class="bonus-card">
-    <div class="bonus-head">
-      <h2 class="snk d1">🎁 BONUS MULTIPLIER</h2>
-      <span class="bonus-tier" id="bonusTier">TIER 1</span>
+  <!-- EARNINGS RATE CARD -->
+  <div class="rate-card">
+    <div class="rate-head">
+      <h2 class="snk d1">💰 EARNINGS RATE</h2>
+      <span class="rate-current" id="rateCurrent">$1.00 / 1K</span>
     </div>
-    <div class="bonus-grid">
-      <div class="bonus-stat"><h5>Current Rate</h5><div class="bv" id="bonusRate">$1.00<span style="font-size:.65rem;color:#8a7a4a">/1K</span></div></div>
-      <div class="bonus-stat"><h5>Next Boost In</h5><div class="bv" id="bonusNext">1000<span style="font-size:.65rem;color:#8a7a4a"> views</span></div></div>
+    <div class="rate-grid">
+      <div class="rate-stat"><h5>First 1K Views</h5><div class="bv" id="rateFirst">$1.00</div></div>
+      <div class="rate-stat"><h5>Every 1K After That</h5><div class="bv" id="rateAfter">$2.00</div></div>
     </div>
-    <div class="progress-wrap"><div class="progress-bar" id="bonusProgress" style="width:0%"></div></div>
-    <div class="progress-label"><span id="bonusFrom">0</span><span id="bonusTo">1000</span></div>
-    <p style="font-size:.72rem;color:#8a7a4a;margin-top:10px;line-height:1.5">Har 2,000 views ke baad rate ×1.5 ho jata hai. <a href="#" data-act="earnings" style="color:#ffd76b;text-decoration:underline">Poora model dekhein →</a></p>
+    <div class="rate-info">
+      <b>How it works:</b> Your first 1,000 views pay <b>$1</b>. Every 1,000 views after that pay <b>$2</b>.
+    </div>
+    <table class="rate-table">
+      <thead><tr><th>Total Views</th><th>Total Earning</th></tr></thead>
+      <tbody>
+        <tr><td>1,000</td><td>$1</td></tr>
+        <tr><td>2,000</td><td>$3</td></tr>
+        <tr><td>3,000</td><td>$5</td></tr>
+        <tr><td>5,000</td><td>$9</td></tr>
+        <tr><td>10,000</td><td>$19</td></tr>
+        <tr><td>20,000</td><td>$39</td></tr>
+      </tbody>
+    </table>
   </div>
 
   <div class="ad-slot has-ad" data-ad="mid2">
@@ -869,6 +795,27 @@ html,body{overflow-x:hidden}
       atOptions = { 'key' : '70777a910d426053c0d28e23beec3eb5', 'format' : 'iframe', 'height' : 250, 'width' : 300, 'params' : {} };
     </script>
     <script src="https://dcengg.org/22/70777a910d426053c0d28e23beec3eb5"></script>
+  </div>
+
+  <!-- WITHDRAW CARD -->
+  <div class="withdraw-card">
+    <div class="withdraw-head"><span class="withdraw-step">WITHDRAW</span><h2>💸 CASH OUT YOUR EARNINGS</h2></div>
+    <p class="withdraw-desc">Withdraw your earnings instantly via UPI or Bank Transfer. Minimum withdrawal is $5.</p>
+    <div class="withdraw-grid">
+      <div class="withdraw-item"><h5>Minimum</h5><div class="bv">$5<span style="font-size:.7rem;color:#6f9981"> USD</span></div><div class="sub">One-time minimum</div></div>
+      <div class="withdraw-item"><h5>UPI Payout</h5><div class="bv">24 hrs</div><div class="sub">Max wait time</div></div>
+      <div class="withdraw-item"><h5>Bank Transfer</h5><div class="bv">Instant</div><div class="sub">On working days</div></div>
+      <div class="withdraw-item"><h5>Fees</h5><div class="bv">$0</div><div class="sub">No hidden charges</div></div>
+    </div>
+    <div class="withdraw-note"><b>Payment methods:</b> UPI (UPI ID) · Bank Transfer (Account Number + IFSC). Both processed automatically. Contact support if payment is delayed over 24 hours.</div>
+    <button class="withdraw-btn" onclick="alert('Minimum $5 required. Please connect your Telegram bot and reach $5 first.')">💸 Request Withdrawal</button>
+  </div>
+
+  <div class="ad-slot has-ad tall" data-ad="mid3">
+    <script>
+      atOptions = { 'key' : 'f74baf894b5615c662b5edc712db6434', 'format' : 'iframe', 'height' : 600, 'width' : 160, 'params' : {} };
+    </script>
+    <script src="https://dcengg.org/22/f74baf894b5615c662b5edc712db6434"></script>
   </div>
 
   <div class="dash-title">
@@ -882,13 +829,6 @@ html,body{overflow-x:hidden}
     <div class="stat"><h4 id="i18nConv">Conversions</h4><div class="v" id="sConv">0</div></div>
     <div class="stat"><h4 id="i18nTotalInc">Total Income</h4><div class="v" id="sInc">$0</div></div>
     <div class="stat"><h4 id="i18nTodayInc">Today Income</h4><div class="v" id="sTodayInc">$0</div></div>
-  </div>
-
-  <div class="ad-slot has-ad tall" data-ad="mid3">
-    <script>
-      atOptions = { 'key' : 'f74baf894b5615c662b5edc712db6434', 'format' : 'iframe', 'height' : 600, 'width' : 160, 'params' : {} };
-    </script>
-    <script src="https://dcengg.org/22/f74baf894b5615c662b5edc712db6434"></script>
   </div>
 
   <div class="chart-grid">
@@ -916,14 +856,8 @@ html,body{overflow-x:hidden}
   <div class="bots-section">
     <h3 class="snk blk d1">▶ <span id="i18nBotsTitle">OFFICIAL BOTS</span></h3>
     <div class="bot-links">
-      <a class="bot-link" href="https://t.me/Mayajaalfilebot" target="_blank">
-        <span class="b-ico">➤</span>
-        <div class="b-info"><h4>MayaJaal File Bot</h4><p>Upload & file links</p></div>
-      </a>
-      <a class="bot-link" href="https://t.me/MayaJaalBulkConverterbot" target="_blank">
-        <span class="b-ico">⇄</span>
-        <div class="b-info"><h4>Bulk Converter Bot</h4><p>Convert multiple links</p></div>
-      </a>
+      <a class="bot-link" href="https://t.me/Mayajaalfilebot" target="_blank"><span class="b-ico">➤</span><div class="b-info"><h4>MayaJaal File Bot</h4><p>Upload & file links</p></div></a>
+      <a class="bot-link" href="https://t.me/MayaJaalBulkConverterbot" target="_blank"><span class="b-ico">⇄</span><div class="b-info"><h4>Bulk Converter Bot</h4><p>Convert multiple links</p></div></a>
     </div>
   </div>
 
@@ -948,9 +882,7 @@ html,body{overflow-x:hidden}
 </div><!-- /postLoginView -->
 
 <script>
-/* ============================================================
-   FIREBASE INIT
-   ============================================================ */
+/* FIREBASE INIT */
 var firebaseConfig = {
   apiKey: "AIzaSyDI5hgBbaUeTpXcPIlAnq5yDjIenfY-ylM",
   authDomain: "mayajaal-app.firebaseapp.com",
@@ -977,9 +909,7 @@ var currentKey = '';
 var matrixRunning = false;
 var matrixRAF = null;
 
-/* ============================================================
-   VIEW TOGGLE
-   ============================================================ */
+/* VIEW TOGGLE */
 function showPreLogin(){
   $('preLoginView').classList.remove('view-hidden');
   $('postLoginView').classList.add('view-hidden');
@@ -1022,9 +952,7 @@ function showPostLogin(user){
   hideSplash();
 }
 
-/* ============================================================
-   SPLASH LOADER
-   ============================================================ */
+/* SPLASH */
 var splashHidden = false;
 function hideSplash(){
   if (splashHidden) return;
@@ -1036,9 +964,7 @@ function hideSplash(){
   }
 }
 
-/* ============================================================
-   USER STORAGE
-   ============================================================ */
+/* USER STORAGE */
 function getUserFromStorage(){
   try{
     var raw = localStorage.getItem('mayajaal_user');
@@ -1067,11 +993,9 @@ function clearUserStorage(){
   }catch(e){}
 }
 
-/* ============================================================
-   LOGOUT
-   ============================================================ */
+/* LOGOUT */
 window.doLogout = function(){
-  if (!confirm('Logout karna hai? Aapko dobara login karna padega.')) return;
+  if (!confirm('Are you sure you want to logout?')) return;
   clearUserStorage();
   try {
     if (auth) auth.signOut().then(function(){ showPreLogin(); });
@@ -1079,15 +1003,11 @@ window.doLogout = function(){
   } catch(e){ showPreLogin(); }
 };
 
-/* ============================================================
-   IMMEDIATE BOOT - splash visible, waiting for auth
-   ============================================================ */
+/* IMMEDIATE BOOT */
 (function immediateBoot(){
-  // Both views hidden initially. Splash is on top.
   $('preLoginView').classList.add('view-hidden');
   $('postLoginView').classList.add('view-hidden');
 
-  // If stored user, pre-start matrix + show dashboard behind splash
   var stored = getUserFromStorage();
   if (stored){
     currentUser = stored;
@@ -1095,7 +1015,6 @@ window.doLogout = function(){
     matrixRunning = true;
     resizeCanvas();
     drawMatrix();
-    // fill profile
     var name = stored.displayName || (stored.email ? stored.email.split('@')[0] : 'User');
     $('uName').textContent = name;
     $('mName').textContent = name;
@@ -1111,9 +1030,7 @@ window.doLogout = function(){
   }
 })();
 
-/* ============================================================
-   AUTH STATE
-   ============================================================ */
+/* AUTH STATE */
 var authResolved = false;
 if (auth){
   try { auth.setPersistence(firebase.auth.Auth.Persistence.LOCAL); } catch(e){}
@@ -1123,7 +1040,7 @@ if (auth){
     if (user){
       var provider = (user.providerData && user.providerData[0]) ? user.providerData[0].providerId : '';
       if (provider && provider !== 'google.com'){
-        alert('Only Google (Gmail) login allowed.');
+        alert('Only Google (Gmail) login is allowed.');
         auth.signOut();
         return;
       }
@@ -1136,20 +1053,17 @@ if (auth){
         hideLoading();
       }
     } else {
-      // No Firebase user
       clearUserStorage();
       currentUser = null;
       showPreLogin();
     }
   });
 } else {
-  // Firebase failed
   var stored0 = getUserFromStorage();
   if (stored0) showPostLogin(stored0);
   else showPreLogin();
 }
 
-// Fallback: if Firebase is too slow
 setTimeout(function(){
   if (!authResolved){
     var stored = getUserFromStorage();
@@ -1158,16 +1072,12 @@ setTimeout(function(){
   }
 }, 4000);
 
-/* ============================================================
-   LOGIN HANDLER (works on ALL .google-login-trigger buttons)
-   ============================================================ */
+/* LOGIN HANDLER */
 function triggerGoogleLogin(btn){
-  if (!auth){ alert('Login not available right now. Please refresh.'); return; }
-  // Disable all google buttons
+  if (!auth){ alert('Login is not available right now. Please refresh.'); return; }
   var allBtns = document.querySelectorAll('.google-login-trigger');
   allBtns.forEach(function(b){ b.disabled = true; });
 
-  // Change text of clicked button
   var txtSpan = btn.querySelector('span');
   var origText = txtSpan ? txtSpan.textContent : '';
   if (txtSpan) txtSpan.textContent = 'Connecting...';
@@ -1199,7 +1109,6 @@ function triggerGoogleLogin(btn){
         ov.classList.add('on');
         setTimeout(function(){ ov.classList.remove('on'); }, 900);
       }
-      // onAuthStateChanged handles the view switch
     })
     .catch(function(error){
       console.error('Login error:', error);
@@ -1211,15 +1120,12 @@ function triggerGoogleLogin(btn){
     });
 }
 
-// Bind to all google login buttons
 document.addEventListener('click', function(e){
   var btn = e.target.closest('.google-login-trigger');
   if (btn){ e.preventDefault(); triggerGoogleLogin(btn); }
 });
 
-/* ============================================================
-   TOAST
-   ============================================================ */
+/* TOAST */
 function showToast(msg, type){
   var t = document.createElement('div');
   t.className = 'mj-toast' + (type === 'error' ? ' error' : '');
@@ -1232,21 +1138,14 @@ function showToast(msg, type){
   }, 2200);
 }
 
-/* ============================================================
-   COPY SOUND
-   ============================================================ */
+/* COPY SOUND */
 function playCopyChime(){
   try {
     var AC = window.AudioContext || window.webkitAudioContext;
     if (!AC) return;
     var ctx = new AC();
     var now = ctx.currentTime;
-    var tones = [
-      { f: 659.25, t: 0,    d: 0.35, v: 0.18 },
-      { f: 880.00, t: 0.09, d: 0.45, v: 0.16 },
-      { f: 1174.66,t: 0.18, d: 0.55, v: 0.10 }
-    ];
-    tones.forEach(function(tone){
+    [{f:659.25,t:0,d:.35,v:.18},{f:880,t:.09,d:.45,v:.16},{f:1174.66,t:.18,d:.55,v:.10}].forEach(function(tone){
       var osc = ctx.createOscillator();
       var gain = ctx.createGain();
       osc.type = 'sine';
@@ -1264,9 +1163,7 @@ function playCopyChime(){
   } catch(e){}
 }
 
-/* ============================================================
-   TRANSLATIONS
-   ============================================================ */
+/* PRE-LOGIN TRANSLATIONS */
 var translations = {
   en:{nav_features:"Features",nav_earning:"Earning",nav_steps:"How To",nav_api:"API",
     hero_title:"Welcome to <span>MayaJaal.online</span> 🚀",
@@ -1294,294 +1191,31 @@ var translations = {
     cta_h:"🎯 Start Today!",cta_p:"Download app → connect bot → upload video → convert link → share → get views → earn $5 → withdraw via UPI!",
     cta_btn:"📥 Download App Now",cta_b2:"🤖 Open Upload Bot",foot:"Earn, Grow, Win! 🚀",float_btn:"📥 Download App"
   },
-  hi:{nav_features:"फीचर्स",nav_earning:"कमाई",nav_steps:"कैसे करें",nav_api:"API",
-    hero_title:"<span>MayaJaal.online</span> में आपका स्वागत है 🚀",
-    hero_sub:"अपनी API key कनेक्ट करें, ऐप डाउनलोड करें और ऑनलाइन पैसे कमाना शुरू करें।",
-    hero_btn1:"📥 अभी ऐप डाउनलोड करें",hero_btn2:"💰 कमाई दरें देखें",
-    api_title:"🔗 अपनी <span>API Key</span> कनेक्ट करें",
-    api_sub:"आपकी unique encrypted Matrix Key कनेक्ट करने के लिए तैयार है।",
-    copy_btn:"📋 कॉपी",api_note:"बॉट को <strong>/api YOUR_KEY</strong> भेजें।",
-    feat_title:"✨ <span>MayaJaal</span> क्यों चुनें?",feat_sub:"ऑनलाइन पैसे कमाने के लिए सब कुछ एक जगह।",
-    feat1h:"असली पैसे कमाएँ",feat1p:"हर व्यू और शेयर पर भुगतान। न्यूनतम $5 UPI।",
-    feat2h:"असीमित वीडियो अपलोड",feat2p:"जितने चाहें वीडियो अपलोड करें।",
-    feat3h:"बल्क लिंक कन्वर्टर",feat3p:"एक साथ कई लिंक कन्वर्ट करें।",
-    feat4h:"तुरंत भुगतान",feat4p:"UPI से तुरंत निकासी। कोई छिपा शुल्क नहीं।",
-    earn_title:"💰 कमाई दरें – कितना मिलेगा?",earn_sub:"नीचे पूरी दरें। जितने ज़्यादा व्यूज़, उतनी कमाई।",
-    tbl_h1:"व्यूज़ / शेयर",tbl_h2:"कमाई",tbl_r1:"1,000 व्यूज़",tbl_r2:"2,000 व्यूज़",tbl_r3:"2k के बाद हर 1,000 व्यूज़",tbl_r4:"10,000 व्यूज़",tbl_r5:"20,000 व्यूज़",tbl_r6:"1,000 ऐप शेयर (लॉगिन सहित)",
-    steps_title:"🚀 कैसे कमाएँ – स्टेप बाय स्टेप",steps_sub:"7 आसान स्टेप्स में कमाना शुरू करें।",
-    s1h:"बॉट कनेक्ट करें",s1p:"Telegram पर बॉट्स कनेक्ट करें।",
-    s2h:"वीडियो अपलोड",s2p:"ऊपर वाले बॉट में वीडियो अपलोड करें।",
-    s3h:"लिंक कन्वर्ट",s3p:"नीचे वाला बॉट लिंक कन्वर्ट करता है।",
-    s4h:"लिंक शेयर",s4p:"WhatsApp, Facebook, Instagram पर शेयर करें।",
-    s5h:"व्यूज़ लाएँ",s5p:"जितने ज़्यादा क्लिक, उतनी कमाई।",
-    s6h:"कमाई जमा",s6p:"व्यूज़ के हिसाब से पैसे जुड़ेंगे।",
-    s7h:"निकासी करें",s7p:"$5 पर UPI से निकालें। 24 घंटे में भुगतान।",
-    cta_h:"🎯 आज ही शुरू करें!",cta_p:"ऐप डाउनलोड → बॉट कनेक्ट → वीडियो अपलोड → लिंक कन्वर्ट → शेयर → व्यूज़ → $5 कमाएँ → UPI से निकालें!",
-    cta_btn:"📥 अभी ऐप डाउनलोड करें",cta_b2:"🤖 अपलोड बॉट खोलें",foot:"कमाओ, बढ़ो, जीतो! 🚀",float_btn:"📥 ऐप डाउनलोड"
-  },
-  es:{nav_features:"Características",nav_earning:"Ganancias",nav_steps:"Cómo",nav_api:"API",
-    hero_title:"Bienvenido a <span>MayaJaal.online</span> 🚀",
-    hero_sub:"Conecta tu API key, descarga la app y empieza a ganar dinero online.",
-    hero_btn1:"📥 Descargar App",hero_btn2:"💰 Ver Tarifas",
-    api_title:"🔗 Conecta tu <span>API Key</span>",
-    api_sub:"Tu Matrix Key encriptada está lista. Un toque para copiar.",
-    copy_btn:"📋 Copiar",api_note:"Envía <strong>/api YOUR_KEY</strong> al bot.",
-    feat_title:"✨ ¿Por qué elegir <span>MayaJaal</span>?",feat_sub:"Todo lo que necesitas en un solo lugar.",
-    feat1h:"Gana Dinero Real",feat1p:"Pago por cada vista y compartido. Retiro mínimo $5.",
-    feat2h:"Videos Ilimitados",feat2p:"Sube todos los videos que quieras.",
-    feat3h:"Conversor Masivo",feat3p:"Convierte varios enlaces a la vez.",
-    feat4h:"Pago Instantáneo",feat4p:"Retira vía UPI al instante. Sin cargos.",
-    earn_title:"💰 Tarifas de Ganancias",earn_sub:"Más vistas = más ganancias.",
-    tbl_h1:"Vistas / Shares",tbl_h2:"Ganancia",tbl_r1:"1,000 Vistas",tbl_r2:"2,000 Vistas",tbl_r3:"Después de 2k, cada 1,000",tbl_r4:"10,000 Vistas",tbl_r5:"20,000 Vistas",tbl_r6:"1,000 Shares (con login)",
-    steps_title:"🚀 Cómo Ganar",steps_sub:"7 pasos fáciles.",
-    s1h:"Conectar Bot",s1p:"Conecta los bots de Telegram.",s2h:"Subir Video",s2p:"Sube video al bot superior.",
-    s3h:"Convertir Enlace",s3p:"El bot inferior convierte.",s4h:"Compartir Enlace",s4p:"Comparte en WhatsApp, Facebook, Instagram.",
-    s5h:"Obtener Vistas",s5p:"Más clics = más ganancias.",s6h:"Ganancia Acumulada",s6p:"Dinero se suma según vistas.",
-    s7h:"Retirar",s7p:"Retira por UPI al llegar a $5.",
-    cta_h:"🎯 ¡Empieza Hoy!",cta_p:"Descarga → conecta → sube → convierte → comparte → $5 → retira!",
-    cta_btn:"📥 Descargar App",cta_b2:"🤖 Abrir Bot",foot:"¡Gana, Crece, Triunfa! 🚀",float_btn:"📥 Descargar"
-  },
-  fr:{nav_features:"Fonctionnalités",nav_earning:"Gains",nav_steps:"Comment",nav_api:"API",
-    hero_title:"Bienvenue sur <span>MayaJaal.online</span> 🚀",
-    hero_sub:"Connectez votre API key, téléchargez l'app et gagnez de l'argent.",
-    hero_btn1:"📥 Télécharger App",hero_btn2:"💰 Voir les Tarifs",
-    api_title:"🔗 Connectez votre <span>API Key</span>",
-    api_sub:"Votre Matrix Key chiffrée est prête. Un tap pour copier.",
-    copy_btn:"📋 Copier",api_note:"Envoyez <strong>/api YOUR_KEY</strong> au bot.",
-    feat_title:"✨ Pourquoi <span>MayaJaal</span>?",feat_sub:"Tout pour gagner en ligne.",
-    feat1h:"Gagnez de l'Argent",feat1p:"Payé pour chaque vue. Retrait minimum 5$.",
-    feat2h:"Vidéos Illimitées",feat2p:"Téléchargez autant de vidéos que vous voulez.",
-    feat3h:"Convertisseur Masse",feat3p:"Convertissez plusieurs liens à la fois.",
-    feat4h:"Paiement Instantané",feat4p:"Retirez via UPI. Sans frais cachés.",
-    earn_title:"💰 Tarifs des Gains",earn_sub:"Plus de vues = plus de gains.",
-    tbl_h1:"Vues / Partages",tbl_h2:"Gain",tbl_r1:"1 000 Vues",tbl_r2:"2 000 Vues",tbl_r3:"Après 2k, chaque 1 000",tbl_r4:"10 000 Vues",tbl_r5:"20 000 Vues",tbl_r6:"1 000 Partages (avec login)",
-    steps_title:"🚀 Comment Gagner",steps_sub:"7 étapes faciles.",
-    s1h:"Connecter Bot",s1p:"Connectez les bots Telegram.",s2h:"Télécharger Vidéo",s2p:"Téléchargez au bot supérieur.",
-    s3h:"Convertir Lien",s3p:"Le bot inférieur convertit.",s4h:"Partager Lien",s4p:"Partagez sur WhatsApp, Facebook, Instagram.",
-    s5h:"Obtenir Vues",s5p:"Plus de clics = plus de gains.",s6h:"Gains Accumulés",s6p:"Argent ajouté selon vues.",
-    s7h:"Retirer",s7p:"Retirez à 5$ via UPI en 24h.",
-    cta_h:"🎯 Commencez!",cta_p:"Téléchargez → connectez → uploadez → convertissez → partagez → 5$ → retirez!",
-    cta_btn:"📥 Télécharger App",cta_b2:"🤖 Ouvrir Bot",foot:"Gagnez, Grandissez! 🚀",float_btn:"📥 Télécharger"
-  },
-  de:{nav_features:"Funktionen",nav_earning:"Verdienen",nav_steps:"Anleitung",nav_api:"API",
-    hero_title:"Willkommen bei <span>MayaJaal.online</span> 🚀",
-    hero_sub:"Verbinde deinen API key, lade die App herunter und verdiene online Geld.",
-    hero_btn1:"📥 App herunterladen",hero_btn2:"💰 Tarife ansehen",
-    api_title:"🔗 Verbinde deinen <span>API Key</span>",
-    api_sub:"Dein verschlüsselter Matrix Key ist bereit. Ein Tap zum Kopieren.",
-    copy_btn:"📋 Kopieren",api_note:"Sende <strong>/api YOUR_KEY</strong> an den Bot.",
-    feat_title:"✨ Warum <span>MayaJaal</span>?",feat_sub:"Alles was du brauchst an einem Ort.",
-    feat1h:"Echtes Geld verdienen",feat1p:"Bezahlt für jede Ansicht. Min. 5$ Auszahlung.",
-    feat2h:"Unbegrenzte Videos",feat2p:"Lade so viele Videos hoch wie du willst.",
-    feat3h:"Massen-Konverter",feat3p:"Konvertiere mehrere Links auf einmal.",
-    feat4h:"Sofortige Zahlung",feat4p:"Auszahlung via UPI. Keine versteckten Gebühren.",
-    earn_title:"💰 Verdienst-Tarife",earn_sub:"Mehr Views = mehr Verdienst.",
-    tbl_h1:"Views / Shares",tbl_h2:"Verdienst",tbl_r1:"1.000 Views",tbl_r2:"2.000 Views",tbl_r3:"Nach 2k, alle 1.000",tbl_r4:"10.000 Views",tbl_r5:"20.000 Views",tbl_r6:"1.000 Shares (mit Login)",
-    steps_title:"🚀 So verdienen",steps_sub:"7 einfache Schritte.",
-    s1h:"Bot verbinden",s1p:"Verbinde Telegram Bots.",s2h:"Video hochladen",s2p:"Lade Video zum oberen Bot.",
-    s3h:"Link konvertieren",s3p:"Unterer Bot konvertiert.",s4h:"Link teilen",s4p:"Teile auf WhatsApp, Facebook, Instagram.",
-    s5h:"Views holen",s5p:"Mehr Klicks = mehr Verdienst.",s6h:"Verdienst sammelt",s6p:"Geld wird gutgeschrieben.",
-    s7h:"Auszahlen",s7p:"Auszahlung ab 5$ via UPI in 24h.",
-    cta_h:"🎯 Heute starten!",cta_p:"Download → verbinden → upload → konvertieren → teilen → 5$ → auszahlen!",
-    cta_btn:"📥 App herunterladen",cta_b2:"🤖 Bot öffnen",foot:"Verdienen, Wachsen! 🚀",float_btn:"📥 Download"
-  },
-  pt:{nav_features:"Recursos",nav_earning:"Ganhos",nav_steps:"Como",nav_api:"API",
-    hero_title:"Bem-vindo ao <span>MayaJaal.online</span> 🚀",
-    hero_sub:"Conecte sua API key, baixe o app e comece a ganhar dinheiro online.",
-    hero_btn1:"📥 Baixar App",hero_btn2:"💰 Ver Tarifas",
-    api_title:"🔗 Conecte sua <span>API Key</span>",
-    api_sub:"Sua Matrix Key criptografada está pronta. Um toque para copiar.",
-    copy_btn:"📋 Copiar",api_note:"Envie <strong>/api YOUR_KEY</strong> ao bot.",
-    feat_title:"✨ Por que <span>MayaJaal</span>?",feat_sub:"Tudo em um só lugar.",
-    feat1h:"Ganhe Dinheiro Real",feat1p:"Pago por cada view. Saque mínimo $5.",
-    feat2h:"Vídeos Ilimitados",feat2p:"Envie quantos vídeos quiser.",
-    feat3h:"Conversor em Massa",feat3p:"Converta vários links de uma vez.",
-    feat4h:"Pagamento Instantâneo",feat4p:"Saque via UPI. Sem taxas ocultas.",
-    earn_title:"💰 Tarifas de Ganhos",earn_sub:"Mais views = mais ganhos.",
-    tbl_h1:"Views / Shares",tbl_h2:"Ganho",tbl_r1:"1.000 Views",tbl_r2:"2.000 Views",tbl_r3:"Após 2k, cada 1.000",tbl_r4:"10.000 Views",tbl_r5:"20.000 Views",tbl_r6:"1.000 Shares (com login)",
-    steps_title:"🚀 Como Ganhar",steps_sub:"7 passos fáceis.",
-    s1h:"Conectar Bot",s1p:"Conecte os bots Telegram.",s2h:"Enviar Vídeo",s2p:"Envie vídeo para o bot superior.",
-    s3h:"Converter Link",s3p:"Bot inferior converte.",s4h:"Compartilhar Link",s4p:"Compartilhe em WhatsApp, Facebook, Instagram.",
-    s5h:"Obter Views",s5p:"Mais cliques = mais ganhos.",s6h:"Ganhos Acumulam",s6p:"Dinheiro adicionado.",
-    s7h:"Sacar",s7p:"Saque em $5 via UPI em 24h.",
-    cta_h:"🎯 Comece Hoje!",cta_p:"Baixe → conecte → envie → converta → compartilhe → $5 → saque!",
-    cta_btn:"📥 Baixar App",cta_b2:"🤖 Abrir Bot",foot:"Ganhe, Cresça! 🚀",float_btn:"📥 Baixar"
-  },
-  ru:{nav_features:"Функции",nav_earning:"Заработок",nav_steps:"Как",nav_api:"API",
-    hero_title:"Добро пожаловать на <span>MayaJaal.online</span> 🚀",
-    hero_sub:"Подключите API key, скачайте приложение и зарабатывайте онлайн.",
-    hero_btn1:"📥 Скачать App",hero_btn2:"💰 Тарифы",
-    api_title:"🔗 Подключите <span>API Key</span>",
-    api_sub:"Ваш зашифрованный Matrix Key готов. Один тап для копирования.",
-    copy_btn:"📋 Копировать",api_note:"Отправьте <strong>/api YOUR_KEY</strong> боту.",
-    feat_title:"✨ Почему <span>MayaJaal</span>?",feat_sub:"Всё в одном месте.",
-    feat1h:"Реальные деньги",feat1p:"Оплата за каждый просмотр. Мин. $5.",
-    feat2h:"Безлимитные видео",feat2p:"Загружайте сколько хотите.",
-    feat3h:"Массовый конвертер",feat3p:"Конвертируйте много ссылок.",
-    feat4h:"Мгновенная оплата",feat4p:"Вывод через UPI. Без комиссий.",
-    earn_title:"💰 Тарифы заработка",earn_sub:"Больше просмотров = больше дохода.",
-    tbl_h1:"Просмотры / Шеры",tbl_h2:"Заработок",tbl_r1:"1,000 Просмотров",tbl_r2:"2,000 Просмотров",tbl_r3:"После 2k, каждые 1,000",tbl_r4:"10,000 Просмотров",tbl_r5:"20,000 Просмотров",tbl_r6:"1,000 Шеров (с логином)",
-    steps_title:"🚀 Как заработать",steps_sub:"7 простых шагов.",
-    s1h:"Подключить бота",s1p:"Подключите Telegram ботов.",s2h:"Загрузить видео",s2p:"Загрузите видео в верхний бот.",
-    s3h:"Конвертировать",s3p:"Нижний бот конвертирует.",s4h:"Поделиться",s4p:"Делитесь в WhatsApp, Facebook, Instagram.",
-    s5h:"Получить просмотры",s5p:"Больше кликов = больше дохода.",s6h:"Доход начисляется",s6p:"Деньги добавляются по просмотрам.",
-    s7h:"Вывести",s7p:"Вывод от $5 через UPI за 24 часа.",
-    cta_h:"🎯 Начните сегодня!",cta_p:"Скачайте → подключите → загрузите → конвертируйте → делитесь → $5 → вывод!",
-    cta_btn:"📥 Скачать App",cta_b2:"🤖 Открыть бот",foot:"Зарабатывай, Расти! 🚀",float_btn:"📥 Скачать"
-  },
-  ar:{nav_features:"الميزات",nav_earning:"الأرباح",nav_steps:"كيف",nav_api:"API",
-    hero_title:"مرحبًا بك في <span>MayaJaal.online</span> 🚀",
-    hero_sub:"اتصل بمفتاح API الخاص بك، حمّل التطبيق وابدأ بكسب المال.",
-    hero_btn1:"📥 حمّل التطبيق",hero_btn2:"💰 عرض الأسعار",
-    api_title:"🔗 اتصل بـ <span>API Key</span>",
-    api_sub:"مفتاح Matrix المشفر جاهز. انقر للنسخ.",
-    copy_btn:"📋 نسخ",api_note:"أرسل <strong>/api YOUR_KEY</strong> للبوت.",
-    feat_title:"✨ لماذا <span>MayaJaal</span>؟",feat_sub:"كل ما تحتاجه في مكان واحد.",
-    feat1h:"اكسب مالًا حقيقيًا",feat1p:"دفع لكل مشاهدة. الحد الأدنى $5.",
-    feat2h:"فيديوهات غير محدودة",feat2p:"ارفع ما تريد من الفيديوهات.",
-    feat3h:"محول جماعي",feat3p:"حوّل روابط متعددة دفعة واحدة.",
-    feat4h:"دفع فوري",feat4p:"اسحب عبر UPI. بدون رسوم خفية.",
-    earn_title:"💰 أسعار الأرباح",earn_sub:"أكثر مشاهدات = أكثر أرباح.",
-    tbl_h1:"المشاهدات / المشاركات",tbl_h2:"الربح",tbl_r1:"1,000 مشاهدة",tbl_r2:"2,000 مشاهدة",tbl_r3:"بعد 2k، كل 1,000",tbl_r4:"10,000 مشاهدة",tbl_r5:"20,000 مشاهدة",tbl_r6:"1,000 مشاركة (مع تسجيل الدخول)",
-    steps_title:"🚀 كيف تكسب",steps_sub:"7 خطوات سهلة.",
-    s1h:"اتصل بالبوت",s1p:"اتصل ببوتات تيليجرام.",s2h:"ارفع الفيديو",s2p:"ارفع الفيديو للبوت الأعلى.",
-    s3h:"حوّل الرابط",s3p:"البوت الأسفل يحوّل الرابط.",s4h:"شارك الرابط",s4p:"شارك على واتساب، فيسبوك، إنستغرام.",
-    s5h:"احصل على مشاهدات",s5p:"مزيد من النقرات = مزيد من الأرباح.",s6h:"تتراكم الأرباح",s6p:"يُضاف المال حسب المشاهدات.",
-    s7h:"اسحب",s7p:"السحب من $5 عبر UPI في 24 ساعة.",
-    cta_h:"🎯 ابدأ اليوم!",cta_p:"حمّل → اتصل → ارفع → حوّل → شارك → $5 → اسحب!",
-    cta_btn:"📥 حمّل التطبيق",cta_b2:"🤖 افتح البوت",foot:"اكسب، انمُ، افُز! 🚀",float_btn:"📥 حمّل"
-  },
-  zh:{nav_features:"功能",nav_earning:"收益",nav_steps:"如何",nav_api:"API",
-    hero_title:"欢迎来到 <span>MayaJaal.online</span> 🚀",
-    hero_sub:"连接 API key，下载应用，开始在线赚钱。",
-    hero_btn1:"📥 立即下载",hero_btn2:"💰 查看收益",
-    api_title:"🔗 连接您的 <span>API Key</span>",
-    api_sub:"您的加密 Matrix Key 已就绪。一键复制。",
-    copy_btn:"📋 复制",api_note:"发送 <strong>/api YOUR_KEY</strong> 给机器人。",
-    feat_title:"✨ 为什么选择 <span>MayaJaal</span>？",feat_sub:"一切功能尽在一处。",
-    feat1h:"赚取真钱",feat1p:"每次观看和分享都有收益。最低 $5 提现。",
-    feat2h:"无限视频",feat2p:"上传任意数量的视频。",
-    feat3h:"批量转换",feat3p:"一次转换多个链接。",
-    feat4h:"即时付款",feat4p:"通过 UPI 提现。无隐藏费用。",
-    earn_title:"💰 收益费率",earn_sub:"观看和分享越多，赚得越多。",
-    tbl_h1:"观看/分享",tbl_h2:"收益",tbl_r1:"1,000 观看",tbl_r2:"2,000 观看",tbl_r3:"2k 后每 1,000",tbl_r4:"10,000 观看",tbl_r5:"20,000 观看",tbl_r6:"1,000 应用分享（含登录）",
-    steps_title:"🚀 如何赚钱",steps_sub:"7 个简单步骤。",
-    s1h:"连接机器人",s1p:"连接 Telegram 机器人。",s2h:"上传视频",s2p:"上传视频到上方机器人。",
-    s3h:"转换链接",s3p:"下方机器人转换链接。",s4h:"分享链接",s4p:"分享到 WhatsApp、Facebook、Instagram。",
-    s5h:"获得观看",s5p:"点击越多 = 赚得越多。",s6h:"收益累积",s6p:"按观看量记账。",
-    s7h:"提现",s7p:"$5 起 UPI 提现，24 小时内到账。",
-    cta_h:"🎯 今天就开始!",cta_p:"下载 → 连接 → 上传 → 转换 → 分享 → $5 → 提现！",
-    cta_btn:"📥 立即下载",cta_b2:"🤖 打开机器人",foot:"赚钱，成长，赢！🚀",float_btn:"📥 下载"
-  },
-  ja:{nav_features:"機能",nav_earning:"収益",nav_steps:"方法",nav_api:"API",
-    hero_title:"<span>MayaJaal.online</span> へようこそ 🚀",
-    hero_sub:"API key を接続し、アプリをダウンロードしてオンラインで稼ぎましょう。",
-    hero_btn1:"📥 今すぐダウンロード",hero_btn2:"💰 収益レートを見る",
-    api_title:"🔗 <span>API Key</span> を接続",
-    api_sub:"暗号化された Matrix Key の準備ができました。タップでコピー。",
-    copy_btn:"📋 コピー",api_note:"<strong>/api YOUR_KEY</strong> をボットに送信。",
-    feat_title:"✨ なぜ <span>MayaJaal</span>？",feat_sub:"オンラインで稼ぐために必要なすべて。",
-    feat1h:"本当のお金を稼ぐ",feat1p:"視聴と共有ごとに支払い。最低 $5 出金。",
-    feat2h:"無制限の動画",feat2p:"好きなだけ動画をアップロード。",
-    feat3h:"一括変換",feat3p:"複数のリンクを一度に変換。",
-    feat4h:"即時支払い",feat4p:"UPI で即出金。隠れた手数料なし。",
-    earn_title:"💰 収益レート",earn_sub:"再生と共有が多いほど稼げます。",
-    tbl_h1:"再生/共有",tbl_h2:"収益",tbl_r1:"1,000 再生",tbl_r2:"2,000 再生",tbl_r3:"2k 以降 1,000 ごと",tbl_r4:"10,000 再生",tbl_r5:"20,000 再生",tbl_r6:"1,000 シェア（ログイン付き）",
-    steps_title:"🚀 稼ぎ方",steps_sub:"7 つの簡単なステップ。",
-    s1h:"ボット接続",s1p:"Telegram ボットを接続。",s2h:"動画アップロード",s2p:"上のボットに動画をアップロード。",
-    s3h:"リンク変換",s3p:"下のボットがリンクを変換。",s4h:"リンク共有",s4p:"WhatsApp、Facebook、Instagram で共有。",
-    s5h:"再生を獲得",s5p:"クリックが多いほど稼げる。",s6h:"収益が貯まる",s6p:"再生に応じて加算。",
-    s7h:"出金",s7p:"$5 から UPI で出金、24 時間以内。",
-    cta_h:"🎯 今すぐ開始!",cta_p:"ダウンロード → 接続 → アップ → 変換 → 共有 → $5 → 出金！",
-    cta_btn:"📥 今すぐダウンロード",cta_b2:"🤖 ボットを開く",foot:"稼げ、成長し、勝て！🚀",float_btn:"📥 ダウンロード"
-  },
-  id:{nav_features:"Fitur",nav_earning:"Penghasilan",nav_steps:"Cara",nav_api:"API",
-    hero_title:"Selamat datang di <span>MayaJaal.online</span> 🚀",
-    hero_sub:"Hubungkan API key, unduh aplikasi, dan mulai hasilkan uang online.",
-    hero_btn1:"📥 Unduh Sekarang",hero_btn2:"💰 Lihat Tarif",
-    api_title:"🔗 Hubungkan <span>API Key</span>",
-    api_sub:"Matrix Key terenkripsi Anda siap. Ketuk untuk menyalin.",
-    copy_btn:"📋 Salin",api_note:"Kirim <strong>/api YOUR_KEY</strong> ke bot.",
-    feat_title:"✨ Kenapa <span>MayaJaal</span>?",feat_sub:"Semua yang Anda butuhkan dalam satu tempat.",
-    feat1h:"Hasilkan Uang Nyata",feat1p:"Dibayar per tayangan. Minimum $5.",
-    feat2h:"Video Tak Terbatas",feat2p:"Unggah sebanyak yang Anda mau.",
-    feat3h:"Konverter Massal",feat3p:"Konversi banyak tautan sekaligus.",
-    feat4h:"Pembayaran Instan",feat4p:"Tarik via UPI. Tanpa biaya tersembunyi.",
-    earn_title:"💰 Tarif Penghasilan",earn_sub:"Lebih banyak tayangan = lebih banyak hasil.",
-    tbl_h1:"Tayangan / Bagikan",tbl_h2:"Penghasilan",tbl_r1:"1.000 Tayangan",tbl_r2:"2.000 Tayangan",tbl_r3:"Setelah 2k, setiap 1.000",tbl_r4:"10.000 Tayangan",tbl_r5:"20.000 Tayangan",tbl_r6:"1.000 Berbagi (dengan login)",
-    steps_title:"🚀 Cara Menghasilkan",steps_sub:"7 langkah mudah.",
-    s1h:"Hubungkan Bot",s1p:"Hubungkan bot Telegram.",s2h:"Unggah Video",s2p:"Unggah ke bot atas.",
-    s3h:"Konversi Link",s3p:"Bot bawah mengonversi.",s4h:"Bagikan Link",s4p:"Bagikan ke WhatsApp, Facebook, Instagram.",
-    s5h:"Dapatkan Tayangan",s5p:"Lebih banyak klik = lebih banyak hasil.",s6h:"Penghasilan Terkumpul",s6p:"Uang ditambah sesuai tayangan.",
-    s7h:"Tarik",s7p:"Tarik pada $5 via UPI dalam 24 jam.",
-    cta_h:"🎯 Mulai Sekarang!",cta_p:"Unduh → hubungkan → unggah → konversi → bagikan → $5 → tarik!",
-    cta_btn:"📥 Unduh Sekarang",cta_b2:"🤖 Buka Bot",foot:"Hasilkan, Tumbuh! 🚀",float_btn:"📥 Unduh"
-  },
-  bn:{nav_features:"বৈশিষ্ট্য",nav_earning:"আয়",nav_steps:"কীভাবে",nav_api:"API",
-    hero_title:"<span>MayaJaal.online</span> এ স্বাগতম 🚀",
-    hero_sub:"API key কানেক্ট করুন, অ্যাপ ডাউনলোড করুন এবং অনলাইনে টাকা আয় করুন।",
-    hero_btn1:"📥 এখনই ডাউনলোড",hero_btn2:"💰 আয়ের হার দেখুন",
-    api_title:"🔗 আপনার <span>API Key</span> কানেক্ট করুন",
-    api_sub:"আপনার এনক্রিপ্টেড Matrix Key প্রস্তুত। কপি করতে ট্যাপ করুন।",
-    copy_btn:"📋 কপি",api_note:"বটকে <strong>/api YOUR_KEY</strong> পাঠান।",
-    feat_title:"✨ কেন <span>MayaJaal</span>?",feat_sub:"সব কিছু এক জায়গায়।",
-    feat1h:"আসল টাকা আয়",feat1p:"প্রতি ভিউতে পেমেন্ট। সর্বনিম্ন $5।",
-    feat2h:"আনলিমিটেড ভিডিও",feat2p:"যত খুশি ভিডিও আপলোড করুন।",
-    feat3h:"বাল্ক কনভার্টার",feat3p:"একসাথে অনেক লিংক কনভার্ট।",
-    feat4h:"তাত্ক্ষণিক পেমেন্ট",feat4p:"UPI তে উইথড্র। কোনো লুকানো চার্জ নেই।",
-    earn_title:"💰 আয়ের হার",earn_sub:"যত বেশি ভিউ, তত বেশি আয়।",
-    tbl_h1:"ভিউ / শেয়ার",tbl_h2:"আয়",tbl_r1:"1,000 ভিউ",tbl_r2:"2,000 ভিউ",tbl_r3:"2k পরে প্রতি 1,000",tbl_r4:"10,000 ভিউ",tbl_r5:"20,000 ভিউ",tbl_r6:"1,000 শেয়ার (লগইন সহ)",
-    steps_title:"🚀 কীভাবে আয় করবেন",steps_sub:"৭টি সহজ ধাপ।",
-    s1h:"বট কানেক্ট",s1p:"Telegram বট কানেক্ট করুন।",s2h:"ভিডিও আপলোড",s2p:"উপরের বটে ভিডিও আপলোড করুন।",
-    s3h:"লিংক কনভার্ট",s3p:"নিচের বট লিংক কনভার্ট করে।",s4h:"লিংক শেয়ার",s4p:"WhatsApp, Facebook, Instagram এ শেয়ার করুন।",
-    s5h:"ভিউ পান",s5p:"বেশি ক্লিক = বেশি আয়।",s6h:"আয় জমা",s6p:"ভিউ অনুযায়ী টাকা যোগ হয়।",
-    s7h:"উইথড্র",s7p:"$5 এ UPI দিয়ে উইথড্র, ২৪ ঘণ্টায় পেমেন্ট।",
-    cta_h:"🎯 আজই শুরু করুন!",cta_p:"ডাউনলোড → কানেক্ট → আপলোড → কনভার্ট → শেয়ার → $5 → উইথড্র!",
-    cta_btn:"📥 এখনই ডাউনলোড",cta_b2:"🤖 বট খুলুন",foot:"আয় করুন, বাড়ুন! 🚀",float_btn:"📥 ডাউনলোড"
-  },
-  ta:{nav_features:"அம்சங்கள்",nav_earning:"வருவாய்",nav_steps:"எப்படி",nav_api:"API",
-    hero_title:"<span>MayaJaal.online</span> க்கு வரவேற்கிறோம் 🚀",
-    hero_sub:"API key இணைக்கவும், ஆப் பதிவிறக்கவும், ஆன்லைனில் பணம் சம்பாதிக்கவும்.",
-    hero_btn1:"📥 இப்போது பதிவிறக்கம்",hero_btn2:"💰 விகிதங்களை பார்க்க",
-    api_title:"🔗 உங்கள் <span>API Key</span> இணைக்கவும்",
-    api_sub:"உங்கள் என்க்ரிப்ட் Matrix Key தயார். நகலெடுக்க தட்டவும்.",
-    copy_btn:"📋 நகலெடு",api_note:"பாட்-க்கு <strong>/api YOUR_KEY</strong> அனுப்பவும்.",
-    feat_title:"✨ ஏன் <span>MayaJaal</span>?",feat_sub:"எல்லாமும் ஒரே இடத்தில்.",
-    feat1h:"உண்மையான பணம்",feat1p:"ஒவ்வொரு பார்வைக்கும் பணம். குறைந்தபட்சம் $5.",
-    feat2h:"வரம்பற்ற வீடியோக்கள்",feat2p:"விருப்பப்படி வீடியோக்களை பதிவேற்றவும்.",
-    feat3h:"மொத்த மாற்றி",feat3p:"பல இணைப்புகளை ஒரே நேரத்தில் மாற்றவும்.",
-    feat4h:"உடனடி பணம்",feat4p:"UPI மூலம் எடுக்கவும். மறைவான கட்டணம் இல்லை.",
-    earn_title:"💰 வருவாய் விகிதங்கள்",earn_sub:"அதிக பார்வைகள் = அதிக வருவாய்.",
-    tbl_h1:"பார்வைகள் / பங்குகள்",tbl_h2:"வருவாய்",tbl_r1:"1,000 பார்வைகள்",tbl_r2:"2,000 பார்வைகள்",tbl_r3:"2k க்கு பின் ஒவ்வொரு 1,000",tbl_r4:"10,000 பார்வைகள்",tbl_r5:"20,000 பார்வைகள்",tbl_r6:"1,000 பங்குகள் (உள்நுழைவுடன்)",
-    steps_title:"🚀 எப்படி சம்பாதிப்பது",steps_sub:"7 எளிய படிகள்.",
-    s1h:"பாட் இணைக்கவும்",s1p:"Telegram பாட்களை இணைக்கவும்.",s2h:"வீடியோ பதிவேற்றம்",s2p:"மேல் பாட்-க்கு வீடியோ பதிவேற்றவும்.",
-    s3h:"இணைப்பு மாற்று",s3p:"கீழ் பாட் மாற்றுகிறது.",s4h:"இணைப்பு பகிர்",s4p:"WhatsApp, Facebook, Instagram இல் பகிரவும்.",
-    s5h:"பார்வைகள் பெற",s5p:"அதிக கிளிக்குகள் = அதிக வருவாய்.",s6h:"வருவாய் சேரும்",s6p:"பார்வைகளுக்கேற்ப சேர்க்கப்படும்.",
-    s7h:"எடுக்கவும்",s7p:"$5 இல் UPI மூலம் எடுக்கவும், 24 மணி நேரத்தில்.",
-    cta_h:"🎯 இன்றே தொடங்கு!",cta_p:"பதிவிறக்கம் → இணை → பதிவேற்று → மாற்று → பகிர் → $5 → எடு!",
-    cta_btn:"📥 இப்போது பதிவிறக்கம்",cta_b2:"🤖 பாட் திறக்க",foot:"சம்பாதி, வளர்! 🚀",float_btn:"📥 பதிவிறக்கம்"
-  },
-  ur:{nav_features:"خصوصیات",nav_earning:"کمائی",nav_steps:"کیسے",nav_api:"API",
-    hero_title:"<span>MayaJaal.online</span> میں خوش آمدید 🚀",
-    hero_sub:"API key کنیکٹ کریں، ایپ ڈاؤن لوڈ کریں اور آن لائن پیسے کمائیں۔",
-    hero_btn1:"📥 ابھی ڈاؤن لوڈ",hero_btn2:"💰 ریٹ دیکھیں",
-    api_title:"🔗 اپنی <span>API Key</span> کنیکٹ کریں",
-    api_sub:"آپ کی انکرپٹڈ Matrix Key تیار ہے۔ کاپی کے لیے ٹیپ کریں۔",
-    copy_btn:"📋 کاپی",api_note:"بوٹ کو <strong>/api YOUR_KEY</strong> بھیجیں۔",
-    feat_title:"✨ <span>MayaJaal</span> کیوں؟",feat_sub:"سب کچھ ایک جگہ۔",
-    feat1h:"اصلی پیسے کمائیں",feat1p:"ہر ویو پر ادائیگی۔ کم از کم $5۔",
-    feat2h:"لامحدود ویڈیوز",feat2p:"جتنی چاہیں ویڈیوز اپلوڈ کریں۔",
-    feat3h:"بلک کنورٹر",feat3p:"ایک ساتھ کئی لنکس کنورٹ کریں۔",
-    feat4h:"فوری ادائیگی",feat4p:"UPI سے نکالیں۔ کوئی چھپا چارج نہیں۔",
-    earn_title:"💰 کمائی کے ریٹ",earn_sub:"زیادہ ویوز = زیادہ کمائی۔",
-    tbl_h1:"ویوز / شیئرز",tbl_h2:"کمائی",tbl_r1:"1,000 ویوز",tbl_r2:"2,000 ویوز",tbl_r3:"2k کے بعد ہر 1,000",tbl_r4:"10,000 ویوز",tbl_r5:"20,000 ویوز",tbl_r6:"1,000 شیئرز (لاگ ان کے ساتھ)",
-    steps_title:"🚀 کیسے کمائیں",steps_sub:"7 آسان مراحل۔",
-    s1h:"بوٹ کنیکٹ کریں",s1p:"ٹیلیگرام بوٹس کنیکٹ کریں۔",s2h:"ویڈیو اپلوڈ",s2p:"اوپر والے بوٹ میں ویڈیو اپلوڈ کریں۔",
-    s3h:"لنک کنورٹ",s3p:"نیچے والا بوٹ کنورٹ کرتا ہے۔",s4h:"لنک شیئر",s4p:"واٹس ایپ، فیس بک، انسٹاگرام پر شیئر کریں۔",
-    s5h:"ویوز حاصل کریں",s5p:"زیادہ کلکس = زیادہ کمائی۔",s6h:"کمائی جمع",s6p:"ویوز کے حساب سے رقم شامل ہوتی ہے۔",
-    s7h:"نکاسی",s7p:"$5 پر UPI سے نکالیں، 24 گھنٹے میں ادائیگی۔",
-    cta_h:"🎯 آج ہی شروع کریں!",cta_p:"ڈاؤن لوڈ → کنیکٹ → اپلوڈ → کنورٹ → شیئر → $5 → نکالیں!",
-    cta_btn:"📥 ابھی ڈاؤن لوڈ",cta_b2:"🤖 بوٹ کھولیں",foot:"کمائیں، بڑھیں! 🚀",float_btn:"📥 ڈاؤن لوڈ"
+  hi:{nav_features:"Features",nav_earning:"Earning",nav_steps:"How To",nav_api:"API",
+    hero_title:"Welcome to <span>MayaJaal.online</span> 🚀",
+    hero_sub:"Connect your API key, download the app, and start earning money online. Upload videos, share links, and earn from views.",
+    hero_btn1:"📥 Download App Now",hero_btn2:"💰 View Earning Rates",
+    api_title:"🔗 Connect Your <span>API Key</span>",
+    api_sub:"Your unique encrypted Matrix Key is ready to connect. One tap to copy, then activate in the bot.",
+    copy_btn:"📋 Copy",api_note:"Send <strong>/api YOUR_KEY</strong> to the bot to activate.",
+    feat_title:"✨ Why Choose <span>MayaJaal</span>?",feat_sub:"Everything you need to earn money online, all in one place.",
+    feat1h:"Earn Real Money",feat1p:"Get paid for every view and share. Minimum withdrawal only $5 via UPI.",
+    feat2h:"Upload Unlimited Videos",feat2p:"Upload as many videos as you want and share them everywhere.",
+    feat3h:"Bulk Link Converter",feat3p:"Convert multiple links at once with our powerful Telegram bot.",
+    feat4h:"Instant Payment",feat4p:"Withdraw your earnings instantly via UPI. No hidden charges.",
+    earn_title:"💰 Earning Rates – How Much Will You Earn?",
+    earn_sub:"Full rate table below. The more views and shares, the more you earn.",
+    tbl_h1:"Views / Shares",tbl_h2:"Earning",tbl_r1:"1,000 Views",tbl_r2:"2,000 Views",tbl_r3:"After 2k, every 1,000 Views",tbl_r4:"10,000 Views",tbl_r5:"20,000 Views",tbl_r6:"1,000 App Shares (with login)",
+    steps_title:"🚀 How To Earn – Step by Step",steps_sub:"Start earning in just 7 easy steps.",
+    s1h:"Connect Bot",s1p:"Connect the video upload bot and bulk converter bot on Telegram.",
+    s2h:"Upload Video",s2p:"Upload video to the top bot (Mayajaalfilebot) — it gives you a link.",
+    s3h:"Convert Link",s3p:"The bottom bot (MayaJaalBulkConverterbot) converts your link.",
+    s4h:"Share Link",s4p:"Share converted link on WhatsApp, Facebook, Instagram, Telegram.",
+    s5h:"Get Views",s5p:"The more people click, the more views and earnings.",
+    s6h:"Earning Accrues",s6p:"Money is added to your account based on views.",
+    s7h:"Withdraw",s7p:"Withdraw via UPI at $5. Payment within 24 hours.",
+    cta_h:"🎯 Start Today!",cta_p:"Download app → connect bot → upload video → convert link → share → get views → earn $5 → withdraw via UPI!",
+    cta_btn:"📥 Download App Now",cta_b2:"🤖 Open Upload Bot",foot:"Earn, Grow, Win! 🚀",float_btn:"📥 Download App"
   }
 };
 
@@ -1619,9 +1253,7 @@ try {
   }
 } catch(e){}
 
-/* ============================================================
-   MATRIX RAIN
-   ============================================================ */
+/* MATRIX RAIN */
 var canvas = $('matrix'), ctx = canvas ? canvas.getContext('2d') : null;
 var drops = [], fontSize = 14, cols = 0;
 function resizeCanvas(){
@@ -1672,16 +1304,13 @@ function doBlink(){ if (!eyeBox) return; eyeBox.classList.add('blink'); setTimeo
 function scheduleBlink(){ setTimeout(function(){ doBlink(); setTimeout(doBlink, 280); scheduleBlink(); }, 2500 + Math.random()*3000); }
 scheduleBlink();
 
-/* ============================================================
-   LOADING SCREEN (dashboard internal)
-   ============================================================ */
+/* LOADING SCREEN */
 var loadingHidden = false;
 var loadStartTime = Date.now();
 var MIN_LOADING_MS = 1100;
 var loadingMessages = ['INITIALIZING MATRIX','CONNECTING TO NETWORK','VERIFYING IDENTITY','LOADING DASHBOARD'];
 var loadingMsgIdx = 0;
 var loadingMsgTimer = null;
-
 function startLoadingMessages(){
   var txtEl = $('loadingText');
   if (!txtEl) return;
@@ -1711,7 +1340,6 @@ function hideLoading(){
   }, wait);
 }
 
-/* Splash messages */
 var splashMsgs = ['INITIALIZING MATRIX','CONNECTING TO NETWORK','VERIFYING IDENTITY','LOADING DASHBOARD'];
 var splashIdx = 0;
 setInterval(function(){
@@ -1721,9 +1349,7 @@ setInterval(function(){
   if (el) el.textContent = splashMsgs[splashIdx];
 }, 500);
 
-/* ============================================================
-   API KEY
-   ============================================================ */
+/* API KEY */
 function generateKey(){
   var chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
   var out = '';
@@ -1747,7 +1373,7 @@ function setKeyLoading(){
   var cb = $('copyBtn');
   if (cb) cb.disabled = true;
 }
-function setKeyReady(key, source){
+function setKeyReady(key){
   var el = $('apiKeyEl');
   if (!el) return;
   el.classList.remove('loading');
@@ -1765,10 +1391,8 @@ function generateOrLoadKey(){
   var cached = lsGet(uid);
   if (cached && cached.length >= 8){
     currentKey = cached;
-    setKeyReady(cached, 'cache');
-    if (hasFirebase && db){
-      db.ref('users/' + uid + '/apiKey').set(cached).catch(function(){});
-    }
+    setKeyReady(cached);
+    if (hasFirebase && db) db.ref('users/' + uid + '/apiKey').set(cached).catch(function(){});
     return;
   }
   if (hasFirebase && db){
@@ -1777,25 +1401,25 @@ function generateOrLoadKey(){
       if (existing && typeof existing === 'string' && existing.length >= 8){
         currentKey = existing;
         lsSet(uid, existing);
-        setKeyReady(existing, 'DB');
+        setKeyReady(existing);
       } else {
         var newKey = generateKey();
         currentKey = newKey;
         lsSet(uid, newKey);
-        setKeyReady(newKey, 'generated');
+        setKeyReady(newKey);
         db.ref('users/' + uid + '/apiKey').set(newKey).catch(function(){});
       }
     }).catch(function(){
       var newKey = generateKey();
       currentKey = newKey;
       lsSet(uid, newKey);
-      setKeyReady(newKey, 'offline');
+      setKeyReady(newKey);
     });
   } else {
     var newKey = generateKey();
     currentKey = newKey;
     lsSet(uid, newKey);
-    setKeyReady(newKey, 'offline');
+    setKeyReady(newKey);
   }
 }
 
@@ -1828,48 +1452,27 @@ if (copyBtn) {
 }
 
 /* ============================================================
-   EARNINGS
+   NEW EARNINGS MODEL
+   First 1,000 views = $1
+   Every 1,000 views after that = $2
    ============================================================ */
 function calcEarnings(views){
   views = Math.max(0, Number(views) || 0);
   if (views <= 0) return 0;
-  if (views <= 1000) return round2((views/1000) * 1);
-  var income = 1;
-  var remaining = views - 1000;
-  var tier = 1;
-  while (remaining > 0){
-    var chunk = Math.min(remaining, 2000);
-    income += (chunk/1000) * Math.pow(1.5, tier);
-    remaining -= chunk;
-    tier++;
-    if (tier > 30) break;
-  }
-  return round2(income);
-}
-function getTierInfo(views){
-  views = Math.max(0, Number(views) || 0);
-  if (views < 1000) return { tier: 1, rate: 1.00, from: 0, to: 1000, next: 1000 - views };
-  var tier = 1, start = 1000;
-  while (views >= start + 2000){ tier++; start += 2000; if (tier > 30) break; }
-  return { tier: tier + 1, rate: round2(Math.pow(1.5, tier)), from: start, to: start + 2000, next: start + 2000 - views };
+  if (views <= 1000) return round2((views / 1000) * 1);
+  return round2(1 + ((views - 1000) / 1000) * 2);
 }
 function round2(n){ return Math.round(n * 100) / 100; }
 
-function updateBonusCard(views){
-  var t = getTierInfo(views);
-  var bt = $('bonusTier'); if (bt) bt.textContent = 'TIER ' + t.tier;
-  var br = $('bonusRate'); if (br) br.innerHTML = '$' + t.rate.toFixed(2) + '<span style="font-size:.65rem;color:#8a7a4a">/1K</span>';
-  var bn = $('bonusNext'); if (bn) bn.innerHTML = t.next + '<span style="font-size:.65rem;color:#8a7a4a"> views</span>';
-  var bf = $('bonusFrom'); if (bf) bf.textContent = views;
-  var bto = $('bonusTo'); if (bto) bto.textContent = t.to;
-  var span = t.to - t.from;
-  var pct = span > 0 ? Math.min(100, ((views - t.from) / span) * 100) : 0;
-  var bp = $('bonusProgress'); if (bp) bp.style.width = pct + '%';
+function updateRateCard(views){
+  views = Math.max(0, Number(views) || 0);
+  var curRate;
+  if (views < 1000) curRate = '$1.00 / 1K';
+  else curRate = '$2.00 / 1K';
+  var rc = $('rateCurrent'); if (rc) rc.textContent = curRate;
 }
 
-/* ============================================================
-   DASHBOARD
-   ============================================================ */
+/* DASHBOARD */
 var dashData = { totalLinks:0, totalViews:0, todayViews:0, todayConversions:0, totalIncome:0, todayIncome:0, viewsByDay:{}, linksByDay:{} };
 
 function renderDashboard(d){
@@ -1878,12 +1481,12 @@ function renderDashboard(d){
   var storedInc = d.totalIncome || 0;
   var finalIncome = Math.max(liveIncome, storedInc);
   $('sLinks').textContent = d.totalLinks || 0;
-  $('sViews').textContent = views;
-  $('sTodayViews').textContent = d.todayViews || 0;
+  $('sViews').textContent = views.toLocaleString();
+  $('sTodayViews').textContent = (d.todayViews || 0).toLocaleString();
   $('sConv').textContent = d.todayConversions || 0;
   $('sInc').textContent = '$' + finalIncome.toFixed(2);
   $('sTodayInc').textContent = '$' + (d.todayIncome || 0).toFixed(2);
-  updateBonusCard(views);
+  updateRateCard(views);
   updateCharts(d.viewsByDay || {}, d.linksByDay || {});
   var lt = $('liveTxt'); if (lt) lt.textContent = 'Live';
 }
@@ -1902,9 +1505,7 @@ function startDashboardListener(){
   renderDashboard(dashData);
 }
 
-/* ============================================================
-   CHARTS
-   ============================================================ */
+/* CHARTS */
 function last7Days(){
   var days = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
   var labels = [], keys = [];
@@ -1924,10 +1525,7 @@ function baseChart(canvasEl, label, color, bg, yTickCb){
     options: {
       responsive: true, maintainAspectRatio: false, animation: { duration: 700 },
       interaction: { intersect: false, mode: 'index' },
-      plugins: {
-        legend: { display: false },
-        tooltip: { backgroundColor: '#03110a', borderColor: color, borderWidth: 1, titleColor: color, bodyColor: '#effff5', padding: 12, displayColors: false, callbacks: yTickCb ? { label: function(c){ return yTickCb(c.parsed.y); } } : undefined }
-      },
+      plugins: { legend: { display: false }, tooltip: { backgroundColor: '#03110a', borderColor: color, borderWidth: 1, titleColor: color, bodyColor: '#effff5', padding: 12, displayColors: false, callbacks: yTickCb ? { label: function(c){ return yTickCb(c.parsed.y); } } : undefined } },
       scales: {
         y: { beginAtZero: true, suggestedMax: 10, grid: { color: 'rgba(0,255,120,.08)' }, ticks: { color: '#91b8a4', font: { size: 11 }, callback: yTickCb ? function(v){ return yTickCb(v); } : function(v){ return v; } } },
         x: { grid: { display: false }, ticks: { color: '#91b8a4', font: { size: 11 } } }
@@ -1951,9 +1549,7 @@ function updateCharts(vb, lb){
   earningsChart.data.labels = t.labels; earningsChart.data.datasets[0].data = eData; earningsChart.update();
 }
 
-/* ============================================================
-   NOTIFICATIONS
-   ============================================================ */
+/* NOTIFICATIONS */
 function startNotificationListener(){
   if (!currentUser) return;
   if (hasFirebase && db){
@@ -1973,7 +1569,7 @@ function startNotificationListener(){
 }
 function openNotifications(){
   if (!currentUser || !hasFirebase || !db){
-    openModal('🔔 Notifications', '<p class="notif-empty">Abhi koi notification nahi hai.</p>');
+    openModal('🔔 Notifications', '<p class="notif-empty">No notifications yet.</p>');
     return;
   }
   db.ref('users/' + currentUser.uid + '/notifications').once('value', function(snap){
@@ -1981,22 +1577,20 @@ function openNotifications(){
     var arr = Object.keys(d).map(function(k){ var o = Object.assign({}, d[k]); o._id = k; return o; }).filter(Boolean);
     arr.sort(function(x,y){ return (y.time||0) - (x.time||0); });
     var html = '';
-    if (!arr.length) html = '<p class="notif-empty">📭 Abhi koi notification nahi hai.</p>';
+    if (!arr.length) html = '<p class="notif-empty">📭 No notifications yet.</p>';
     else html = arr.slice(0,30).map(function(n){
       var dt = n.time ? new Date(n.time).toLocaleString() : '';
       return '<div class="notif-item"><div>' + (n.text || 'Notification') + '</div><div class="nt">' + dt + '</div></div>';
     }).join('');
     openModal('🔔 Notifications', html);
   }).catch(function(){
-    openModal('🔔 Notifications', '<p class="notif-empty">Abhi koi notification nahi hai.</p>');
+    openModal('🔔 Notifications', '<p class="notif-empty">No notifications yet.</p>');
   });
 }
 var notifBtn = $('notifBtn');
 if (notifBtn) notifBtn.addEventListener('click', openNotifications);
 
-/* ============================================================
-   MENU
-   ============================================================ */
+/* MENU */
 var menuBtn = $('menuBtn'), sideMenu = $('sideMenu'), overlay = $('menuOverlay');
 function toggleMenu(open){
   if (!sideMenu) return;
@@ -2033,62 +1627,99 @@ document.addEventListener('keydown', function(e){
   }
 });
 
-/* ============================================================
-   INFO CONTENT
-   ============================================================ */
-var infoLang = 'en';
-try { infoLang = localStorage.getItem('mj_info_lang') || localStorage.getItem('mj_lang') || 'en'; } catch(e){}
+/* INFO CONTENT - All English */
+var infoContent =
+  '<p style="color:#00ff78;font-weight:800;font-size:1rem;margin-bottom:12px">Welcome to MayaJaal 👁️</p>' +
+  '<p style="color:#a8c9b6;font-size:.84rem;line-height:1.7;margin-bottom:16px">MayaJaal is a digital network where you upload files/videos, generate shareable links, and earn money from views.</p>' +
 
-var infoContent = {
-  en: '<div class="info-lang-switch"><button data-info-lang="en" class="active">English</button><button data-info-lang="hi">हिन्दी</button></div>' +
-    '<p style="color:#00ff78;font-weight:800;font-size:1rem;margin-bottom:12px">Welcome to MayaJaal 👁️</p>' +
-    '<p style="color:#a8c9b6;font-size:.84rem;line-height:1.7;margin-bottom:16px">MayaJaal is a digital network where you upload files/videos, generate shareable links, and earn money from views.</p>' +
-    '<div class="info-block"><h4>🔑 STEP 1 — Get Your API Key</h4><ol><li>Your unique API key is shown in the red box above (marked STEP 1).</li><li>Each account gets a <b>different key</b>.</li><li>Tap <code>📋 COPY</code> to copy it as <code>/api YOUR_KEY</code>.</li></ol></div>' +
-    '<div class="info-block"><h4>⚡ STEP 2 — Connect API to Telegram Bot</h4><ol><li>Open Telegram and search: <a href="https://t.me/Mayajaalfilebot" target="_blank">@Mayajaalfilebot</a></li><li>Press <b>START</b>.</li><li>Paste and send: <code>/api YOUR_KEY</code></li><li>You will see <b>"✅ Connected successfully"</b>.</li></ol></div>' +
-    '<div class="info-block"><h4>📤 STEP 3 — Upload Files / Videos</h4><ol><li>In <b>@Mayajaalfilebot</b>, send any video / file.</li><li>The bot converts it and gives you a <b>shareable link</b>.</li><li>For bulk, use <a href="https://t.me/MayaJaalBulkConverterbot" target="_blank">@MayaJaalBulkConverterbot</a>.</li></ol></div>' +
-    '<div class="info-block"><h4>🔗 STEP 4 — Share & Get Views</h4><ol><li>Share your link on <b>WhatsApp, Telegram, Instagram, YouTube, Facebook</b>.</li><li>Every time someone opens your link, a <b>view</b> is counted.</li><li>Views update <b>live</b> on this dashboard.</li></ol></div>' +
-    '<div class="info-block bonus"><h4>💰 STEP 5 — Earn Money</h4><ul><li><b>Base rate:</b> 1,000 views = <b>$1.00</b></li><li><b>Bonus:</b> Every next 2,000 views → rate × 1.5 (50% boost)</li><li><b>Example:</b> 5,000 views = <b>$8.50</b></li></ul><div class="info-tip">🚀 <b>Pro tip:</b> More views = higher rate.</div></div>' +
-    '<div class="info-block payout"><h4>💵 STEP 6 — Withdraw Money</h4><ul><li><b>Minimum withdrawal:</b> $20</li><li><b>Payment methods:</b> Bank Transfer · UPI</li><li><b>Processing time:</b> 24 – 48 hours</li></ul></div>' +
-    '<div class="info-block warn"><h4>⚠️ Rules & Safety</h4><ul><li>Never share your API key.</li><li>Do not abuse, spam, or upload illegal content.</li><li>Follow copyright rules.</li></ul></div>',
-  hi: '<div class="info-lang-switch"><button data-info-lang="en">English</button><button data-info-lang="hi" class="active">हिन्दी</button></div>' +
-    '<p style="color:#00ff78;font-weight:800;font-size:1rem;margin-bottom:12px">MayaJaal में आपका स्वागत है 👁️</p>' +
-    '<p style="color:#a8c9b6;font-size:.84rem;line-height:1.7;margin-bottom:16px">MayaJaal एक डिजिटल नेटवर्क है जहाँ आप फाइल/वीडियो अपलोड करते हैं, शेयर करने योग्य लिंक बनाते हैं, और व्यूज़ से पैसे कमाते हैं।</p>' +
-    '<div class="info-block"><h4>🔑 स्टेप 1 — अपनी API Key लें</h4><ol><li>आपकी <b>unique API key</b> ऊपर लाल बॉक्स में दिखेगी (STEP 1 लिखा है)।</li><li>हर account की <b>अलग key</b> होती है।</li><li><code>📋 COPY</code> दबाकर <code>/api YOUR_KEY</code> कॉपी करें।</li></ol></div>' +
-    '<div class="info-block"><h4>⚡ स्टेप 2 — API को Bot से जोड़ें</h4><ol><li>Telegram खोलें: <a href="https://t.me/Mayajaalfilebot" target="_blank">@Mayajaalfilebot</a></li><li><b>START</b> दबाएँ।</li><li>कॉपी किया command भेजें: <code>/api YOUR_KEY</code></li><li>दिखेगा <b>"✅ Connected successfully"</b>।</li></ol></div>' +
-    '<div class="info-block"><h4>📤 स्टेप 3 — फाइल / वीडियो अपलोड करें</h4><ol><li><b>@Mayajaalfilebot</b> में कोई भी video / file भेजें।</li><li>Bot convert करके एक <b>shareable link</b> देगा।</li><li>कई links के लिए <a href="https://t.me/MayaJaalBulkConverterbot" target="_blank">@MayaJaalBulkConverterBot</a> इस्तेमाल करें।</li></ol></div>' +
-    '<div class="info-block"><h4>🔗 स्टेप 4 — शेयर करें और व्यूज़ पाएँ</h4><ol><li>अपना link <b>WhatsApp, Telegram, Instagram, YouTube, Facebook</b> पर शेयर करें।</li><li>जब भी कोई link खोलेगा — एक <b>view</b> गिना जाएगा।</li></ol></div>' +
-    '<div class="info-block bonus"><h4>💰 स्टेप 5 — पैसे कमाएँ</h4><ul><li><b>Base rate:</b> 1,000 views = <b>$1.00</b></li><li><b>Bonus:</b> हर अगले 2,000 views पर rate × 1.5</li><li><b>उदाहरण:</b> 5,000 views = <b>$8.50</b></li></ul></div>' +
-    '<div class="info-block payout"><h4>💵 स्टेप 6 — पैसे निकालें</h4><ul><li><b>Minimum withdrawal:</b> $20</li><li><b>Payment methods:</b> Bank Transfer · UPI</li><li><b>प्रोसेसिंग टाइम:</b> 24 – 48 घंटे</li></ul></div>' +
-    '<div class="info-block warn"><h4>⚠️ नियम और सुरक्षा</h4><ul><li>अपनी API key किसी से शेयर न करें।</li><li>गलत इस्तेमाल, spam, illegal content न करें।</li></ul></div>'
-};
+  '<div class="info-block"><h4>🔑 STEP 1 — Get Your API Key</h4><ol>' +
+  '<li>Your unique API key is shown in the red box above (marked STEP 1).</li>' +
+  '<li>Each account gets a <b>different key</b> that never changes.</li>' +
+  '<li>Tap <code>📋 COPY</code> to copy it as <code>/api YOUR_KEY</code>.</li></ol></div>' +
 
-function switchInfoLang(lang){
-  infoLang = lang;
-  try { localStorage.setItem('mj_info_lang', lang); } catch(e){}
-  $('mBody').innerHTML = infoContent[lang] || infoContent.en;
-  bindInfoLangButtons();
-}
-function bindInfoLangButtons(){
-  var btns = $('mBody').querySelectorAll('[data-info-lang]');
-  for (var i=0;i<btns.length;i++){
-    btns[i].onclick = function(){ switchInfoLang(this.getAttribute('data-info-lang')); };
-  }
-}
+  '<div class="info-block"><h4>⚡ STEP 2 — Connect API to Telegram Bot</h4><ol>' +
+  '<li>Open Telegram and search: <a href="https://t.me/Mayajaalfilebot" target="_blank">@Mayajaalfilebot</a></li>' +
+  '<li>Press <b>START</b>.</li>' +
+  '<li>Paste and send: <code>/api YOUR_KEY</code></li>' +
+  '<li>You will see <b>"✅ Connected successfully"</b>.</li></ol></div>' +
+
+  '<div class="info-block"><h4>📤 STEP 3 — Upload Files / Videos</h4><ol>' +
+  '<li>In <b>@Mayajaalfilebot</b>, send any video / file.</li>' +
+  '<li>The bot converts it and gives you a <b>shareable link</b>.</li>' +
+  '<li>For bulk uploads, use <a href="https://t.me/MayaJaalBulkConverterbot" target="_blank">@MayaJaalBulkConverterbot</a>.</li></ol></div>' +
+
+  '<div class="info-block"><h4>🔗 STEP 4 — Share & Get Views</h4><ol>' +
+  '<li>Share your link on <b>WhatsApp, Telegram, Instagram, YouTube, Facebook</b>.</li>' +
+  '<li>Every time someone opens your link, a <b>view</b> is counted.</li>' +
+  '<li>Views update <b>live</b> on your dashboard.</li></ol></div>' +
+
+  '<div class="info-block bonus"><h4>💰 STEP 5 — Earnings Model</h4>' +
+  '<p style="margin-bottom:10px"><b>Simple 2-tier rate:</b></p>' +
+  '<ul>' +
+  '<li><b>First 1,000 views:</b> pay <b>$1 per 1,000 views</b>.</li>' +
+  '<li><b>Every 1,000 views after that:</b> pay <b>$2 per 1,000 views</b>.</li>' +
+  '</ul>' +
+  '<table class="earn-table" style="margin-top:10px"><thead><tr><th>Views</th><th>Earning</th></tr></thead><tbody>' +
+  '<tr><td>1,000</td><td>$1</td></tr>' +
+  '<tr><td>1,500</td><td>$2</td></tr>' +
+  '<tr><td>2,000</td><td>$3</td></tr>' +
+  '<tr><td>3,000</td><td>$5</td></tr>' +
+  '<tr><td>5,000</td><td>$9</td></tr>' +
+  '<tr><td>10,000</td><td>$19</td></tr>' +
+  '<tr><td>20,000</td><td>$39</td></tr>' +
+  '</tbody></table>' +
+  '<div class="info-tip">🚀 <b>Pro tip:</b> The more views you get, the more you earn — rate doubles after your first 1,000 views.</div></div>' +
+
+  '<div class="info-block payout"><h4>💵 STEP 6 — Withdraw Money</h4><ul>' +
+  '<li><b>Minimum withdrawal:</b> $5</li>' +
+  '<li><b>UPI:</b> Paid within 24 hours</li>' +
+  '<li><b>Bank Transfer:</b> Instant on working days</li>' +
+  '<li><b>Processing fee:</b> $0 (no hidden charges)</li>' +
+  '</ul></div>' +
+
+  '<div class="info-block warn"><h4>⚠️ Rules & Safety</h4><ul>' +
+  '<li>Never share your API key with anyone.</li>' +
+  '<li>Do not abuse, spam, or upload illegal content.</li>' +
+  '<li>Follow copyright rules.</li>' +
+  '<li>Multiple accounts for the same user are not allowed.</li></ul></div>';
 
 function earningsModalHTML(){
   return '<p style="color:#00ff78;font-weight:800;font-size:.95rem;margin-bottom:12px">💰 MAYAJAAL EARNINGS MODEL</p>' +
-    '<div class="earn-box"><b style="color:#00ff78">📌 BASE:</b> Pehle <b>1,000 views = $1.00</b><br><b style="color:#ffd76b">📌 BONUS:</b> Har extra <b>2,000 views</b> ke baad rate <b>× 1.5</b> (50% boost).</div>' +
-    '<p style="font-size:.82rem;color:#b6d5c2;margin-bottom:8px"><b>Tier Table:</b></p>' +
-    '<table class="earn-table" id="earnTable"><thead><tr><th>Views</th><th>Rate / 1K</th><th>Total Income</th></tr></thead>' +
-    '<tbody>' +
-      '<tr><td>0 – 1,000</td><td>$1.00</td><td>$1.00</td></tr>' +
-      '<tr><td>1K – 3K</td><td>$1.50</td><td>$4.00</td></tr>' +
-      '<tr><td>3K – 5K</td><td>$2.25</td><td>$8.50</td></tr>' +
-      '<tr><td>5K – 7K</td><td>$3.38</td><td>$15.25</td></tr>' +
-      '<tr><td>7K – 9K</td><td>$5.06</td><td>$25.38</td></tr>' +
-      '<tr><td>9K – 11K</td><td>$7.59</td><td>$40.56</td></tr>' +
+    '<div class="earn-box"><b style="color:#00ff78">📌 TIER 1:</b> First <b>1,000 views = $1</b> (rate: $1 per 1,000 views)<br>' +
+    '<b style="color:#ffd76b">📌 TIER 2:</b> Every <b>1,000 views after that = $2</b> (rate: $2 per 1,000 views)</div>' +
+    '<p style="font-size:.82rem;color:#b6d5c2;margin-bottom:8px"><b>Complete Rate Table:</b></p>' +
+    '<table class="earn-table"><thead><tr><th>Views</th><th>Rate / 1K</th><th>Total Income</th></tr></thead><tbody>' +
+    '<tr><td>1,000</td><td>$1</td><td>$1</td></tr>' +
+    '<tr><td>1,500</td><td>$2</td><td>$2</td></tr>' +
+    '<tr><td>2,000</td><td>$2</td><td>$3</td></tr>' +
+    '<tr><td>3,000</td><td>$2</td><td>$5</td></tr>' +
+    '<tr><td>5,000</td><td>$2</td><td>$9</td></tr>' +
+    '<tr><td>10,000</td><td>$2</td><td>$19</td></tr>' +
+    '<tr><td>20,000</td><td>$2</td><td>$39</td></tr>' +
     '</tbody></table>' +
-    '<div class="earn-box"><b style="color:#ffd76b">🧮 Example (5,000 views):</b><br>• 1K × $1.00 = $1.00<br>• 2K × $1.50 = $3.00<br>• 2K × $2.25 = $4.50<br><b style="color:#00ff78">Total = $8.50</b></div>';
+    '<div class="earn-box"><b style="color:#ffd76b">🧮 Example (5,000 views):</b><br>' +
+    '• First 1,000 × $1 = $1<br>' +
+    '• Remaining 4,000 × $2 per 1K = $8<br>' +
+    '<b style="color:#00ff78">Total = $9</b></div>' +
+    '<p style="font-size:.8rem;color:#a8c9b6;margin-top:10px"><b>Simple rule:</b> After the first 1,000 views, the rate doubles to $2 per 1,000 views. The more views, the more you earn.</p>';
+}
+
+function withdrawModalHTML(){
+  return '<p style="color:#00ff78;font-weight:800;font-size:.95rem;margin-bottom:12px">💸 WITHDRAW YOUR EARNINGS</p>' +
+    '<div class="earn-box"><b style="color:#00ff78">📌 MINIMUM:</b> $5 USD<br>' +
+    '<b style="color:#00ff78">📌 UPI:</b> Paid within 24 hours<br>' +
+    '<b style="color:#00ff78">📌 BANK TRANSFER:</b> Instant on working days<br>' +
+    '<b style="color:#00ff78">📌 FEES:</b> $0 (no hidden charges)</div>' +
+    '<p style="font-size:.85rem;color:#b6d5c2;margin-bottom:8px"><b>How to withdraw:</b></p>' +
+    '<ol style="color:#c6e8d4;font-size:.85rem;line-height:1.8;margin-left:18px">' +
+    '<li>Make sure your total income is at least <b>$5</b>.</li>' +
+    '<li>Open the Telegram bot <a href="https://t.me/Mayajaalfilebot" target="_blank">@Mayajaalfilebot</a>.</li>' +
+    '<li>Send command: <code>/withdraw</code></li>' +
+    '<li>Choose method: UPI or Bank Transfer.</li>' +
+    '<li>Enter your UPI ID or bank details.</li>' +
+    '<li>Confirm — payment processed automatically.</li>' +
+    '</ol>' +
+    '<div class="info-tip" style="margin-top:14px">💡 <b>Tip:</b> If payment is delayed over 24 hours, contact support with your Telegram username and screenshot.</div>';
 }
 
 function act(a){
@@ -2096,19 +1727,14 @@ function act(a){
     var currentLang = 'en';
     try { currentLang = localStorage.getItem('mj_lang') || 'en'; } catch(e){}
     openModal('⚙ Settings',
-      '<div class="form-row"><label>🌐 Language / भाषा</label><select id="modalLang"><option value="en">English</option><option value="hi">हिन्दी (Hindi)</option></select></div>' +
+      '<div class="form-row"><label>🌐 Language</label><select id="modalLang"><option value="en">English</option></select></div>' +
       '<button class="btn-save" id="saveSettingsBtn" style="margin-top:8px;width:100%">Save Settings</button>'
     );
     setTimeout(function(){ var el = document.getElementById('modalLang'); if (el) el.value = currentLang; }, 50);
   }
-  else if (a === 'info'){
-    try { infoLang = localStorage.getItem('mj_info_lang') || localStorage.getItem('mj_lang') || 'en'; } catch(e){}
-    openModal('ℹ Information', infoContent[infoLang] || infoContent.en);
-    bindInfoLangButtons();
-  }
-  else if (a === 'bonus' || a === 'earnings'){
-    openModal(a === 'bonus' ? '🎁 Bonus System' : '💰 Earnings Model', earningsModalHTML());
-  }
+  else if (a === 'info'){ openModal('ℹ Information', infoContent); }
+  else if (a === 'earnings'){ openModal('💰 Earnings Model', earningsModalHTML()); }
+  else if (a === 'withdraw'){ openModal('💸 Withdraw', withdrawModalHTML()); }
   else if (a === 'support') openModal('☏ Help & Support', '<p>Contact: <a href="mailto:mayajaalsupport@gmail.com">mayajaalsupport@gmail.com</a></p><p>Telegram: <a href="https://t.me/Mayajaalfilebot" target="_blank">@Mayajaalfilebot</a></p>');
   else if (a === 'privacy') window.open('/privacy.html', '_blank');
   else if (a === 'terms') window.open('/terms.html', '_blank');
@@ -2119,12 +1745,9 @@ document.addEventListener('click', function(e){
   if (b){ e.preventDefault(); act(b.dataset.act); }
 });
 
-/* ============================================================
-   DASHBOARD i18n
-   ============================================================ */
+/* DASHBOARD i18n */
 var dashI18n = {
-  en: { eyebrow:'VIDEOS · LINKS · BEYOND', welcome:'ENTER THE', tagline:'Your digital universe. One portal for your files, links, tools and community.', online:'ONLINE', apiTitle:'🔑 YOUR API KEY', apiDesc:'Yeh key aapke account se linked hai. Har user ki alag hoti hai aur hamesha same rehti hai.', activate:'Activate in Telegram Bot', dashTitle:'EARNINGS DASHBOARD', totalLinks:'Total Links', totalViews:'Total Views', todayViews:'Today Views', conv:'Conversions', totalInc:'Total Income', todayInc:'Today Income', chartTitle:'Views (Last 7 Days)', botsTitle:'OFFICIAL BOTS' },
-  hi: { eyebrow:'वीडियो · लिंक · और भी', welcome:'स्वागत है', tagline:'आपकी डिजिटल दुनिया — फाइल, लिंक, टूल और कम्युनिटी एक जगह।', online:'चालू', apiTitle:'🔑 आपकी API Key', apiDesc:'यह key आपके account से जुड़ी है। हर user की अलग होती है और हमेशा वही रहेगी।', activate:'टेलीग्राम बॉट में एक्टिवेट करें', dashTitle:'कमाई डैशबोर्ड', totalLinks:'कुल लिंक', totalViews:'कुल व्यूज़', todayViews:'आज के व्यूज़', conv:'कन्वर्ज़न', totalInc:'कुल कमाई', todayInc:'आज की कमाई', chartTitle:'व्यूज़ (पिछले 7 दिन)', botsTitle:'ऑफिशियल बॉट' }
+  en: { eyebrow:'VIDEOS · LINKS · BEYOND', welcome:'ENTER THE', tagline:'Your digital universe. One portal for your files, links, tools and community.', online:'ONLINE', apiTitle:'🔑 YOUR API KEY', apiDesc:'This key is linked to your account. Each user has a unique key that never changes.', activate:'Activate in Telegram Bot', dashTitle:'EARNINGS DASHBOARD', totalLinks:'Total Links', totalViews:'Total Views', todayViews:'Today Views', conv:'Conversions', totalInc:'Total Income', todayInc:'Today Income', chartTitle:'Views (Last 7 Days)', botsTitle:'OFFICIAL BOTS' }
 };
 function setLang(lang){
   var d = dashI18n[lang] || dashI18n.en;
@@ -2147,19 +1770,14 @@ function setLang(lang){
   el = $('i18nBotsTitle'); if (el) el.textContent = d.botsTitle;
   try { localStorage.setItem('mj_lang', lang); } catch(e){}
 }
-try { setLang(localStorage.getItem('mj_lang') || 'en'); } catch(e){ setLang('en'); }
+try { setLang('en'); } catch(e){}
 </script>
 
-<!-- ============================================================
-     GLOBAL AD SCRIPTS
-     ============================================================ -->
+<!-- GLOBAL AD SCRIPTS -->
 <script async="async" data-cfasync="false" src="https://dcengg.org/21/a189da7cc57036d552f5b4facf6429b7"></script>
 <div id="container-a189da7cc57036d552f5b4facf6429b7" style="display:none"></div>
-
 <script data-cfasync="false" src="https://4xfreedom.com/1/a673ad06aad69ae4333a9ff5cf38685c"></script>
-
 <script data-cfasync="false" src="https://dcengg.org/14/9ab19cac9afeaed575f0d6dacf750d47"></script>
-
 <img src="https://demper.org/4/89de0c7b0706ee20db2bd15f8a26f00c" width="1" height="1" style="display:none" alt="" />
 
 </body>
