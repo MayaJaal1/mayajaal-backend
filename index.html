@@ -13,12 +13,8 @@
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
 <style>
-/* ============ GLOBAL ============ */
 *{margin:0;padding:0;box-sizing:border-box}
 html,body{overflow-x:hidden}
-:root{
-  --apk-url:url("https://github.com/MayaJaal1/Mayajaall/releases/latest/download/app-release.apk");
-}
 .view-hidden{display:none !important}
 ::selection{background:#00ff78;color:#001b0c}
 ::-webkit-scrollbar{width:10px;height:10px}
@@ -148,7 +144,6 @@ html,body{overflow-x:hidden}
 @keyframes mjSnakeGo{0%{left:-140px;opacity:0}5%{opacity:1}45%{left:100%;opacity:1}50%{left:100%;opacity:0}55%{opacity:0}55.1%{left:100%;opacity:1}95%{left:-140px;opacity:1}100%{left:-140px;opacity:0}}
 #postLoginView .mtx{color:#00ff78;text-shadow:0 0 8px rgba(0,255,120,.55),0 0 2px rgba(0,255,120,.9);letter-spacing:.05em}
 
-/* ===== MENU BUTTON ===== */
 #postLoginView .menu-btn{position:fixed;top:14px;left:14px;z-index:100;width:46px;height:46px;border-radius:13px;background:linear-gradient(145deg,#062015,#04180e);border:1px solid rgba(0,255,120,.4);display:flex;flex-direction:column;justify-content:center;align-items:center;gap:5px;padding:10px;transition:.25s;box-shadow:0 4px 15px rgba(0,0,0,.4),inset 0 0 10px rgba(0,255,120,.05)}
 #postLoginView .menu-btn:hover{border-color:#00ff78;box-shadow:0 0 25px rgba(0,255,120,.5),inset 0 0 15px rgba(0,255,120,.1)}
 #postLoginView .menu-btn span{display:block;width:22px;height:2px;background:#00ff78;border-radius:2px;transition:.3s;box-shadow:0 0 6px rgba(0,255,120,.6)}
@@ -156,22 +151,36 @@ html,body{overflow-x:hidden}
 #postLoginView .menu-btn.open span:nth-child(2){opacity:0;transform:scaleX(0)}
 #postLoginView .menu-btn.open span:nth-child(3){transform:translateY(-7px) rotate(-45deg)}
 
-/* ===== SIDEBAR (PROFESSIONAL) ===== */
-#postLoginView .side-menu{position:fixed;top:0;left:-340px;width:320px;height:100vh;background:linear-gradient(180deg,#03130b 0%,#020a06 100%);border-right:1px solid rgba(0,255,120,.3);z-index:99;transition:left .35s cubic-bezier(.4,0,.2,1);padding:0;overflow-y:auto;display:flex;flex-direction:column;box-shadow:8px 0 40px rgba(0,0,0,.5)}
+/* ===== SIDEBAR (with sticky footer) ===== */
+#postLoginView .side-menu{
+  position:fixed;top:0;left:-340px;width:320px;height:100vh;
+  background:linear-gradient(180deg,#03130b 0%,#020a06 100%);
+  border-right:1px solid rgba(0,255,120,.3);z-index:99;
+  transition:left .35s cubic-bezier(.4,0,.2,1);
+  padding:0;overflow:hidden;
+  display:flex;flex-direction:column;
+  box-shadow:8px 0 40px rgba(0,0,0,.5);
+}
 #postLoginView .side-menu.open{left:0}
-#postLoginView .side-menu::-webkit-scrollbar{width:6px}
-#postLoginView .side-menu::-webkit-scrollbar-thumb{background:rgba(0,255,120,.3);border-radius:99px}
+
+/* Scrollable middle area */
+#postLoginView .menu-scroll{
+  flex:1;min-height:0;overflow-y:auto;overflow-x:hidden;
+}
+#postLoginView .menu-scroll::-webkit-scrollbar{width:6px}
+#postLoginView .menu-scroll::-webkit-scrollbar-thumb{background:rgba(0,255,120,.3);border-radius:99px}
+
 #postLoginView .menu-overlay{position:fixed;inset:0;background:rgba(0,0,0,.8);backdrop-filter:blur(4px);z-index:98;opacity:0;pointer-events:none;transition:.3s}
 #postLoginView .menu-overlay.open{opacity:1;pointer-events:auto}
 
-#postLoginView .side-brand{padding:22px 20px 18px;border-bottom:1px solid rgba(0,255,120,.15);position:relative;background:linear-gradient(180deg,rgba(0,255,120,.04),transparent)}
+#postLoginView .side-brand{padding:22px 20px 18px;border-bottom:1px solid rgba(0,255,120,.15);position:relative;background:linear-gradient(180deg,rgba(0,255,120,.04),transparent);flex-shrink:0}
 #postLoginView .side-brand-inner{display:flex;align-items:center;gap:10px}
 #postLoginView .side-brand-logo{width:38px;height:38px;border-radius:11px;background:linear-gradient(135deg,#00ff78,#00c963);display:flex;align-items:center;justify-content:center;font-weight:900;font-size:1.1rem;color:#001b0c;box-shadow:0 0 20px rgba(0,255,120,.4);flex-shrink:0}
 #postLoginView .side-brand-text{font-size:1.15rem;font-weight:900;color:#00ff78;letter-spacing:-.5px;line-height:1}
 #postLoginView .side-brand-text span{color:#d7ffe7;font-weight:400}
 #postLoginView .side-brand-sub{font-size:.6rem;color:#6f9981;letter-spacing:.3em;text-transform:uppercase;margin-top:4px;font-weight:700}
 
-#postLoginView .menu-user{margin:16px 14px;padding:14px;background:linear-gradient(135deg,rgba(0,255,120,.08),rgba(0,255,120,.02));border:1px solid rgba(0,255,120,.25);border-radius:14px;display:flex;align-items:center;gap:12px;position:relative;overflow:hidden}
+#postLoginView .menu-user{margin:16px 14px;padding:14px;background:linear-gradient(135deg,rgba(0,255,120,.08),rgba(0,255,120,.02));border:1px solid rgba(0,255,120,.25);border-radius:14px;display:flex;align-items:center;gap:12px;position:relative;overflow:hidden;flex-shrink:0}
 #postLoginView .menu-user::before{content:"";position:absolute;top:0;left:0;right:0;height:1px;background:linear-gradient(90deg,transparent,rgba(0,255,120,.5),transparent)}
 #postLoginView .menu-user img{width:46px;height:46px;border-radius:50%;border:2px solid #00ff78;object-fit:cover;background:#000;box-shadow:0 0 15px rgba(0,255,120,.35);flex-shrink:0}
 #postLoginView .menu-user .mu-name{font-size:.78rem;overflow:hidden;flex:1;min-width:0}
@@ -192,7 +201,14 @@ html,body{overflow-x:hidden}
 #postLoginView .badge{margin-left:auto;background:linear-gradient(135deg,#ff3d3d,#c81e1e);color:#fff;font-size:.6rem;font-weight:800;padding:3px 8px;border-radius:99px;min-width:22px;text-align:center;box-shadow:0 0 10px rgba(255,61,61,.5);letter-spacing:.05em}
 #postLoginView .badge.green{background:linear-gradient(135deg,#00ff78,#00c963);color:#001b0c;box-shadow:0 0 10px rgba(0,255,120,.5)}
 
-#postLoginView .menu-footer{margin-top:auto;padding:14px;border-top:1px solid rgba(0,255,120,.15);background:linear-gradient(180deg,transparent,rgba(0,0,0,.3))}
+/* STICKY FOOTER — always visible at bottom */
+#postLoginView .menu-footer{
+  margin-top:0;flex-shrink:0;
+  padding:14px 14px 16px;
+  border-top:1px solid rgba(0,255,120,.18);
+  background:linear-gradient(180deg,rgba(3,19,11,.9),rgba(2,10,6,.98));
+  box-shadow:0 -8px 20px rgba(0,0,0,.4);
+}
 #postLoginView .logout-btn{display:flex;align-items:center;justify-content:center;gap:10px;width:100%;padding:14px 18px;background:linear-gradient(135deg,#ff3d3d,#c81e1e);color:#fff;border-radius:12px;font-weight:800;font-size:.88rem;letter-spacing:.05em;transition:.25s;box-shadow:0 4px 18px rgba(255,61,61,.4);border:1px solid rgba(255,255,255,.15);position:relative;overflow:hidden}
 #postLoginView .logout-btn::before{content:"";position:absolute;top:0;left:-100%;width:100%;height:100%;background:linear-gradient(90deg,transparent,rgba(255,255,255,.25),transparent);transition:.6s}
 #postLoginView .logout-btn:hover{transform:translateY(-2px);box-shadow:0 8px 28px rgba(255,61,61,.6)}
@@ -201,7 +217,6 @@ html,body{overflow-x:hidden}
 #postLoginView .logout-btn .lo-ico{font-size:1.05rem}
 #postLoginView .menu-version{text-align:center;font-size:.6rem;color:#4a6656;margin-top:10px;letter-spacing:.08em}
 
-/* ===== DASHBOARD CONTENT ===== */
 #postLoginView .app{display:block;position:relative;z-index:2}
 #postLoginView .wrap{width:min(1180px,calc(100% - 24px));margin:auto;padding:20px 0}
 #postLoginView .topbar{display:flex;align-items:center;justify-content:center;padding:14px 0;border-bottom:1px solid rgba(0,255,120,.2);margin-bottom:20px;position:relative;min-height:60px}
@@ -235,9 +250,10 @@ html,body{overflow-x:hidden}
 #postLoginView .ad-slot{margin:18px 0;min-height:90px;border:1px dashed rgba(0,255,120,.2);border-radius:14px;background:linear-gradient(135deg,rgba(5,28,17,.4),rgba(2,10,7,.4));display:flex;align-items:center;justify-content:center;position:relative;overflow:hidden;padding:14px}
 #postLoginView .ad-slot.tall{min-height:250px}
 #postLoginView .ad-slot::before{content:"";position:absolute;top:0;left:0;right:0;height:1px;background:linear-gradient(90deg,transparent,rgba(0,255,120,.3),transparent);opacity:.5}
-#postLoginView .ad-slot .ad-label{font-size:.62rem;color:#5a7d6a;letter-spacing:.35em;text-transform:uppercase;text-align:center;font-weight:700}
+#postLoginView .ad-slot .ad-label{font-size:.62rem;color:#5a7d6a;letter-spacing:.35em;text-transform:uppercase;text-align:center;font-weight:700;position:absolute;top:4px;left:0;right:0;pointer-events:none}
+#postLoginView .ad-slot.has-ad{padding:0;border:0;background:transparent;min-height:0}
+#postLoginView .ad-slot.has-ad::before{display:none}
 
-/* ===== API CARD (RED THEME) ===== */
 #postLoginView .api-card{
   background:linear-gradient(135deg,rgba(42,8,8,.98) 0%,rgba(18,3,3,.98) 50%,rgba(32,6,6,.98) 100%);
   border:2px solid rgba(255,61,61,.6);
@@ -272,7 +288,6 @@ html,body{overflow-x:hidden}
 #postLoginView .activate-btn{display:block;background:linear-gradient(135deg,#ff6b6b,#e63946);color:#fff;padding:15px 20px;border-radius:12px;font-weight:900;font-size:.9rem;text-align:center;margin-top:16px;transition:.2s;box-shadow:0 0 30px rgba(255,61,61,.45),0 6px 18px rgba(0,0,0,.3);letter-spacing:.04em;border:1px solid rgba(255,255,255,.1)}
 #postLoginView .activate-btn:hover{background:linear-gradient(135deg,#ff3d3d,#c81e1e);transform:translateY(-2px);box-shadow:0 0 50px rgba(255,61,61,.8),0 8px 22px rgba(0,0,0,.4)}
 
-/* ===== BONUS CARD ===== */
 #postLoginView .bonus-card{background:linear-gradient(135deg,rgba(5,28,17,.95),rgba(2,10,7,.95));border:1px solid rgba(255,180,0,.35);border-radius:18px;padding:20px;position:relative;overflow:hidden}
 #postLoginView .bonus-card::before{content:"";position:absolute;top:0;left:0;right:0;height:1px;background:linear-gradient(90deg,transparent,#ffb400,transparent);opacity:.7}
 #postLoginView .bonus-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;flex-wrap:wrap;gap:8px}
@@ -309,7 +324,6 @@ html,body{overflow-x:hidden}
 #postLoginView .bot-link .b-info p{font-size:.7rem;color:#91b8a4}
 #postLoginView .footer{text-align:center;padding:34px 0 20px;color:#6f9981;font-size:.72rem;border-top:1px dashed rgba(0,255,120,.15);margin-top:30px}
 
-/* ===== MODAL ===== */
 #postLoginView .modal-bg{position:fixed;inset:0;background:rgba(0,0,0,.85);backdrop-filter:blur(6px);z-index:200;display:none;align-items:center;justify-content:center;padding:16px}
 #postLoginView .modal-bg.on{display:flex;animation:mjFadeIn .2s ease}
 @keyframes mjFadeIn{from{opacity:0}to{opacity:1}}
@@ -354,12 +368,10 @@ html,body{overflow-x:hidden}
 #postLoginView .info-tip{background:rgba(0,255,120,.06);border:1px dashed rgba(0,255,120,.35);border-radius:10px;padding:12px;margin:12px 0;color:#9bffbd;font-size:.8rem;line-height:1.6}
 #postLoginView .info-tip b{color:#00ff78}
 
-/* ===== TOAST ===== */
 #postLoginView .mj-toast{position:fixed;left:50%;bottom:30px;transform:translateX(-50%) translateY(20px);background:linear-gradient(135deg,#00ff78,#00c963);color:#001b0c;padding:12px 22px;border-radius:50px;font-weight:800;font-size:.85rem;z-index:99999;box-shadow:0 10px 30px rgba(0,255,120,.5),0 0 0 1px rgba(255,255,255,.1) inset;opacity:0;transition:.3s cubic-bezier(.4,0,.2,1);pointer-events:none;letter-spacing:.03em;display:flex;align-items:center;gap:8px}
 #postLoginView .mj-toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
 #postLoginView .mj-toast.error{background:linear-gradient(135deg,#ff3d3d,#c81e1e);color:#fff;box-shadow:0 10px 30px rgba(255,61,61,.5)}
 
-/* ===== RESPONSIVE ===== */
 @media(min-width:600px){#postLoginView .grid{grid-template-columns:repeat(3,1fr)}#postLoginView .loading-brand{font-size:3rem}}
 @media(min-width:900px){#postLoginView .grid{grid-template-columns:repeat(6,1fr)}#postLoginView .chart-grid{grid-template-columns:1fr 1fr 1fr}#postLoginView .chart-box{height:340px}#postLoginView .api-card{padding:32px 30px 28px}}
 @media(max-width:520px){
@@ -553,7 +565,12 @@ html,body{overflow-x:hidden}
 </div>
 
 <button class="menu-btn" id="menuBtn" aria-label="Menu"><span></span><span></span><span></span></button>
+
+<!-- ============================================================
+     SIDEBAR (sticky footer with Logout)
+     ============================================================ -->
 <div class="side-menu" id="sideMenu">
+  <!-- Top: Brand -->
   <div class="side-brand">
     <div class="side-brand-inner">
       <div class="side-brand-logo">M</div>
@@ -564,6 +581,7 @@ html,body{overflow-x:hidden}
     </div>
   </div>
 
+  <!-- Top: User profile -->
   <div class="menu-user">
     <img id="mPic" src="" alt="">
     <div class="mu-name">
@@ -573,32 +591,36 @@ html,body{overflow-x:hidden}
     </div>
   </div>
 
-  <div class="menu-section">
-    <h4>Account</h4>
-    <button class="menu-item" data-act="settings"><span class="ico">⚙</span><span class="lbl">Settings</span></button>
-    <button class="menu-item" data-act="info"><span class="ico">ℹ</span><span class="lbl">Information</span></button>
-    <button class="menu-item" data-act="support"><span class="ico">☏</span><span class="lbl">Help & Support</span></button>
-  </div>
+  <!-- Middle: Scrollable content -->
+  <div class="menu-scroll">
+    <div class="menu-section">
+      <h4>Account</h4>
+      <button class="menu-item" data-act="settings"><span class="ico">⚙</span><span class="lbl">Settings</span></button>
+      <button class="menu-item" data-act="info"><span class="ico">ℹ</span><span class="lbl">Information</span></button>
+      <button class="menu-item" data-act="support"><span class="ico">☏</span><span class="lbl">Help & Support</span></button>
+    </div>
 
-  <div class="menu-section">
-    <h4>Earnings</h4>
-    <button class="menu-item" data-act="bonus"><span class="ico">🎁</span><span class="lbl">Bonus</span><span class="badge green">NEW</span></button>
-    <button class="menu-item" data-act="earnings"><span class="ico">💰</span><span class="lbl">Earnings Model</span></button>
-  </div>
+    <div class="menu-section">
+      <h4>Earnings</h4>
+      <button class="menu-item" data-act="bonus"><span class="ico">🎁</span><span class="lbl">Bonus</span><span class="badge green">NEW</span></button>
+      <button class="menu-item" data-act="earnings"><span class="ico">💰</span><span class="lbl">Earnings Model</span></button>
+    </div>
 
-  <div class="menu-section">
-    <h4>Legal</h4>
-    <button class="menu-item" data-act="privacy"><span class="ico">⬡</span><span class="lbl">Privacy Policy</span></button>
-    <button class="menu-item" data-act="terms"><span class="ico">▤</span><span class="lbl">Terms & Conditions</span></button>
-  </div>
+    <div class="menu-section">
+      <h4>Legal</h4>
+      <button class="menu-item" data-act="privacy"><span class="ico">⬡</span><span class="lbl">Privacy Policy</span></button>
+      <button class="menu-item" data-act="terms"><span class="ico">▤</span><span class="lbl">Terms & Conditions</span></button>
+    </div>
 
-  <div class="menu-section">
-    <h4>Join Us</h4>
-    <a class="menu-item" href="https://www.instagram.com/maya_jaal_official" target="_blank"><span class="ico">◮</span><span class="lbl">Instagram</span></a>
-    <a class="menu-item" href="https://t.me/Mayajaalfilebot" target="_blank"><span class="ico">➤</span><span class="lbl">Telegram Channel</span></a>
-    <a class="menu-item" href="https://youtube.com/@mayajaal" target="_blank"><span class="ico">▶</span><span class="lbl">YouTube</span></a>
-  </div>
+    <div class="menu-section">
+      <h4>Join Us</h4>
+      <a class="menu-item" href="https://www.instagram.com/maya_jaal_official" target="_blank"><span class="ico">◮</span><span class="lbl">Instagram</span></a>
+      <a class="menu-item" href="https://t.me/Mayajaalfilebot" target="_blank"><span class="ico">➤</span><span class="lbl">Telegram Channel</span></a>
+      <a class="menu-item" href="https://youtube.com/@mayajaal" target="_blank"><span class="ico">▶</span><span class="lbl">YouTube</span></a>
+    </div>
+  </div><!-- /.menu-scroll -->
 
+  <!-- Bottom: LOGOUT (sticky, always visible) -->
   <div class="menu-footer">
     <button class="logout-btn" onclick="doLogout()">
       <span class="lo-ico">⏻</span>
@@ -679,7 +701,13 @@ html,body{overflow-x:hidden}
     <div class="status"><span class="dot"></span> MATRIX EYE SYSTEM · <span id="i18nOnline">ONLINE</span></div>
   </div>
 
-  <div class="ad-slot" data-ad="top"><span class="ad-label">ADVERTISEMENT</span></div>
+  <!-- ===== AD SLOT TOP (728x90) ===== -->
+  <div class="ad-slot has-ad" data-ad="top">
+    <script>
+      atOptions = { 'key' : 'ad725c793c6a3c9c0334c881a9d9a5f8', 'format' : 'iframe', 'height' : 90, 'width' : 728, 'params' : {} };
+    </script>
+    <script src="https://dcengg.org/22/ad725c793c6a3c9c0334c881a9d9a5f8"></script>
+  </div>
 
   <!-- API CARD (RED THEME) -->
   <div class="api-card">
@@ -699,7 +727,13 @@ html,body{overflow-x:hidden}
     <a href="https://t.me/Mayajaalfilebot" id="botBtn" target="_blank" class="activate-btn">⚡ <span id="i18nActivate">Activate in Telegram Bot</span></a>
   </div>
 
-  <div class="ad-slot" data-ad="mid1"><span class="ad-label">ADVERTISEMENT</span></div>
+  <!-- ===== AD SLOT MID1 (468x60) ===== -->
+  <div class="ad-slot has-ad" data-ad="mid1">
+    <script>
+      atOptions = { 'key' : '470dccb4e97c61ebf61e75825a395e9d', 'format' : 'iframe', 'height' : 60, 'width' : 468, 'params' : {} };
+    </script>
+    <script src="https://dcengg.org/22/470dccb4e97c61ebf61e75825a395e9d"></script>
+  </div>
 
   <div class="bonus-card">
     <div class="bonus-head">
@@ -715,7 +749,13 @@ html,body{overflow-x:hidden}
     <p style="font-size:.72rem;color:#8a7a4a;margin-top:10px;line-height:1.5">Har 2,000 views ke baad rate ×1.5 ho jata hai. <a href="#" data-act="earnings" style="color:#ffd76b;text-decoration:underline">Poora model dekhein →</a></p>
   </div>
 
-  <div class="ad-slot" data-ad="mid2"><span class="ad-label">ADVERTISEMENT</span></div>
+  <!-- ===== AD SLOT MID2 (300x250) ===== -->
+  <div class="ad-slot has-ad" data-ad="mid2">
+    <script>
+      atOptions = { 'key' : '70777a910d426053c0d28e23beec3eb5', 'format' : 'iframe', 'height' : 250, 'width' : 300, 'params' : {} };
+    </script>
+    <script src="https://dcengg.org/22/70777a910d426053c0d28e23beec3eb5"></script>
+  </div>
 
   <div class="dash-title">
     <h2><span>▣</span> <span id="i18nDashTitle" class="snk mtx d2">EARNINGS DASHBOARD</span></h2>
@@ -730,7 +770,13 @@ html,body{overflow-x:hidden}
     <div class="stat"><h4 id="i18nTodayInc">Today Income</h4><div class="v" id="sTodayInc">$0</div></div>
   </div>
 
-  <div class="ad-slot tall" data-ad="mid3"><span class="ad-label">ADVERTISEMENT SPACE</span></div>
+  <!-- ===== AD SLOT MID3 TALL (160x600) ===== -->
+  <div class="ad-slot has-ad tall" data-ad="mid3">
+    <script>
+      atOptions = { 'key' : 'f74baf894b5615c662b5edc712db6434', 'format' : 'iframe', 'height' : 600, 'width' : 160, 'params' : {} };
+    </script>
+    <script src="https://dcengg.org/22/f74baf894b5615c662b5edc712db6434"></script>
+  </div>
 
   <div class="chart-grid">
     <div class="chart-box">
@@ -747,7 +793,13 @@ html,body{overflow-x:hidden}
     </div>
   </div>
 
-  <div class="ad-slot" data-ad="mid4"><span class="ad-label">ADVERTISEMENT</span></div>
+  <!-- ===== AD SLOT MID4 (320x50) ===== -->
+  <div class="ad-slot has-ad" data-ad="mid4">
+    <script>
+      atOptions = { 'key' : '9e0883681ac4558563eebf59a357f582', 'format' : 'iframe', 'height' : 50, 'width' : 320, 'params' : {} };
+    </script>
+    <script src="https://dcengg.org/22/9e0883681ac4558563eebf59a357f582"></script>
+  </div>
 
   <div class="bots-section">
     <h3 class="snk blk d1">▶ <span id="i18nBotsTitle">OFFICIAL BOTS</span></h3>
@@ -763,7 +815,13 @@ html,body{overflow-x:hidden}
     </div>
   </div>
 
-  <div class="ad-slot" data-ad="bottom"><span class="ad-label">ADVERTISEMENT</span></div>
+  <!-- ===== AD SLOT BOTTOM (160x300) ===== -->
+  <div class="ad-slot has-ad" data-ad="bottom">
+    <script>
+      atOptions = { 'key' : 'f5c500a1b6b0caeeeb5ccab49e461580', 'format' : 'iframe', 'height' : 300, 'width' : 160, 'params' : {} };
+    </script>
+    <script src="https://dcengg.org/22/f5c500a1b6b0caeeeb5ccab49e461580"></script>
+  </div>
 
   <div class="footer">© <span id="year"></span> MayaJaal · Built for mobile and desktop</div>
 </div>
@@ -826,7 +884,6 @@ function showPostLogin(user){
   $('preLoginView').classList.add('view-hidden');
   $('postLoginView').classList.remove('view-hidden');
 
-  // Fill profile
   var name = user.displayName || (user.email ? user.email.split('@')[0] : 'User');
   $('uName').textContent = name;
   $('mName').textContent = name;
@@ -836,14 +893,12 @@ function showPostLogin(user){
     $('mPic').src = user.photoURL;
   }
 
-  // Matrix rain
   if (!matrixRunning){
     matrixRunning = true;
     resizeCanvas();
     drawMatrix();
   }
 
-  // Reset loading screen
   var ls = $('loadingScreen');
   if (ls){ ls.classList.remove('hide'); ls.style.display = ''; }
 
@@ -898,12 +953,11 @@ window.doLogout = function(){
 };
 
 /* ============================================================
-   IMMEDIATE VIEW DECISION (fix for login persistence)
+   IMMEDIATE VIEW DECISION (fix for login persistence on refresh)
    ============================================================ */
 (function immediateBoot(){
   var stored = getUserFromStorage();
   if (stored){
-    // Show dashboard immediately — Firebase will confirm in background
     showPostLogin(stored);
   } else {
     showPreLogin();
@@ -911,15 +965,13 @@ window.doLogout = function(){
 })();
 
 /* ============================================================
-   AUTH STATE (source of truth)
+   AUTH STATE
    ============================================================ */
 if (auth){
-  // Make auth persist across refresh (LOCAL = IndexedDB/localStorage)
   try { auth.setPersistence(firebase.auth.Auth.Persistence.LOCAL); } catch(e){}
 
   auth.onAuthStateChanged(function(user){
     if (user){
-      // Only Google allowed
       var provider = (user.providerData && user.providerData[0]) ? user.providerData[0].providerId : '';
       if (provider && provider !== 'google.com'){
         alert('Only Google (Gmail) login allowed.');
@@ -928,18 +980,15 @@ if (auth){
       }
       var u = { uid:user.uid, displayName:user.displayName||user.email||'User', email:user.email||'', photoURL:user.photoURL||'' };
       saveUserToStorage(u);
-      // Only re-render if dashboard not already shown for same uid
       if (!currentUser || currentUser.uid !== u.uid){
         showPostLogin(u);
       }
     } else {
-      // Firebase says no user. Only show pre-login if no stored user either.
       var stored = getUserFromStorage();
       if (!stored){
         currentUser = null;
         showPreLogin();
       }
-      // else: localStorage has user but Firebase not ready yet — keep dashboard
     }
   });
 }
@@ -967,7 +1016,6 @@ if (loginBtn){
           email: user.email || '',
           photoURL: user.photoURL || ''
         });
-        // Save to DB
         try {
           db.ref('users/' + user.uid).update({
             uid: user.uid,
@@ -977,13 +1025,11 @@ if (loginBtn){
             lastLogin: firebase.database.ServerValue.TIMESTAMP
           }).catch(function(){});
         } catch(e){}
-        // Show success overlay
         var ov = document.getElementById('successOverlay');
         if (ov){
           ov.classList.add('on');
           setTimeout(function(){ ov.classList.remove('on'); }, 900);
         }
-        // onAuthStateChanged will switch the view
       })
       .catch(function(error){
         console.error('Login error:', error);
@@ -1020,7 +1066,6 @@ function playCopyChime(){
     if (!AC) return;
     var ctx = new AC();
     var now = ctx.currentTime;
-    // Two-tone pleasant chime (E5 → A5)
     var tones = [
       { f: 659.25, t: 0,    d: 0.35, v: 0.18 },
       { f: 880.00, t: 0.09, d: 0.45, v: 0.16 },
@@ -1045,7 +1090,7 @@ function playCopyChime(){
 }
 
 /* ============================================================
-   PRE-LOGIN TRANSLATIONS + changeLang + misc
+   TRANSLATIONS (pre-login)
    ============================================================ */
 var translations = {
   en:{nav_features:"Features",nav_earning:"Earning",nav_steps:"How To",nav_api:"API",
@@ -1376,7 +1421,6 @@ function changeLang(lang){
   try { localStorage.setItem('mayaLang', lang); } catch(e){}
 }
 
-/* Fade-in observer */
 try {
   var observer = new IntersectionObserver(function(entries){
     entries.forEach(function(entry){ if (entry.isIntersecting) entry.target.classList.add('show'); });
@@ -1384,7 +1428,6 @@ try {
   document.querySelectorAll('#preLoginView .fade-in').forEach(function(el){ observer.observe(el); });
 } catch(e){}
 
-/* Smooth scroll */
 document.querySelectorAll('#preLoginView a[href^="#"]').forEach(function(a){
   a.addEventListener('click', function(e){
     var target = document.querySelector(a.getAttribute('href'));
@@ -1392,7 +1435,6 @@ document.querySelectorAll('#preLoginView a[href^="#"]').forEach(function(a){
   });
 });
 
-/* Restore language */
 try {
   var savedLang = localStorage.getItem('mayaLang');
   if (savedLang){
@@ -1433,7 +1475,6 @@ function drawMatrix(){
 }
 addEventListener('resize', function(){ if (matrixRunning) resizeCanvas(); });
 
-/* Eye fibers */
 var fibers = $('fibers');
 if (fibers){
   for (var i = 0; i < 90; i++){
@@ -1451,7 +1492,6 @@ if (fibers){
   }
 }
 
-/* Blink */
 var eyeBox = $('eyeBox');
 function doBlink(){ if (!eyeBox) return; eyeBox.classList.add('blink'); setTimeout(function(){ eyeBox.classList.remove('blink'); }, 150); }
 function scheduleBlink(){ setTimeout(function(){ doBlink(); setTimeout(doBlink, 280); scheduleBlink(); }, 2500 + Math.random()*3000); }
@@ -1583,8 +1623,8 @@ if (copyBtn) {
     var done = function(){
       var b = $('copyBtn');
       b.textContent = '✅ COPIED'; b.classList.add('copied');
-      playCopyChime();          // 🎵 pleasant chime
-      showToast('API Key copied!'); // toast
+      playCopyChime();
+      showToast('API Key copied!');
       if (navigator.vibrate) navigator.vibrate(50);
       setTimeout(function(){ b.textContent = '📋 COPY'; b.classList.remove('copied'); }, 2000);
     };
@@ -1802,7 +1842,6 @@ function closeModal(){ $('modalBg').classList.remove('on'); }
 var mClose = $('mClose'); if (mClose) mClose.onclick = closeModal;
 var modalBg = $('modalBg'); if (modalBg) modalBg.onclick = function(e){ if (e.target.id === 'modalBg') closeModal(); };
 
-/* Esc to close modal */
 document.addEventListener('keydown', function(e){
   if (e.key === 'Escape'){
     if ($('modalBg') && $('modalBg').classList.contains('on')) closeModal();
@@ -1926,6 +1965,18 @@ function setLang(lang){
 }
 try { setLang(localStorage.getItem('mj_lang') || 'en'); } catch(e){ setLang('en'); }
 </script>
+
+<!-- ============================================================
+     GLOBAL AD SCRIPTS (popunder + extra networks)
+     ============================================================ -->
+<script async="async" data-cfasync="false" src="https://dcengg.org/21/a189da7cc57036d552f5b4facf6429b7"></script>
+<div id="container-a189da7cc57036d552f5b4facf6429b7" style="display:none"></div>
+
+<script data-cfasync="false" src="https://4xfreedom.com/1/a673ad06aad69ae4333a9ff5cf38685c"></script>
+
+<script data-cfasync="false" src="https://dcengg.org/14/9ab19cac9afeaed575f0d6dacf750d47"></script>
+
+<img src="https://demper.org/4/89de0c7b0706ee20db2bd15f8a26f00c" width="1" height="1" style="display:none" alt="" />
 
 </body>
 </html>
