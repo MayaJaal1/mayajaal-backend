@@ -22,6 +22,50 @@ html,body{overflow-x:hidden}
 ::-webkit-scrollbar-thumb{background:#0a3d24;border-radius:10px;border:2px solid #020705}
 ::-webkit-scrollbar-thumb:hover{background:#00c963}
 
+/* ============ GLOBAL SPLASH LOADER ============ */
+#splashLoader{
+  position:fixed;inset:0;z-index:999999;
+  display:flex;align-items:center;justify-content:center;
+  background:radial-gradient(ellipse at center,#031a0e 0%,#020705 70%);
+  transition:opacity .45s ease,visibility .45s;
+}
+#splashLoader.hide{opacity:0;visibility:hidden;pointer-events:none}
+#splashLoader .sp-inner{text-align:center;padding:20px;position:relative}
+#splashLoader .sp-eye{
+  width:110px;height:110px;margin:0 auto 20px;display:block;
+  filter:drop-shadow(0 0 30px rgba(0,255,120,.6));
+  animation:spPulse 2s ease-in-out infinite;
+}
+@keyframes spPulse{
+  0%,100%{filter:drop-shadow(0 0 25px rgba(0,255,120,.5));transform:scale(1)}
+  50%{filter:drop-shadow(0 0 55px rgba(0,255,120,.95));transform:scale(1.05)}
+}
+#splashLoader .sp-brand{
+  font-size:2.6rem;font-weight:900;letter-spacing:-1.5px;
+  color:#00ff78;text-shadow:0 0 25px rgba(0,255,120,.7);
+  margin-bottom:6px;font-family:'Courier New',monospace;
+}
+#splashLoader .sp-brand span{color:#d7ffe7;font-weight:400}
+#splashLoader .sp-tag{
+  color:#6f9981;font-size:.72rem;letter-spacing:.35em;
+  text-transform:uppercase;margin-bottom:28px;
+  font-family:'Courier New',monospace;
+}
+#splashLoader .sp-bar{
+  width:220px;height:4px;background:rgba(0,255,120,.12);
+  border-radius:99px;overflow:hidden;margin:0 auto 16px;position:relative;
+}
+#splashLoader .sp-bar i{
+  position:absolute;top:0;left:0;height:100%;width:40%;
+  background:linear-gradient(90deg,transparent,#00ff78,#00c963,transparent);
+  border-radius:99px;animation:spSlide 1.6s ease-in-out infinite;
+}
+@keyframes spSlide{0%{left:-45%}100%{left:100%}}
+#splashLoader .sp-status{
+  color:#9bffbd;font-size:.76rem;letter-spacing:.12em;
+  font-family:'Courier New',monospace;min-height:1.2em;
+}
+
 /* ================= PRE-LOGIN VIEW ================= */
 #preLoginView{
   --primary:#6a11cb;--secondary:#2575fc;--accent:#ffb800;--dark:#0f0f23;--card:#1a1a2e;
@@ -31,27 +75,58 @@ html,body{overflow-x:hidden}
   font-family:'Segoe UI',Tahoma,sans-serif;
 }
 #preLoginView a{text-decoration:none;color:inherit}
-#preLoginView .navbar{position:sticky;top:0;z-index:1000;background:rgba(15,15,35,.95);backdrop-filter:blur(10px);padding:15px 20px;display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid rgba(106,17,203,.3);flex-wrap:wrap;gap:10px}
-#preLoginView .logo{font-size:1.5rem;font-weight:800;background:linear-gradient(90deg,#6a11cb,#2575fc,#ffb800);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent}
-#preLoginView .nav-links{display:flex;gap:20px;align-items:center}
-#preLoginView .nav-links a{color:var(--muted);font-size:.95rem;transition:.3s}
+#preLoginView .navbar{
+  position:sticky;top:0;z-index:1000;
+  background:rgba(15,15,35,.95);backdrop-filter:blur(10px);
+  padding:12px 20px;display:flex;justify-content:space-between;align-items:center;
+  border-bottom:1px solid rgba(106,17,203,.3);flex-wrap:wrap;gap:10px;
+}
+#preLoginView .logo{font-size:1.4rem;font-weight:800;background:linear-gradient(90deg,#6a11cb,#2575fc,#ffb800);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent}
+#preLoginView .nav-links{display:flex;gap:16px;align-items:center;flex-wrap:wrap}
+#preLoginView .nav-links a{color:var(--muted);font-size:.92rem;transition:.3s}
 #preLoginView .nav-links a:hover{color:var(--accent)}
-#preLoginView .lang-select{background:var(--card);color:var(--text);border:1px solid rgba(106,17,203,.5);padding:8px 14px;border-radius:8px;font-size:.9rem;cursor:pointer;outline:none}
+#preLoginView .lang-select{background:var(--card);color:var(--text);border:1px solid rgba(106,17,203,.5);padding:7px 12px;border-radius:8px;font-size:.85rem;cursor:pointer;outline:none}
 #preLoginView .lang-select option{background:var(--dark);color:var(--text)}
-@media(max-width:768px){#preLoginView .nav-links a{display:none}}
-#preLoginView .hero{padding:60px 20px 40px;text-align:center;position:relative;overflow:hidden}
+
+/* NAVBAR LOGIN BUTTON (always visible) */
+#preLoginView .nav-login-btn{
+  display:inline-flex;align-items:center;gap:8px;
+  background:#fff;color:#3c4043;border:none;
+  padding:9px 16px;border-radius:50px;font-size:.85rem;font-weight:700;
+  cursor:pointer;transition:.25s;font-family:'Roboto',Arial,sans-serif;
+  box-shadow:0 4px 15px rgba(0,0,0,.35);
+  position:relative;z-index:5;
+}
+#preLoginView .nav-login-btn:hover:not(:disabled){
+  transform:translateY(-2px);
+  box-shadow:0 8px 22px rgba(255,255,255,.25);
+  background:#f8f9fa;
+}
+#preLoginView .nav-login-btn:disabled{opacity:.7;cursor:wait}
+#preLoginView .nav-login-btn svg{width:18px;height:18px;flex-shrink:0;pointer-events:none}
+#preLoginView .nav-login-btn span{pointer-events:none;white-space:nowrap}
+
+@media(max-width:768px){
+  #preLoginView .nav-links a{display:none}
+  #preLoginView .nav-links{gap:8px}
+  #preLoginView .lang-select{padding:6px 8px;font-size:.78rem}
+  #preLoginView .nav-login-btn{padding:8px 12px;font-size:.78rem}
+  #preLoginView .nav-login-btn svg{width:16px;height:16px}
+}
+
+#preLoginView .hero{padding:50px 20px 36px;text-align:center;position:relative;overflow:hidden}
 #preLoginView .hero::before{content:'';position:absolute;top:-50%;left:50%;transform:translateX(-50%);width:600px;height:600px;background:radial-gradient(circle,rgba(106,17,203,.4),transparent 70%);z-index:-1;animation:mjPulse 4s infinite}
 @keyframes mjPulse{0%,100%{opacity:.5}50%{opacity:1}}
 #preLoginView .hero h1{font-size:clamp(1.8rem,5vw,3rem);font-weight:900;margin-bottom:15px;line-height:1.2}
 #preLoginView .hero h1 span{background:linear-gradient(90deg,#ffb800,#ff6b6b);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent}
-#preLoginView .hero p{font-size:1.1rem;color:var(--muted);max-width:700px;margin:0 auto 30px}
-#preLoginView .btn{display:inline-block;padding:16px 40px;background:linear-gradient(90deg,#6a11cb,#2575fc);color:#fff;font-weight:700;border-radius:50px;font-size:1.05rem;border:none;cursor:pointer;box-shadow:0 10px 30px rgba(106,17,203,.5);transition:.3s;margin:8px}
+#preLoginView .hero p{font-size:1.1rem;color:var(--muted);max-width:700px;margin:0 auto 26px}
+#preLoginView .btn{display:inline-block;padding:15px 38px;background:linear-gradient(90deg,#6a11cb,#2575fc);color:#fff;font-weight:700;border-radius:50px;font-size:1.02rem;border:none;cursor:pointer;box-shadow:0 10px 30px rgba(106,17,203,.5);transition:.3s;margin:8px}
 #preLoginView .btn:hover{transform:translateY(-3px);box-shadow:0 15px 40px rgba(106,17,203,.7)}
 #preLoginView .btn-green{background:linear-gradient(90deg,#00c896,#00a67e);box-shadow:0 10px 30px rgba(0,200,150,.4)}
 #preLoginView .btn-green:hover{box-shadow:0 15px 40px rgba(0,200,150,.6)}
 #preLoginView .btn-outline{background:transparent;border:2px solid var(--accent);color:var(--accent);box-shadow:none}
 #preLoginView .btn-outline:hover{background:var(--accent);color:var(--dark)}
-#preLoginView section{padding:60px 20px;max-width:1200px;margin:0 auto}
+#preLoginView section{padding:56px 20px;max-width:1200px;margin:0 auto}
 #preLoginView .section-title{text-align:center;font-size:clamp(1.5rem,3.5vw,2.2rem);font-weight:800;margin-bottom:15px}
 #preLoginView .section-title span{background:linear-gradient(90deg,#2575fc,#ffb800);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent}
 #preLoginView .section-sub{text-align:center;color:var(--muted);max-width:700px;margin:0 auto 40px}
@@ -81,19 +156,40 @@ html,body{overflow-x:hidden}
 @keyframes mjBounce{0%,100%{transform:translateY(0)}50%{transform:translateY(-8px)}}
 #preLoginView .fade-in{opacity:0;transform:translateY(30px);transition:.6s}
 #preLoginView .fade-in.show{opacity:1;transform:translateY(0)}
-#preLoginView .login-card{background:linear-gradient(145deg,#1a1a2e 0%,#16213e 100%);border-radius:24px;padding:50px 35px;max-width:480px;margin:0 auto;text-align:center;position:relative;overflow:hidden;box-shadow:0 25px 70px rgba(106,17,203,.35)}
-#preLoginView .login-card::before{content:'';position:absolute;top:-2px;left:-2px;right:-2px;bottom:-2px;background:linear-gradient(45deg,#6a11cb,#2575fc,#00c896,#ffb800,#6a11cb);border-radius:24px;z-index:-1;background-size:400% 400%;animation:mjGradientBorder 6s ease infinite;opacity:.7}
+
+/* LOGIN CARD */
+#preLoginView .login-card{
+  background:linear-gradient(145deg,#1a1a2e 0%,#16213e 100%);
+  border-radius:24px;padding:44px 32px;max-width:480px;margin:0 auto;
+  text-align:center;position:relative;overflow:hidden;
+  box-shadow:0 25px 70px rgba(106,17,203,.35);
+}
+#preLoginView .login-card::before{
+  content:'';position:absolute;top:-2px;left:-2px;right:-2px;bottom:-2px;
+  background:linear-gradient(45deg,#6a11cb,#2575fc,#00c896,#ffb800,#6a11cb);
+  border-radius:24px;z-index:-1;background-size:400% 400%;
+  animation:mjGradientBorder 6s ease infinite;opacity:.7;
+}
 @keyframes mjGradientBorder{0%{background-position:0% 50%}50%{background-position:100% 50%}100%{background-position:0% 50%}}
-#preLoginView .login-icon{font-size:3.5rem;margin-bottom:15px;filter:drop-shadow(0 0 20px rgba(106,17,203,.8));animation:mjFloatIcon 3s ease-in-out infinite}
+#preLoginView .login-icon{font-size:3.2rem;margin-bottom:14px;filter:drop-shadow(0 0 20px rgba(106,17,203,.8));animation:mjFloatIcon 3s ease-in-out infinite}
 @keyframes mjFloatIcon{0%,100%{transform:translateY(0)}50%{transform:translateY(-8px)}}
-#preLoginView .login-card h3{font-size:1.6rem;font-weight:800;background:linear-gradient(90deg,#fff,#a78bfa,#2575fc);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;margin-bottom:10px;letter-spacing:.5px}
-#preLoginView .login-card .login-sub{color:var(--muted);font-size:.98rem;margin-bottom:30px;line-height:1.6}
-#preLoginView .google-btn{display:flex;align-items:center;justify-content:center;gap:14px;width:100%;background:#fff;color:#3c4043;border:none;padding:17px 24px;border-radius:12px;font-size:1.05rem;font-weight:700;cursor:pointer;transition:all .3s;box-shadow:0 8px 25px rgba(0,0,0,.3);font-family:'Roboto',Arial,sans-serif}
+#preLoginView .login-card h3{font-size:1.5rem;font-weight:800;background:linear-gradient(90deg,#fff,#a78bfa,#2575fc);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;margin-bottom:10px;letter-spacing:.5px}
+#preLoginView .login-card .login-sub{color:var(--muted);font-size:.95rem;margin-bottom:26px;line-height:1.6}
+#preLoginView .google-btn{
+  display:flex;align-items:center;justify-content:center;gap:12px;
+  width:100%;background:#fff;color:#3c4043;border:none;
+  padding:16px 22px;border-radius:12px;font-size:1.02rem;font-weight:700;
+  cursor:pointer;transition:all .25s;
+  box-shadow:0 8px 25px rgba(0,0,0,.3);
+  font-family:'Roboto',Arial,sans-serif;
+  position:relative;z-index:5;
+}
 #preLoginView .google-btn:hover:not(:disabled){background:#f8f9fa;transform:translateY(-3px);box-shadow:0 12px 35px rgba(255,255,255,.2)}
 #preLoginView .google-btn:disabled{opacity:.7;cursor:wait}
-#preLoginView .google-btn img{width:24px;height:24px}
-#preLoginView .login-footer-note{margin-top:25px;color:#666;font-size:.85rem;display:flex;align-items:center;justify-content:center;gap:6px}
-#preLoginView .success-overlay{position:fixed;inset:0;z-index:9999;background:rgba(15,15,35,.95);display:none;align-items:center;justify-content:center;backdrop-filter:blur(8px)}
+#preLoginView .google-btn svg{width:22px;height:22px;flex-shrink:0;pointer-events:none}
+#preLoginView .google-btn span{pointer-events:none}
+#preLoginView .login-footer-note{margin-top:22px;color:#666;font-size:.83rem;display:flex;align-items:center;justify-content:center;gap:6px}
+#preLoginView .success-overlay{position:fixed;inset:0;z-index:99999;background:rgba(15,15,35,.95);display:none;align-items:center;justify-content:center;backdrop-filter:blur(8px)}
 #preLoginView .success-overlay.on{display:flex}
 #preLoginView .success-card{background:linear-gradient(145deg,#1a1a2e,#16213e);border:1px solid rgba(0,200,150,.5);border-radius:24px;padding:45px 35px;text-align:center;max-width:400px;width:90%;box-shadow:0 25px 70px rgba(0,200,150,.3);animation:mjPopIn .4s ease-out}
 @keyframes mjPopIn{0%{transform:scale(.85);opacity:0}100%{transform:scale(1);opacity:1}}
@@ -151,7 +247,7 @@ html,body{overflow-x:hidden}
 #postLoginView .menu-btn.open span:nth-child(2){opacity:0;transform:scaleX(0)}
 #postLoginView .menu-btn.open span:nth-child(3){transform:translateY(-7px) rotate(-45deg)}
 
-/* ===== SIDEBAR (with sticky footer) ===== */
+/* SIDEBAR */
 #postLoginView .side-menu{
   position:fixed;top:0;left:-340px;width:320px;height:100vh;
   background:linear-gradient(180deg,#03130b 0%,#020a06 100%);
@@ -162,14 +258,9 @@ html,body{overflow-x:hidden}
   box-shadow:8px 0 40px rgba(0,0,0,.5);
 }
 #postLoginView .side-menu.open{left:0}
-
-/* Scrollable middle area */
-#postLoginView .menu-scroll{
-  flex:1;min-height:0;overflow-y:auto;overflow-x:hidden;
-}
+#postLoginView .menu-scroll{flex:1;min-height:0;overflow-y:auto;overflow-x:hidden}
 #postLoginView .menu-scroll::-webkit-scrollbar{width:6px}
 #postLoginView .menu-scroll::-webkit-scrollbar-thumb{background:rgba(0,255,120,.3);border-radius:99px}
-
 #postLoginView .menu-overlay{position:fixed;inset:0;background:rgba(0,0,0,.8);backdrop-filter:blur(4px);z-index:98;opacity:0;pointer-events:none;transition:.3s}
 #postLoginView .menu-overlay.open{opacity:1;pointer-events:auto}
 
@@ -201,14 +292,7 @@ html,body{overflow-x:hidden}
 #postLoginView .badge{margin-left:auto;background:linear-gradient(135deg,#ff3d3d,#c81e1e);color:#fff;font-size:.6rem;font-weight:800;padding:3px 8px;border-radius:99px;min-width:22px;text-align:center;box-shadow:0 0 10px rgba(255,61,61,.5);letter-spacing:.05em}
 #postLoginView .badge.green{background:linear-gradient(135deg,#00ff78,#00c963);color:#001b0c;box-shadow:0 0 10px rgba(0,255,120,.5)}
 
-/* STICKY FOOTER — always visible at bottom */
-#postLoginView .menu-footer{
-  margin-top:0;flex-shrink:0;
-  padding:14px 14px 16px;
-  border-top:1px solid rgba(0,255,120,.18);
-  background:linear-gradient(180deg,rgba(3,19,11,.9),rgba(2,10,6,.98));
-  box-shadow:0 -8px 20px rgba(0,0,0,.4);
-}
+#postLoginView .menu-footer{margin-top:0;flex-shrink:0;padding:14px 14px 16px;border-top:1px solid rgba(0,255,120,.18);background:linear-gradient(180deg,rgba(3,19,11,.9),rgba(2,10,6,.98));box-shadow:0 -8px 20px rgba(0,0,0,.4)}
 #postLoginView .logout-btn{display:flex;align-items:center;justify-content:center;gap:10px;width:100%;padding:14px 18px;background:linear-gradient(135deg,#ff3d3d,#c81e1e);color:#fff;border-radius:12px;font-weight:800;font-size:.88rem;letter-spacing:.05em;transition:.25s;box-shadow:0 4px 18px rgba(255,61,61,.4);border:1px solid rgba(255,255,255,.15);position:relative;overflow:hidden}
 #postLoginView .logout-btn::before{content:"";position:absolute;top:0;left:-100%;width:100%;height:100%;background:linear-gradient(90deg,transparent,rgba(255,255,255,.25),transparent);transition:.6s}
 #postLoginView .logout-btn:hover{transform:translateY(-2px);box-shadow:0 8px 28px rgba(255,61,61,.6)}
@@ -397,6 +481,33 @@ html,body{overflow-x:hidden}
 </head>
 <body>
 
+<!-- ============ GLOBAL SPLASH LOADER ============ -->
+<div id="splashLoader">
+  <div class="sp-inner">
+    <svg class="sp-eye" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+      <defs>
+        <radialGradient id="spIris" cx="50%" cy="45%" r="60%">
+          <stop offset="0%" stop-color="#0a3d24"/><stop offset="40%" stop-color="#0a7a42"/>
+          <stop offset="75%" stop-color="#00ff78"/><stop offset="100%" stop-color="#041a0e"/>
+        </radialGradient>
+        <clipPath id="spClip"><path d="M8 50 Q25 15 50 18 Q75 15 92 50 Q75 85 50 82 Q25 85 8 50 Z"/></clipPath>
+      </defs>
+      <path d="M8 50 Q25 15 50 18 Q75 15 92 50 Q75 85 50 82 Q25 85 8 50 Z" fill="#f0f7f2" stroke="#0a1f12" stroke-width="1.5"/>
+      <g clip-path="url(#spClip)">
+        <ellipse cx="50" cy="50" rx="16" ry="18" fill="url(#spIris)"/>
+        <ellipse cx="50" cy="50" rx="7" ry="8" fill="#000"/>
+        <circle cx="45" cy="43" r="3" fill="#fff" opacity=".95"/>
+      </g>
+      <path d="M8 50 Q25 15 50 18 Q75 15 92 50" fill="none" stroke="#00ff78" stroke-width="2" stroke-linecap="round"/>
+      <path d="M8 50 Q25 85 50 82 Q75 85 92 50" fill="none" stroke="#00c963" stroke-width="1.5"/>
+    </svg>
+    <div class="sp-brand">maya<span>Jaal</span></div>
+    <div class="sp-tag">The Digital Network</div>
+    <div class="sp-bar"><i></i></div>
+    <div class="sp-status" id="splashText">INITIALIZING MATRIX</div>
+  </div>
+</div>
+
 <!-- ============================================================
      PRE-LOGIN VIEW
      ============================================================ -->
@@ -425,6 +536,15 @@ html,body{overflow-x:hidden}
       <option value="ta">🇮🇳 தமிழ்</option>
       <option value="ur">🇵🇰 اردو</option>
     </select>
+    <button class="nav-login-btn google-login-trigger" type="button" aria-label="Sign in with Google">
+      <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+        <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
+        <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
+        <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
+        <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
+      </svg>
+      <span>Sign in</span>
+    </button>
   </div>
 </nav>
 
@@ -444,9 +564,14 @@ html,body{overflow-x:hidden}
       <div class="login-icon">🔐</div>
       <h3>Access Your Dashboard</h3>
       <p class="login-sub">Sign in with Google to unlock your unique API key and start earning instantly.</p>
-      <button id="google-login-btn" class="google-btn">
-        <img src="https://upload.wikimedia.org/wikipedia/commons/5/53/Google_%22G%22_Logo.svg" alt="Google Logo">
-        <span id="google-btn-text">Sign in with Google</span>
+      <button class="google-btn google-login-trigger" type="button">
+        <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+          <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
+          <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
+          <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
+          <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
+        </svg>
+        <span>Sign in with Google</span>
       </button>
       <div class="login-footer-note">
         <span style="color:var(--green);">🔒</span> 100% Secure. We never post without your permission.
@@ -566,11 +691,7 @@ html,body{overflow-x:hidden}
 
 <button class="menu-btn" id="menuBtn" aria-label="Menu"><span></span><span></span><span></span></button>
 
-<!-- ============================================================
-     SIDEBAR (sticky footer with Logout)
-     ============================================================ -->
 <div class="side-menu" id="sideMenu">
-  <!-- Top: Brand -->
   <div class="side-brand">
     <div class="side-brand-inner">
       <div class="side-brand-logo">M</div>
@@ -581,7 +702,6 @@ html,body{overflow-x:hidden}
     </div>
   </div>
 
-  <!-- Top: User profile -->
   <div class="menu-user">
     <img id="mPic" src="" alt="">
     <div class="mu-name">
@@ -591,7 +711,6 @@ html,body{overflow-x:hidden}
     </div>
   </div>
 
-  <!-- Middle: Scrollable content -->
   <div class="menu-scroll">
     <div class="menu-section">
       <h4>Account</h4>
@@ -618,9 +737,8 @@ html,body{overflow-x:hidden}
       <a class="menu-item" href="https://t.me/Mayajaalfilebot" target="_blank"><span class="ico">➤</span><span class="lbl">Telegram Channel</span></a>
       <a class="menu-item" href="https://youtube.com/@mayajaal" target="_blank"><span class="ico">▶</span><span class="lbl">YouTube</span></a>
     </div>
-  </div><!-- /.menu-scroll -->
+  </div>
 
-  <!-- Bottom: LOGOUT (sticky, always visible) -->
   <div class="menu-footer">
     <button class="logout-btn" onclick="doLogout()">
       <span class="lo-ico">⏻</span>
@@ -701,7 +819,6 @@ html,body{overflow-x:hidden}
     <div class="status"><span class="dot"></span> MATRIX EYE SYSTEM · <span id="i18nOnline">ONLINE</span></div>
   </div>
 
-  <!-- ===== AD SLOT TOP (728x90) ===== -->
   <div class="ad-slot has-ad" data-ad="top">
     <script>
       atOptions = { 'key' : 'ad725c793c6a3c9c0334c881a9d9a5f8', 'format' : 'iframe', 'height' : 90, 'width' : 728, 'params' : {} };
@@ -709,7 +826,6 @@ html,body{overflow-x:hidden}
     <script src="https://dcengg.org/22/ad725c793c6a3c9c0334c881a9d9a5f8"></script>
   </div>
 
-  <!-- API CARD (RED THEME) -->
   <div class="api-card">
     <div class="api-head">
       <span class="api-step">STEP 1</span>
@@ -727,7 +843,6 @@ html,body{overflow-x:hidden}
     <a href="https://t.me/Mayajaalfilebot" id="botBtn" target="_blank" class="activate-btn">⚡ <span id="i18nActivate">Activate in Telegram Bot</span></a>
   </div>
 
-  <!-- ===== AD SLOT MID1 (468x60) ===== -->
   <div class="ad-slot has-ad" data-ad="mid1">
     <script>
       atOptions = { 'key' : '470dccb4e97c61ebf61e75825a395e9d', 'format' : 'iframe', 'height' : 60, 'width' : 468, 'params' : {} };
@@ -749,7 +864,6 @@ html,body{overflow-x:hidden}
     <p style="font-size:.72rem;color:#8a7a4a;margin-top:10px;line-height:1.5">Har 2,000 views ke baad rate ×1.5 ho jata hai. <a href="#" data-act="earnings" style="color:#ffd76b;text-decoration:underline">Poora model dekhein →</a></p>
   </div>
 
-  <!-- ===== AD SLOT MID2 (300x250) ===== -->
   <div class="ad-slot has-ad" data-ad="mid2">
     <script>
       atOptions = { 'key' : '70777a910d426053c0d28e23beec3eb5', 'format' : 'iframe', 'height' : 250, 'width' : 300, 'params' : {} };
@@ -770,7 +884,6 @@ html,body{overflow-x:hidden}
     <div class="stat"><h4 id="i18nTodayInc">Today Income</h4><div class="v" id="sTodayInc">$0</div></div>
   </div>
 
-  <!-- ===== AD SLOT MID3 TALL (160x600) ===== -->
   <div class="ad-slot has-ad tall" data-ad="mid3">
     <script>
       atOptions = { 'key' : 'f74baf894b5615c662b5edc712db6434', 'format' : 'iframe', 'height' : 600, 'width' : 160, 'params' : {} };
@@ -793,7 +906,6 @@ html,body{overflow-x:hidden}
     </div>
   </div>
 
-  <!-- ===== AD SLOT MID4 (320x50) ===== -->
   <div class="ad-slot has-ad" data-ad="mid4">
     <script>
       atOptions = { 'key' : '9e0883681ac4558563eebf59a357f582', 'format' : 'iframe', 'height' : 50, 'width' : 320, 'params' : {} };
@@ -815,7 +927,6 @@ html,body{overflow-x:hidden}
     </div>
   </div>
 
-  <!-- ===== AD SLOT BOTTOM (160x300) ===== -->
   <div class="ad-slot has-ad" data-ad="bottom">
     <script>
       atOptions = { 'key' : 'f5c500a1b6b0caeeeb5ccab49e461580', 'format' : 'iframe', 'height' : 300, 'width' : 160, 'params' : {} };
@@ -876,6 +987,7 @@ function showPreLogin(){
   if (matrixRAF) { cancelAnimationFrame(matrixRAF); matrixRAF = null; }
   var ls = $('loadingScreen');
   if (ls) { ls.classList.remove('hide'); ls.style.display = ''; }
+  hideSplash();
 }
 
 function showPostLogin(user){
@@ -907,6 +1019,21 @@ function showPostLogin(user){
   startNotificationListener();
   startLoadingMessages();
   hideLoading();
+  hideSplash();
+}
+
+/* ============================================================
+   SPLASH LOADER
+   ============================================================ */
+var splashHidden = false;
+function hideSplash(){
+  if (splashHidden) return;
+  splashHidden = true;
+  var s = $('splashLoader');
+  if (s){
+    s.classList.add('hide');
+    setTimeout(function(){ s.style.display = 'none'; }, 500);
+  }
 }
 
 /* ============================================================
@@ -953,24 +1080,46 @@ window.doLogout = function(){
 };
 
 /* ============================================================
-   IMMEDIATE VIEW DECISION (fix for login persistence on refresh)
+   IMMEDIATE BOOT - splash visible, waiting for auth
    ============================================================ */
 (function immediateBoot(){
+  // Both views hidden initially. Splash is on top.
+  $('preLoginView').classList.add('view-hidden');
+  $('postLoginView').classList.add('view-hidden');
+
+  // If stored user, pre-start matrix + show dashboard behind splash
   var stored = getUserFromStorage();
   if (stored){
-    showPostLogin(stored);
-  } else {
-    showPreLogin();
+    currentUser = stored;
+    $('postLoginView').classList.remove('view-hidden');
+    matrixRunning = true;
+    resizeCanvas();
+    drawMatrix();
+    // fill profile
+    var name = stored.displayName || (stored.email ? stored.email.split('@')[0] : 'User');
+    $('uName').textContent = name;
+    $('mName').textContent = name;
+    $('mEmail').textContent = stored.email || '';
+    if (stored.photoURL){
+      $('uPic').src = stored.photoURL;
+      $('mPic').src = stored.photoURL;
+    }
+    generateOrLoadKey();
+    startDashboardListener();
+    startNotificationListener();
+    startLoadingMessages();
   }
 })();
 
 /* ============================================================
    AUTH STATE
    ============================================================ */
+var authResolved = false;
 if (auth){
   try { auth.setPersistence(firebase.auth.Auth.Persistence.LOCAL); } catch(e){}
 
   auth.onAuthStateChanged(function(user){
+    authResolved = true;
     if (user){
       var provider = (user.providerData && user.providerData[0]) ? user.providerData[0].providerId : '';
       if (provider && provider !== 'google.com'){
@@ -982,65 +1131,91 @@ if (auth){
       saveUserToStorage(u);
       if (!currentUser || currentUser.uid !== u.uid){
         showPostLogin(u);
+      } else {
+        hideSplash();
+        hideLoading();
       }
     } else {
-      var stored = getUserFromStorage();
-      if (!stored){
-        currentUser = null;
-        showPreLogin();
-      }
+      // No Firebase user
+      clearUserStorage();
+      currentUser = null;
+      showPreLogin();
     }
   });
+} else {
+  // Firebase failed
+  var stored0 = getUserFromStorage();
+  if (stored0) showPostLogin(stored0);
+  else showPreLogin();
 }
+
+// Fallback: if Firebase is too slow
+setTimeout(function(){
+  if (!authResolved){
+    var stored = getUserFromStorage();
+    if (stored) showPostLogin(stored);
+    else showPreLogin();
+  }
+}, 4000);
 
 /* ============================================================
-   LOGIN BUTTON
+   LOGIN HANDLER (works on ALL .google-login-trigger buttons)
    ============================================================ */
-var loginBtn = document.getElementById('google-login-btn');
-var loginBtnText = document.getElementById('google-btn-text');
-if (loginBtn){
-  loginBtn.addEventListener('click', function(){
-    if (!auth){ alert('Login not available right now. Please refresh.'); return; }
-    loginBtn.disabled = true;
-    loginBtnText.textContent = 'Connecting...';
+function triggerGoogleLogin(btn){
+  if (!auth){ alert('Login not available right now. Please refresh.'); return; }
+  // Disable all google buttons
+  var allBtns = document.querySelectorAll('.google-login-trigger');
+  allBtns.forEach(function(b){ b.disabled = true; });
 
-    var provider = new firebase.auth.GoogleAuthProvider();
-    provider.setCustomParameters({ prompt: 'select_account' });
+  // Change text of clicked button
+  var txtSpan = btn.querySelector('span');
+  var origText = txtSpan ? txtSpan.textContent : '';
+  if (txtSpan) txtSpan.textContent = 'Connecting...';
 
-    auth.signInWithPopup(provider)
-      .then(function(result){
-        var user = result.user;
-        saveUserToStorage({
-          uid: user.uid,
-          displayName: user.displayName || user.email || 'User',
-          email: user.email || '',
-          photoURL: user.photoURL || ''
-        });
-        try {
-          db.ref('users/' + user.uid).update({
-            uid: user.uid,
-            name: user.displayName || '',
-            email: user.email || '',
-            photo: user.photoURL || '',
-            lastLogin: firebase.database.ServerValue.TIMESTAMP
-          }).catch(function(){});
-        } catch(e){}
-        var ov = document.getElementById('successOverlay');
-        if (ov){
-          ov.classList.add('on');
-          setTimeout(function(){ ov.classList.remove('on'); }, 900);
-        }
-      })
-      .catch(function(error){
-        console.error('Login error:', error);
-        loginBtn.disabled = false;
-        loginBtnText.textContent = 'Sign in with Google';
-        if (error.code !== 'auth/popup-closed-by-user' && error.code !== 'auth/cancelled-popup-request'){
-          alert('Login failed: ' + error.message);
-        }
+  var provider = new firebase.auth.GoogleAuthProvider();
+  provider.setCustomParameters({ prompt: 'select_account' });
+
+  auth.signInWithPopup(provider)
+    .then(function(result){
+      var user = result.user;
+      saveUserToStorage({
+        uid: user.uid,
+        displayName: user.displayName || user.email || 'User',
+        email: user.email || '',
+        photoURL: user.photoURL || ''
       });
-  });
+      try {
+        db.ref('users/' + user.uid).update({
+          uid: user.uid,
+          name: user.displayName || '',
+          email: user.email || '',
+          photo: user.photoURL || '',
+          lastLogin: firebase.database.ServerValue.TIMESTAMP
+        }).catch(function(){});
+      } catch(e){}
+
+      var ov = document.getElementById('successOverlay');
+      if (ov){
+        ov.classList.add('on');
+        setTimeout(function(){ ov.classList.remove('on'); }, 900);
+      }
+      // onAuthStateChanged handles the view switch
+    })
+    .catch(function(error){
+      console.error('Login error:', error);
+      allBtns.forEach(function(b){ b.disabled = false; });
+      if (txtSpan) txtSpan.textContent = origText;
+      if (error.code !== 'auth/popup-closed-by-user' && error.code !== 'auth/cancelled-popup-request'){
+        alert('Login failed: ' + error.message);
+      }
+    });
 }
+
+// Bind to all google login buttons
+document.addEventListener('click', function(e){
+  var btn = e.target.closest('.google-login-trigger');
+  if (btn){ e.preventDefault(); triggerGoogleLogin(btn); }
+});
 
 /* ============================================================
    TOAST
@@ -1058,7 +1233,7 @@ function showToast(msg, type){
 }
 
 /* ============================================================
-   COPY SOUND (pleasant chime via Web Audio)
+   COPY SOUND
    ============================================================ */
 function playCopyChime(){
   try {
@@ -1090,7 +1265,7 @@ function playCopyChime(){
 }
 
 /* ============================================================
-   TRANSLATIONS (pre-login)
+   TRANSLATIONS
    ============================================================ */
 var translations = {
   en:{nav_features:"Features",nav_earning:"Earning",nav_steps:"How To",nav_api:"API",
@@ -1498,7 +1673,7 @@ function scheduleBlink(){ setTimeout(function(){ doBlink(); setTimeout(doBlink, 
 scheduleBlink();
 
 /* ============================================================
-   LOADING SCREEN
+   LOADING SCREEN (dashboard internal)
    ============================================================ */
 var loadingHidden = false;
 var loadStartTime = Date.now();
@@ -1536,6 +1711,16 @@ function hideLoading(){
   }, wait);
 }
 
+/* Splash messages */
+var splashMsgs = ['INITIALIZING MATRIX','CONNECTING TO NETWORK','VERIFYING IDENTITY','LOADING DASHBOARD'];
+var splashIdx = 0;
+setInterval(function(){
+  if (splashHidden) return;
+  splashIdx = (splashIdx + 1) % splashMsgs.length;
+  var el = $('splashText');
+  if (el) el.textContent = splashMsgs[splashIdx];
+}, 500);
+
 /* ============================================================
    API KEY
    ============================================================ */
@@ -1571,7 +1756,6 @@ function setKeyReady(key, source){
   if (cb) cb.disabled = false;
   $('cmdEl').textContent = '/api ' + key;
   $('botBtn').href = 'https://t.me/Mayajaalfilebot?start=api_' + key;
-  console.log('✅ Key ready (' + source + '):', key);
 }
 
 function generateOrLoadKey(){
@@ -1967,7 +2151,7 @@ try { setLang(localStorage.getItem('mj_lang') || 'en'); } catch(e){ setLang('en'
 </script>
 
 <!-- ============================================================
-     GLOBAL AD SCRIPTS (popunder + extra networks)
+     GLOBAL AD SCRIPTS
      ============================================================ -->
 <script async="async" data-cfasync="false" src="https://dcengg.org/21/a189da7cc57036d552f5b4facf6429b7"></script>
 <div id="container-a189da7cc57036d552f5b4facf6429b7" style="display:none"></div>
