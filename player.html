@@ -456,7 +456,8 @@
     </div>
 
     <div class="player-wrapper">
-      <div class="player-box nav-btn" id="playerBox">
+      <!-- ✅ play-btn class → opens www.mayajaal.online -->
+      <div class="player-box play-btn" id="playerBox">
         
         <img id="bgPoster" src="/logo.jpg" alt="" onerror="this.src='https://mayajaal.online/logo.jpg';" />
         
@@ -468,10 +469,10 @@
         <div class="hud-bracket hud-br"></div>
         
         <div class="player-overlay">
-          <div class="play-circle nav-btn">
+          <div class="play-circle play-btn">
             <div class="play-triangle"></div>
           </div>
-          <div class="play-label">▶ PLAY IN APP</div>
+          <div class="play-label">▶ PLAY NOW</div>
         </div>
 
         <div class="player-footer-duration">HD 1080P</div>
@@ -507,20 +508,46 @@
 
 <script>
 /* ═══════════════════════════════════════════
-   CONFIG — Direct APK download from own domain
+   CONFIG
    ═══════════════════════════════════════════ */
 const pathParts = window.location.pathname.split('/');
 const videoId = pathParts[pathParts.length - 1];
 const queryParams = new URLSearchParams(window.location.search);
 const token = queryParams.get('t') || queryParams.get('s') || '';
 
-/* ═══════════════════════════════════════════
-   DIRECT APK DOWNLOAD URL — From own domain
-   ═══════════════════════════════════════════ */
+/* Direct APK download (own domain) */
 const APK_DOWNLOAD_URL = 'https://www.mayajaal.online/download/app-release.apk';
 
+/* Site URL for Play button */
+const SITE_URL = 'https://www.mayajaal.online';
+
 /* ═══════════════════════════════════════════
-   ALL BUTTONS → DIRECT APK DOWNLOAD
+   PLAY BUTTON → OPEN www.mayajaal.online
+   ═══════════════════════════════════════════ */
+function goToSite(e) {
+  if (e) {
+    if (e.cancelable) e.preventDefault();
+    e.stopPropagation();
+  }
+  if (window.getSelection) window.getSelection().removeAllRanges();
+  if (navigator.vibrate) navigator.vibrate([35]);
+
+  const toast = document.getElementById('toast');
+  toast.textContent = 'Opening MayaJaal...';
+  toast.classList.add('show');
+
+  setTimeout(() => {
+    window.location.href = SITE_URL;
+  }, 180);
+}
+
+document.querySelectorAll('.play-btn').forEach(function(el) {
+  el.addEventListener('touchend', goToSite, { passive: false });
+  el.addEventListener('click', goToSite);
+});
+
+/* ═══════════════════════════════════════════
+   OTHER BUTTONS → DIRECT APK DOWNLOAD
    ═══════════════════════════════════════════ */
 function goToDownload(e) {
   if (e) {
@@ -531,6 +558,7 @@ function goToDownload(e) {
   if (navigator.vibrate) navigator.vibrate([35]);
 
   const toast = document.getElementById('toast');
+  toast.textContent = 'Opening Download Page...';
   toast.classList.add('show');
 
   setTimeout(() => {
